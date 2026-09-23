@@ -165,6 +165,19 @@
           <button data-ztime="60">+1H</button>
           <button data-ztime="1440">+1D</button>
         </div>
+
+        <div class="z-sim-controls">
+          <button id="zSimPlayBtn" class="secondary">▶ Play</button>
+          <select id="zSimSpeed" aria-label="Simulation speed">
+            <option value="1">1× real time</option>
+            <option value="60">60×</option>
+            <option value="360">360×</option>
+            <option value="1440">1440×</option>
+            <option value="10080">1 week / min</option>
+          </select>
+          <label><input id="zDayNight" type="checkbox" checked /> Day/night</label>
+        </div>
+
         <div id="zTimeLabel" class="z-time-label">—</div>
         <div id="zEphemerisStatus" class="z-ephemeris-status">Loading current sidereal transits…</div>
 
