@@ -2,6 +2,7 @@ const FEEDS = [
   { category:'weather', source:'Google News · Weather', url:'https://news.google.com/rss/search?q=weather%20OR%20hurricane%20OR%20flood%20OR%20wildfire%20OR%20earthquake%20OR%20volcano&hl=en-US&gl=US&ceid=US:en' },
   { category:'weather', source:'NOAA · Atlantic Tropical Weather', url:'https://www.nhc.noaa.gov/xml/TWDAT.xml' },
   { category:'weather', source:'NOAA · East Pacific Tropical Weather', url:'https://www.nhc.noaa.gov/xml/TWDEP.xml' },
+  { category:'us', source:'Google News · U.S.', url:'https://news.google.com/rss/headlines/section/topic/NATION?hl=en-US&gl=US&ceid=US:en' },
   { category:'politics', source:'Google News · Politics', url:'https://news.google.com/rss/search?q=politics%20OR%20government%20OR%20election%20OR%20parliament%20OR%20congress&hl=en-US&gl=US&ceid=US:en' },
   { category:'world', source:'Google News · World', url:'https://news.google.com/rss/search?q=world%20news%20OR%20international&hl=en-US&gl=US&ceid=US:en' }
 ];
