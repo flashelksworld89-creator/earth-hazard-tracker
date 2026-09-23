@@ -66,6 +66,9 @@ export function initZodiacCompass(map, maplibregl) {
     opacity:.72,
     highlightedPlanet:'',
     shiftHint:false,
+    globalZones:true,
+    globalNak:true,
+    globalSign:'',
     lastData:null
   };
 
@@ -77,7 +80,11 @@ export function initZodiacCompass(map, maplibregl) {
     planetLines:'zodiac-planet-lines',
     labels:'zodiac-labels',
     planets:'zodiac-planets',
-    origin:'zodiac-origin'
+    origin:'zodiac-origin',
+    globalZones:'zodiac-global-zones',
+    globalBounds:'zodiac-global-bounds',
+    globalNak:'zodiac-global-nak',
+    globalLabels:'zodiac-global-labels'
   };
 
   try {
@@ -173,6 +180,21 @@ export function initZodiacCompass(map, maplibregl) {
     document.getElementById('zPlanetSelect').addEventListener('change', (e) => {
       state.highlightedPlanet = e.target.value;
       redrawPlanets();
+    });
+
+    document.getElementById('zGlobalZones')?.addEventListener('change',(e)=>{
+      state.globalZones=e.target.checked;
+      drawGlobalRisingField();
+    });
+
+    document.getElementById('zGlobalNak')?.addEventListener('change',(e)=>{
+      state.globalNak=e.target.checked;
+      drawGlobalRisingField();
+    });
+
+    document.getElementById('zGlobalSignSelect')?.addEventListener('change',(e)=>{
+      state.globalSign=e.target.value;
+      drawGlobalRisingField();
     });
   }
 
@@ -283,6 +305,47 @@ export function initZodiacCompass(map, maplibregl) {
         'circle-stroke-color':'#c084fc'
       }
     });
+
+    if (!map.getLayer(ids.globalZones)) map.addLayer({
+      id:ids.globalZones,type:'fill',source:ids.globalZones,
+      paint:{
+        'fill-color':signColorExpression(),
+        'fill-opacity':['case',['==',['get','active'],true],.16,.035]
+      }
+    });
+
+    if (!map.getLayer(ids.globalBounds)) map.addLayer({
+      id:ids.globalBounds,type:'line',source:ids.globalBounds,
+      paint:{
+        'line-color':signColorExpression(),
+        'line-width':2.4,
+        'line-opacity':.82
+      }
+    });
+
+    if (!map.getLayer(ids.globalNak)) map.addLayer({
+      id:ids.globalNak,type:'line',source:ids.globalNak,
+      paint:{
+        'line-color':'#67e8f9',
+        'line-width':.8,
+        'line-opacity':.42,
+        'line-dasharray':[2,3]
+      }
+    });
+
+    if (!map.getLayer(ids.globalLabels)) map.addLayer({
+      id:ids.globalLabels,type:'symbol',source:ids.globalLabels,
+      layout:{
+        'text-field':['get','label'],
+        'text-size':13,
+        'text-allow-overlap':true
+      },
+      paint:{
+        'text-color':signColorExpression(),
+        'text-halo-color':'#02070d',
+        'text-halo-width':2
+      }
+    });
   }
 
   function addLine(id,color,width,opacity,dash=null) {
@@ -323,6 +386,7 @@ export function initZodiacCompass(map, maplibregl) {
         'Planet rays = true observer azimuth · altitude shown in list · dim rays are below horizon';
 
       drawGeometry(asc,date,aya);
+      drawGlobalRisingField();
       redrawPlanets();
       updatePlanetList(localPlanets);
       updateOpacity();
@@ -353,6 +417,15 @@ export function initZodiacCompass(map, maplibregl) {
     Object.values(ids).forEach(id=>{
       if (map.getLayer(id)) map.setLayoutProperty(id,'visibility',v);
     });
+
+    if(map.getLayer(ids.globalZones)){
+      map.setLayoutProperty(ids.globalZones,'visibility',
+        state.enabled && state.globalZones ? 'visible':'none');
+    }
+    if(map.getLayer(ids.globalNak)){
+      map.setLayoutProperty(ids.globalNak,'visibility',
+        state.enabled && state.globalNak ? 'visible':'none');
+    }
   }
 
   function updateOpacity() {
@@ -361,13 +434,20 @@ export function initZodiacCompass(map, maplibregl) {
       [ids.nak,'line-opacity',.42],
       [ids.houses,'line-opacity',.65],
       [ids.dirs,'line-opacity',.48],
-      [ids.planetLines,'line-opacity',.88]
+      [ids.planetLines,'line-opacity',.88],
+      [ids.globalBounds,'line-opacity',.82],
+      [ids.globalNak,'line-opacity',.42]
     ];
     pairs.forEach(([id,prop,base])=>{
       if(map.getLayer(id)) map.setPaintProperty(id,prop,base*state.opacity);
     });
     if(map.getLayer(ids.labels)) map.setPaintProperty(ids.labels,'text-opacity',state.opacity);
     if(map.getLayer(ids.planets)) map.setPaintProperty(ids.planets,'text-opacity',state.opacity);
+    if(map.getLayer(ids.globalLabels)) map.setPaintProperty(ids.globalLabels,'text-opacity',state.opacity);
+    if(map.getLayer(ids.globalZones)){
+      map.setPaintProperty(ids.globalZones,'fill-opacity',
+        ['case',['==',['get','active'],true],.16*state.opacity,.035*state.opacity]);
+    }
   }
 
   function drawGeometry(asc,date,aya) {
@@ -425,6 +505,166 @@ export function initZodiacCompass(map, maplibregl) {
     setData(ids.dirs,dirs);
     setData(ids.labels,labels);
     setData(ids.origin,[pointFeature(state.origin,{kind:'origin'})]);
+  }
+
+  function drawGlobalRisingField() {
+    if(!state.lastData) return;
+    const {date,aya}=state.lastData;
+
+    const zoneFeatures=[];
+    const step=6;
+    const selected=state.globalSign==='' ? null : Number(state.globalSign);
+
+    if(state.globalZones){
+      for(let lat=-84; lat<84; lat+=step){
+        for(let lon=-180; lon<180; lon+=step){
+          const centerLat=lat+step/2;
+          const centerLon=lon+step/2;
+          const asc=fastSiderealAscendant(date,centerLat,centerLon,aya);
+          const signIndex=Math.floor(asc/30);
+          const nak=nakshatraInfo(asc);
+          const active=selected===null || selected===signIndex;
+
+          zoneFeatures.push({
+            type:'Feature',
+            properties:{
+              signIndex,
+              nakIndex:nak.index,
+              pada:nak.pada,
+              active
+            },
+            geometry:{
+              type:'Polygon',
+              coordinates:[[
+                [lon,lat],
+                [lon+step,lat],
+                [lon+step,lat+step],
+                [lon,lat+step],
+                [lon,lat]
+              ]]
+            }
+          });
+        }
+      }
+    }
+
+    const signBounds=[];
+    const nakBounds=[];
+    const labels=[];
+
+    for(let i=0;i<12;i++){
+      const segments=globalRisingBoundary(date,i*30,aya,2);
+      segments.forEach(seg=>{
+        signBounds.push({
+          type:'Feature',
+          properties:{signIndex:i},
+          geometry:{type:'LineString',coordinates:seg}
+        });
+      });
+
+      const midLon=longitudeWhereSiderealPointRises(date,i*30+15,0,aya);
+      if(Number.isFinite(midLon)){
+        labels.push(pointFeature([midLon,0],{
+          kind:'globalSign',
+          signIndex:i,
+          label:`${SIGNS[i][1]} ${SIGNS[i][0]} rising`
+        }));
+      }
+    }
+
+    if(state.globalNak){
+      const nsize=360/27;
+      for(let i=0;i<27;i++){
+        const segments=globalRisingBoundary(date,i*nsize,aya,3);
+        segments.forEach(seg=>{
+          nakBounds.push({
+            type:'Feature',
+            properties:{nakIndex:i},
+            geometry:{type:'LineString',coordinates:seg}
+          });
+        });
+      }
+    }
+
+    setData(ids.globalZones,zoneFeatures);
+    setData(ids.globalBounds,signBounds);
+    setData(ids.globalNak,nakBounds);
+    setData(ids.globalLabels,labels);
+
+    const zoneVis=state.enabled && state.globalZones ? 'visible':'none';
+    const nakVis=state.enabled && state.globalNak ? 'visible':'none';
+    if(map.getLayer(ids.globalZones)) map.setLayoutProperty(ids.globalZones,'visibility',zoneVis);
+    if(map.getLayer(ids.globalBounds)) map.setLayoutProperty(ids.globalBounds,'visibility',state.enabled?'visible':'none');
+    if(map.getLayer(ids.globalLabels)) map.setLayoutProperty(ids.globalLabels,'visibility',state.enabled?'visible':'none');
+    if(map.getLayer(ids.globalNak)) map.setLayoutProperty(ids.globalNak,'visibility',nakVis);
+  }
+
+  function fastSiderealAscendant(date,latDeg,lonDeg,aya){
+    const jd=julianDate(date);
+    const T=(jd-2451545.0)/36525;
+    const theta=rad(localSiderealDegrees(date,lonDeg));
+    const phi=rad(clamp(latDeg,-89.5,89.5));
+    const eps=rad(meanObliquity(T));
+
+    const tropical=normalize360(
+      deg(Math.atan2(
+        -Math.cos(theta),
+        Math.sin(theta)*Math.cos(eps)+Math.tan(phi)*Math.sin(eps)
+      ))+180
+    );
+
+    return normalize360(tropical-aya);
+  }
+
+  function longitudeWhereSiderealPointRises(date,siderealLon,latDeg,aya){
+    const jd=julianDate(date);
+    const T=(jd-2451545.0)/36525;
+    const eps=rad(meanObliquity(T));
+    const lam=rad(normalize360(siderealLon+aya));
+    const phi=rad(clamp(latDeg,-89.5,89.5));
+
+    const ra=normalize360(deg(Math.atan2(
+      Math.sin(lam)*Math.cos(eps),
+      Math.cos(lam)
+    )));
+    const dec=Math.asin(Math.sin(eps)*Math.sin(lam));
+
+    const cosH=-Math.tan(phi)*Math.tan(dec);
+    if(cosH < -1 || cosH > 1) return NaN;
+
+    const H=-deg(Math.acos(clamp(cosH,-1,1)));
+    const lst=normalize360(ra+H);
+    const gmst=localSiderealDegrees(date,0);
+    return normalizeLng(lst-gmst);
+  }
+
+  function globalRisingBoundary(date,siderealLon,aya,latStep=2){
+    const segments=[];
+    let current=[];
+    let previous=null;
+
+    for(let lat=-88; lat<=88; lat+=latStep){
+      const lon=longitudeWhereSiderealPointRises(date,siderealLon,lat,aya);
+
+      if(!Number.isFinite(lon)){
+        if(current.length>1) segments.push(current);
+        current=[];
+        previous=null;
+        continue;
+      }
+
+      const point=[lon,lat];
+      if(previous && Math.abs(point[0]-previous[0])>180){
+        if(current.length>1) segments.push(current);
+        current=[point];
+      } else {
+        current.push(point);
+      }
+      previous=point;
+    }
+
+    if(current.length>1) segments.push(current);
+    return segments;
   }
 
   function redrawPlanets() {
