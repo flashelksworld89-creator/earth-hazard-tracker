@@ -41,7 +41,35 @@ const typeNames = {
 
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://demotiles.maplibre.org/style.json',
+  style: {
+    version: 8,
+    sources: {
+      osm: {
+        type: 'raster',
+        tiles: [
+          'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+        ],
+        tileSize: 256,
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      }
+    },
+    layers: [
+      {
+        id: 'dark-basemap',
+        type: 'raster',
+        source: 'osm',
+        paint: {
+          'raster-opacity': 0.58,
+          'raster-saturation': -0.55,
+          'raster-contrast': 0.18,
+          'raster-brightness-min': 0.02,
+          'raster-brightness-max': 0.60
+        }
+      }
+    ]
+  },
   center: [0, 18],
   zoom: 1.45,
   pitch: 0,
@@ -56,10 +84,17 @@ map.on('style.load', () => map.setProjection({ type: 'globe' }));
 
 map.on('load', async () => {
   setupCollapsiblePanels();
+  setupDarkMapControls();
   setupAtmosphericRiverLayer();
-  initZodiacCompass(map, maplibregl);
+  window.__zodiacCompass = initZodiacCompass(map, maplibregl);
   await Promise.allSettled([loadAllData(), loadAtmosphericRivers(0)]);
   state.firstLoadComplete = true;
+  const zToggle = document.getElementById('zodiacLayerToggle');
+  if (zToggle) {
+    zToggle.checked = true;
+    zToggle.dispatchEvent(new Event('change'));
+  }
+  syncZodiacMasterButton();
   captureKnownEvents();
   startAutoRefresh();
   startRotation();
@@ -341,6 +376,47 @@ function setAtmosphericRiverVisibility() {
   }
 }
 
+
+
+function setupDarkMapControls() {
+  const slider = document.getElementById('mapBrightness');
+  if (!slider) return;
+
+  const apply = () => {
+    const value = Number(slider.value) / 100;
+    if (map.getLayer('dark-basemap')) {
+      map.setPaintProperty('dark-basemap', 'raster-opacity', value);
+      map.setPaintProperty('dark-basemap', 'raster-brightness-max', Math.max(.25, value));
+    }
+  };
+
+  slider.addEventListener('input', apply);
+  map.on('styledata', apply);
+
+  const master = document.getElementById('zodiacMasterBtn');
+  if (master) {
+    master.addEventListener('click', () => {
+      const toggle = document.getElementById('zodiacLayerToggle');
+      if (!toggle) return;
+      toggle.checked = !toggle.checked;
+      toggle.dispatchEvent(new Event('change'));
+      syncZodiacMasterButton();
+    });
+  }
+
+  const toggle = document.getElementById('zodiacLayerToggle');
+  if (toggle) {
+    toggle.addEventListener('change', syncZodiacMasterButton);
+  }
+}
+
+function syncZodiacMasterButton() {
+  const master = document.getElementById('zodiacMasterBtn');
+  const toggle = document.getElementById('zodiacLayerToggle');
+  if (!master || !toggle) return;
+  master.textContent = `Zodiac Compass: ${toggle.checked ? 'ON' : 'OFF'}`;
+  master.classList.toggle('on', toggle.checked);
+}
 
 function setupCollapsiblePanels() {
   document.querySelectorAll('.collapse-btn').forEach(btn => {

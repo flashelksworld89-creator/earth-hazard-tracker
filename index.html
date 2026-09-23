@@ -25,6 +25,7 @@
           <input id="searchInput" type="search" placeholder="Search city, country, volcano…" autocomplete="off" />
           <button type="submit">Search</button>
         </form>
+        <button id="zodiacMasterBtn" class="secondary zodiac-master-btn">Zodiac Compass: OFF</button>
         <button id="refreshBtn" class="secondary">Refresh now</button>
       </div>
     </header>
@@ -71,9 +72,13 @@
 
         <label class="layer-row">
           <span><i class="legend zodiac"></i>Zodiacal Compass</span>
-          <input id="zodiacLayerToggle" type="checkbox" />
+          <input id="zodiacLayerToggle" type="checkbox" checked />
         </label>
 
+        <label class="z-row map-brightness-row">
+          <span>Map brightness</span>
+          <input id="mapBrightness" type="range" min="25" max="100" value="58" />
+        </label>
         <div class="divider"></div>
 
         <button id="projectionBtn" class="wide secondary">Switch to flat map</button>
@@ -137,7 +142,7 @@
         <div class="collapsible-body"><div id="detailContent"></div></div>
       </section>
 
-      <section id="zodiacPanel" class="panel zodiac-panel hidden">
+      <section id="zodiacPanel" class="panel zodiac-panel">
         <div class="zodiac-head collapsible-head">
           <div>
             <strong>ZODIACAL COMPASS</strong>

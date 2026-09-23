@@ -28,7 +28,7 @@ const DIRS = [
 
 export function initZodiacCompass(map, maplibregl) {
   const state = {
-    enabled:false,
+    enabled:true,
     origin:{lng:map.getCenter().lng, lat:map.getCenter().lat},
     timeOffsetMs:0,
     opacity:.72,
@@ -51,6 +51,11 @@ export function initZodiacCompass(map, maplibregl) {
   try {
     addSourcesAndLayers();
     bindControls();
+    const toggle = document.getElementById('zodiacLayerToggle');
+    if (toggle) toggle.checked = true;
+    const panel = document.getElementById('zodiacPanel');
+    if (panel) panel.classList.remove('hidden');
+    state.enabled = true;
     refresh();
     setVisibility();
     document.getElementById('zodiacStatus').textContent = 'Ready · Sidereal · Lahiri';
@@ -131,10 +136,10 @@ export function initZodiacCompass(map, maplibregl) {
       if (!map.getSource(id)) map.addSource(id,{type:'geojson',data:empty});
     });
 
-    addLine(ids.nak,'#67e8f9',1,.34,[2,3]);
-    addLine(ids.signs,'#f0abfc',2.2,.76);
-    addLine(ids.houses,'#fde68a',1.3,.62,[5,3]);
-    addLine(ids.dirs,'#94a3b8',1,.45,[1,4]);
+    addLine(ids.nak,'#67e8f9',1.25,.48,[2,3]);
+    addLine(ids.signs,'#f0abfc',3.0,.90);
+    addLine(ids.houses,'#fde68a',1.8,.76,[5,3]);
+    addLine(ids.dirs,'#cbd5e1',1.3,.56,[1,4]);
 
     if (!map.getLayer(ids.planetLines)) map.addLayer({
       id:ids.planetLines,type:'line',source:ids.planetLines,

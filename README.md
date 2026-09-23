@@ -1,46 +1,50 @@
-# Earth Hazard Tracker v1.4
+# Earth Hazard Tracker v1.5 — Dark Map + Guaranteed Zodiacal Compass
 
-## Fixes
+## Major graphics upgrade
 
-- Fixed Zodiacal Compass initialization so it no longer depends on a third-party astronomy script loading successfully.
-- The compass now uses a self-contained browser calculation layer and visibly reports errors instead of failing silently.
-- Great-circle globe geometry remains in place.
-- Zodiacal Compass is still toggleable from Layers.
+- Much darker basemap for easier viewing
+- Nearly black/navy map presentation
+- Reduced basemap saturation and brightness
+- Darker glass panels and softer borders
+- Hazard layers remain bright and legible
+- New Map Brightness slider
 
-## New UI feature
+## Zodiacal Compass visibility fix
 
-Every major screen panel is now collapsible:
+This version makes the compass visible by default so you can confirm it is actually loaded.
 
-- Layers
-- Live Events
-- Zodiacal Compass
-- Atmospheric Rivers
-- Auto Refresh
-- Timeline
-- Details
+There are now two ways to control it:
 
-Use the `−` button in a panel header to collapse it and `+` to reopen it.
+1. The **Zodiacal Compass** checkbox in Layers
+2. The new header button: **Zodiac Compass: ON/OFF**
 
-## Compass features retained
+The compass panel also opens by default.
+
+Compass lines have been made brighter and thicker:
+- signs
+- nakshatras
+- houses
+- cardinal/intercardinal directions
+- planetary direction rays
+
+## Existing compass functions retained
 
 - Sidereal / Lahiri
 - ASC east / DSC west
 - 12 signs
 - 27 nakshatras
 - 12 houses
-- N, NE, E, SE, S, SW, W, NW
+- N/NE/E/SE/S/SW/W/NW
 - Sun through Pluto
 - Rahu and Ketu
+- opacity
 - planet highlighting
-- opacity control
 - time forward/backward
-- map-center origin or click-to-set origin
-- continent-spanning great-circle projection
+- click/map-center origin
+- great-circle projection across continents
 
-## Important astronomy note
+## Installation
 
-The v1.4 fallback planetary calculations are intentionally self-contained and robust, but the planetary longitudes are lower precision than a full ephemeris engine. The ASC, sidereal rotation, and geographic great-circle projection remain computed mathematically in-browser.
+Replace the current repository files with this package and commit.
 
-A later precision upgrade can switch the planets to Swiss Ephemeris or a server-side JPL/ephemeris source while keeping this now-stable rendering system.
-
-No environment variables are required.
+No new environment variables are required.
