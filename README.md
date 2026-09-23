@@ -1,42 +1,96 @@
-# Earth Hazard Tracker v1.9 — Corrected OpenFreeMap Build
+# Earth Hazard Tracker v1.10 — Accurate Sidereal Transit Compass + Unique Colors
 
-## Critical fix
+## Main correction
 
-Earlier builds still contained leftover CARTO URLs in `app.js`, which is why the site continued to display an API-key requirement.
+The Zodiacal Compass no longer uses low-precision mean-motion approximations for the planets.
 
-This build removes CARTO completely.
+A new Vercel endpoint:
 
-The map now initializes directly with the official OpenFreeMap style:
+`/api/ephemeris`
 
-`https://tiles.openfreemap.org/styles/liberty`
+uses Astronomy Engine 2.1.19 to calculate geocentric positions for:
 
-OpenFreeMap's public service requires no API key and no registration.
+- Sun
+- Moon
+- Mercury
+- Venus
+- Mars
+- Jupiter
+- Saturn
+- Uranus
+- Neptune
+- Pluto
 
-## Dark appearance
+The geocentric equatorial vectors are converted to true ecliptic-of-date coordinates and then converted to sidereal longitude using Lahiri ayanamsa.
 
-The app keeps the dark presentation with its own semi-transparent dimming layer above the OpenFreeMap basemap and below the hazard / zodiac overlays.
+Rahu is the mean ascending lunar node.
+Ketu is exactly 180° opposite Rahu.
 
-The Map Brightness slider controls that dimming layer.
+## What "current transits" means
 
-## Zodiacal Compass
+When the Zodiacal Compass is on NOW, it requests an ephemeris for the current UTC timestamp.
 
-The compass rendering fix remains included:
-- visible by default
-- header ON/OFF button
-- layer toggle
-- great-circle lines
-- sidereal / Lahiri
-- ASC / DSC
-- 12 signs
-- 27 nakshatras
-- 12 houses
-- planets + Rahu/Ketu
-- collapsible panel
+The forward/backward buttons request a fresh ephemeris for that selected date/time.
 
-## Environment variables
+Planetary transit longitude is geocentric and does not depend on the map origin.
 
-No basemap environment variable or API key is required.
+ASC/DSC do depend on:
+- selected date/time
+- compass origin latitude
+- compass origin longitude
 
-## Install
+## Unique zodiac colors
 
-Replace all current repository files with this package, then commit and let Vercel redeploy.
+Every sign now has its own color:
+- Aries — red
+- Taurus — green
+- Gemini — gold
+- Cancer — light blue
+- Leo — orange
+- Virgo — soft green
+- Libra — lavender
+- Scorpio — crimson
+- Sagittarius — violet
+- Capricorn — slate
+- Aquarius — cyan
+- Pisces — blue-gray
+
+The sign boundary and sign label use the corresponding sign color.
+
+## Unique planet colors
+
+Every planet/node also has a unique color:
+- Sun — gold
+- Moon — white
+- Mercury — teal
+- Venus — pink
+- Mars — red
+- Jupiter — amber
+- Saturn — gray
+- Uranus — cyan
+- Neptune — blue
+- Pluto — purple
+- Rahu — green
+- Ketu — rose
+
+Planet direction rays, map labels, and the transit list use the same consistent color.
+
+## Precision note
+
+Astronomy Engine documents roughly arcminute-class accuracy for supported planetary positions. The sidereal conversion uses this project's Lahiri ayanamsa implementation. Small differences may remain versus Swiss Ephemeris depending on ayanamsa implementation, apparent/true longitude conventions, and lunar node choice.
+
+## Deployment
+
+Upload all files from this package.
+
+Important new file:
+
+`api/ephemeris.js`
+
+The updated `package.json` contains:
+
+`"astronomy-engine": "2.1.19"`
+
+Vercel should install this automatically.
+
+No API key is required.

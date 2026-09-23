@@ -5,6 +5,9 @@
     },
     "api/atmospheric-rivers.js": {
       "maxDuration": 30
+    },
+    "api/ephemeris.js": {
+      "maxDuration": 10
     }
   },
   "headers": [

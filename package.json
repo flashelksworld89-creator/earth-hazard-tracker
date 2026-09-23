@@ -1,10 +1,13 @@
 {
   "name": "earth-hazard-tracker",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "type": "module",
   "description": "Interactive global weather and natural hazard tracker",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "astronomy-engine": "2.1.19"
   }
 }

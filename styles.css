@@ -866,3 +866,36 @@ body {
 .z-disclaimer {
   color:#63798b;
 }
+
+
+.z-ephemeris-status {
+  margin-top:5px;
+  padding:6px 7px;
+  border-radius:7px;
+  border:1px solid rgba(103,232,249,.15);
+  background:rgba(4,23,32,.42);
+  color:#9ddfea;
+  font-size:8px;
+  line-height:1.35;
+}
+
+.z-planet-item {
+  border-left:3px solid var(--planet-color, #c084fc);
+}
+
+.z-planet-item b {
+  color:var(--planet-color, #e9d5ff);
+}
+
+.z-sign-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+}
+
+.z-sign-swatch {
+  width:8px;
+  height:8px;
+  border-radius:2px;
+  display:inline-block;
+}
