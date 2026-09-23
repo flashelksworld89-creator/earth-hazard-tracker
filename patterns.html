@@ -54,6 +54,7 @@ h1{font-size:clamp(28px,4vw,46px);margin:6px 0 8px}.hero p{max-width:820px;color
 <div class="panel"><h2>Moon nakshatra experiment</h2><div class="sub">Observed earthquake timestamps versus an expected Moon-nakshatra distribution sampled uniformly across the same time window.</div><div id="nakGrid" class="nak-grid"><div class="loading">Loading astronomy…</div></div><div id="astroNote" class="note">This is an exploratory correlation screen. It does not show that lunar position causes earthquakes.</div></div>
 <div class="panel"><h2>Regional seismic activity</h2><div class="sub">Broad geographic regions for comparing where the selected seismic activity is concentrated.</div><div id="regionBars" class="bars"><div class="loading">Loading regions…</div></div></div>
 <div class="panel"><h2>Monthly seismic–nakshatra report</h2><div class="sub">Current calendar month. Ranks nakshatras by observed-versus-expected activity and shows where the events were concentrated.</div><div id="monthlyReport"><div class="loading">Building monthly report…</div></div></div>
+<div class="panel"><h2>Schumann resonance snapshot</h2><div class="sub">Current station-derived status for future comparison with seismic and sidereal records.</div><div id="schumannPattern"><div class="loading">Loading Schumann status…</div></div><div class="note">A single current reading is not enough for correlation testing. Persistent historical snapshots are required before this can be compared meaningfully with earthquakes or nakshatras.</div></div>
 </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
@@ -80,6 +81,7 @@ async function load(){
   document.getElementById('status').textContent=problems?'Analysis ready · '+problems+' source unavailable':'Analysis ready';
   document.getElementById('updated').textContent='Updated '+new Date().toLocaleString();
   render();
+  loadSchumannPattern();
  }catch(e){console.error(e);document.getElementById('status').textContent='Pattern data unavailable'}
 }
 function normalizeHaz(data){
@@ -168,6 +170,15 @@ function worldRegion(lat,lon){
  if(lon>=20&&lon<120&&lat<=25&&lat>-60) return 'Indian Ocean';
  if((lon<-20&&lon>-65)||(lon>120&&lon<180&&lat<0)) return 'Atlantic';
  return 'Other';
+}
+
+async function loadSchumannPattern(){
+ const el=document.getElementById('schumannPattern'); if(!el)return;
+ try{
+  const r=await fetch('/api/schumann?ts='+Date.now(),{cache:'no-store'}); if(!r.ok)throw new Error('HTTP '+r.status);
+  const d=await r.json();
+  el.innerHTML='<div class="hotspots"><div class="hotspot"><strong>'+(Number(d.fundamentalHz)||7.83).toFixed(2)+' Hz</strong><span>Fundamental reference</span></div><div class="hotspot"><strong>'+(Number.isFinite(Number(d.score))?d.score+'/100':'Unavailable')+'</strong><span>Current activity · '+(d.status||'Unavailable')+'</span></div></div>';
+ }catch(e){el.innerHTML='<div class="loading">Schumann source unavailable.</div>'}
 }
 
 function moonNak(date){
