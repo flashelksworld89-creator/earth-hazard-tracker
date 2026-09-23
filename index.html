@@ -175,6 +175,35 @@
         <div id="zOriginLabel" class="z-origin-label">Origin: —</div>
 
         <label class="z-row">
+          <span>Global rising zones</span>
+          <input id="zGlobalZones" type="checkbox" checked />
+        </label>
+
+        <label class="z-row">
+          <span>Nakshatra boundaries</span>
+          <input id="zGlobalNak" type="checkbox" checked />
+        </label>
+
+        <label class="z-row">
+          <span>Highlight rising sign</span>
+          <select id="zGlobalSignSelect">
+            <option value="">All signs</option>
+            <option value="0">Aries</option>
+            <option value="1">Taurus</option>
+            <option value="2">Gemini</option>
+            <option value="3">Cancer</option>
+            <option value="4">Leo</option>
+            <option value="5">Virgo</option>
+            <option value="6">Libra</option>
+            <option value="7">Scorpio</option>
+            <option value="8">Sagittarius</option>
+            <option value="9">Capricorn</option>
+            <option value="10">Aquarius</option>
+            <option value="11">Pisces</option>
+          </select>
+        </label>
+
+        <label class="z-row">
           <span>Opacity</span>
           <input id="zOpacity" type="range" min="15" max="100" value="72" />
         </label>
@@ -206,7 +235,7 @@
         </div>
 
         <div id="zPlanetList" class="z-planet-list"></div>
-        <div class="z-disclaimer">Great-circle geographic projection. Equal 30° houses from ASC. Sidereal planetary longitudes use Lahiri conversion.</div>
+        <div class="z-disclaimer">Global rising zones use each location's true eastern horizon, local sidereal time, latitude and Earth's obliquity. Planet glyphs keep geocentric sidereal longitude while local rays use observer azimuth/altitude.</div>
         </div>
       </section>
 
