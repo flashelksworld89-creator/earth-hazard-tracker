@@ -71,7 +71,7 @@ map.on('load', async () => {
   setupAtmosphericRiverLayer();
   window.__zodiacCompass = initZodiacCompass(map, maplibregl);
   setTimeout(() => verifyZodiacCompass(), 500);
-  await Promise.allSettled([loadAllData(), loadAtmosphericRivers(0)]);
+  await Promise.allSettled([loadAllData(), loadAtmosphericRivers(0), loadSchumannResonance()]);
   state.firstLoadComplete = true;
   const zToggle = document.getElementById('zodiacLayerToggle');
   if (zToggle) {
@@ -162,6 +162,8 @@ document.querySelectorAll('[data-ar-hour]').forEach(btn => {
     await loadAtmosphericRivers(hour, true);
   });
 });
+
+document.getElementById('schumannRefreshBtn')?.addEventListener('click',()=>loadSchumannResonance(true));
 
 document.getElementById('closeDetail').addEventListener('click', () => {
   document.getElementById('detailPanel').classList.add('hidden');
@@ -1205,4 +1207,36 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value).replaceAll('`', '&#096;');
+}
+
+
+async function loadSchumannResonance(manual=false){
+  const status=document.getElementById('schumannStatus');
+  const freq=document.getElementById('schumannFreq');
+  const score=document.getElementById('schumannScore');
+  const stations=document.getElementById('schumannStations');
+  const updated=document.getElementById('schumannUpdated');
+  if(!status) return;
+  status.textContent=manual?'Refreshing…':'Loading…';
+  try{
+    const r=await fetch('/api/schumann?ts='+Date.now(),{cache:'no-store'});
+    if(!r.ok) throw new Error('Schumann HTTP '+r.status);
+    const d=await r.json();
+    freq.textContent=(Number(d.fundamentalHz)||7.83).toFixed(2)+' Hz';
+    status.textContent=d.status||'Unavailable';
+    score.textContent=Number.isFinite(Number(d.score))?String(Number(d.score))+'/100':'—';
+    stations.textContent=d.observatories
+      ? 'Observatories: '+d.observatories.reporting+' / '+d.observatories.total+' reporting'
+      : (Number.isFinite(Number(d.tomskScore))?'Tomsk activity score: '+d.tomskScore:'Observatories: unavailable');
+    const t=d.sourceUpdatedAt||d.updatedAt;
+    updated.textContent=t?'Source time: '+formatDate(t):'Source time: unavailable';
+    if(manual) showToast('Schumann resonance status updated.',1800);
+  }catch(err){
+    console.error(err);
+    status.textContent='Unavailable';
+    score.textContent='—';
+    stations.textContent='Station status unavailable';
+    updated.textContent='Source time: unavailable';
+    if(manual) showToast('Schumann resonance source unavailable.',2800);
+  }
 }
