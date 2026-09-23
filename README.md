@@ -1,44 +1,34 @@
-# Earth Hazard Tracker v1.7 — No-Key Dark Map
+# Earth Hazard Tracker v1.8 — OpenFreeMap Rendering Fix
 
-## What changed
+## What was fixed
 
-- Removed the CARTO basemap dependency.
-- Switched to **OpenFreeMap Dark**:
-  - `https://tiles.openfreemap.org/styles/dark`
-  - no API key
-  - no registration
-- Kept the dark visual theme.
-- Kept the Map Brightness control using an in-app dimmer layer.
-- Kept the v1.6 Zodiacal Compass rendering fix.
-- Kept all collapsible widgets.
+The previous build used an OpenFreeMap `dark` style URL that was not the style URL shown in OpenFreeMap's current official quick-start documentation.
 
-## Zodiacal Compass
+This version uses the officially documented style:
 
-The compass remains enabled by default and includes:
-- sidereal / Lahiri
-- ASC east / DSC west
-- 12 signs
-- 27 nakshatras
-- 12 houses
-- N / NE / E / SE / S / SW / W / NW
-- Sun through Pluto
-- Rahu and Ketu
-- opacity control
-- planet highlighting
-- time controls
-- great-circle lines over the globe
+`https://tiles.openfreemap.org/styles/liberty`
+
+Then the app applies its own darkening layer above the basemap and below the weather/hazard/zodiac overlays.
+
+## Result
+
+- No API key
+- No OpenFreeMap account
+- Reliable official OpenFreeMap style URL
+- Dark visual appearance preserved
+- Zodiacal Compass stays bright above the dimmed map
+- Hazard markers remain bright
+- Map Brightness slider still works
+- Collapsible widgets retained
+
+## Diagnostics
+
+The app now surfaces MapLibre style/source errors in the UI instead of failing silently.
 
 ## Environment variables
 
-None are required for the basemap or compass.
-
-## Data sources
-
-- OpenFreeMap / OpenStreetMap for the basemap
-- USGS for earthquakes
-- GDACS for hazard events
-- Open-Meteo for weather / model data
+None required for the basemap.
 
 ## Install
 
-Replace the existing repository files with the contents of this package, then commit. Vercel should redeploy automatically.
+Replace the current repository files with this package and commit. Vercel should redeploy automatically.

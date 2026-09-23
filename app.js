@@ -83,6 +83,15 @@ map.addControl(new maplibregl.GlobeControl(), 'top-right');
 
 map.on('style.load', () => map.setProjection({ type: 'globe' }));
 
+map.on('error', (e) => {
+  console.error('MapLibre error:', e?.error || e);
+  const message = e?.error?.message || 'Map rendering error';
+  if (message.toLowerCase().includes('source') || message.toLowerCase().includes('style')) {
+    showToast(`Map error: ${message}`, 5000);
+  }
+});
+
+
 map.on('load', async () => {
   setupCollapsiblePanels();
   setupDarkMapControls();
@@ -414,18 +423,71 @@ function verifyZodiacCompass() {
 
 function setupDarkMapControls() {
   const slider = document.getElementById('mapBrightness');
-  if (!slider) return;
 
-  const apply = () => {
-    const value = Number(slider.value) / 100;
-    if (map.getLayer('dark-basemap')) {
-      map.setPaintProperty('dark-basemap', 'raster-opacity', value);
-      map.setPaintProperty('dark-basemap', 'raster-brightness-max', Math.max(.25, value));
-    }
+  const dimmerData = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [-179.999, -85],
+            [-0.001, -85],
+            [-0.001, 85],
+            [-179.999, 85],
+            [-179.999, -85]
+          ]]
+        }
+      },
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [0.001, -85],
+            [179.999, -85],
+            [179.999, 85],
+            [0.001, 85],
+            [0.001, -85]
+          ]]
+        }
+      }
+    ]
   };
 
-  slider.addEventListener('input', apply);
-  map.on('styledata', apply);
+  if (!map.getSource('map-dimmer-source')) {
+    map.addSource('map-dimmer-source', {
+      type: 'geojson',
+      data: dimmerData
+    });
+  }
+
+  if (!map.getLayer('map-dimmer')) {
+    map.addLayer({
+      id: 'map-dimmer',
+      type: 'fill',
+      source: 'map-dimmer-source',
+      paint: {
+        'fill-color': '#000814',
+        'fill-opacity': 0.44
+      }
+    });
+  }
+
+  const apply = () => {
+    if (!slider || !map.getLayer('map-dimmer')) return;
+    const brightness = Number(slider.value) / 100;
+    const opacity = Math.max(0.08, Math.min(0.72, 0.88 - brightness));
+    map.setPaintProperty('map-dimmer', 'fill-opacity', opacity);
+  };
+
+  if (slider) {
+    slider.addEventListener('input', apply);
+    apply();
+  }
 
   const master = document.getElementById('zodiacMasterBtn');
   if (master) {
