@@ -1,26 +1,50 @@
-# Earth Hazard Tracker v1.13 — Direct CommonJS Astronomy Build
+# Earth Hazard Tracker v1.14 — Unified Vercel Server Fix
 
-## Why v1.12 still failed
+## Root cause
 
-Vercel was still resolving the `astronomy-engine` package through an ESM path, which produced:
+Previous builds mixed two incompatible server module systems:
 
-`Unexpected token 'export'`
+- `api/ephemeris.cjs` used CommonJS
+- `api/gdacs.js` and `api/atmospheric-rivers.js` still used `export default`
+- `package.json` no longer declared ESM
 
-## Fix in v1.13
+That can make Vercel parse one or more server functions incorrectly and cause:
+- `Unexpected token 'export'`
+- `FUNCTION_INVOCATION_FAILED`
+- deployment failures
 
-The ephemeris function no longer imports the package by its default entry point.
+## Fix in v1.14
 
-It now directly requires Astronomy Engine's precompiled Node/CommonJS build:
+All Vercel server functions now use one format: CommonJS `.cjs`.
 
-`astronomy-engine/astronomy.min.js`
+Files:
+- `api/gdacs.cjs`
+- `api/atmospheric-rivers.cjs`
+- `api/ephemeris.cjs`
 
-That file is compiled for Node/browser use and uses CommonJS exports internally.
+All use `module.exports`.
 
-The accurate geocentric transit calculations remain the same:
-- Sun through Pluto
-- Lahiri sidereal conversion
+The browser app now calls those exact `.cjs` endpoints.
+
+The ephemeris function uses:
+`require('astronomy-engine')`
+
+Astronomy Engine's own Node documentation supports CommonJS `require`, avoiding the broken ESM resolution path.
+
+## Retained features
+
+- OpenFreeMap no-key basemap
+- dark graphics
+- collapsible widgets
+- earthquakes / GDACS hazards
+- atmospheric river scan
+- Zodiacal Compass
+- current geocentric sidereal transits
+- Lahiri conversion
 - mean Rahu/Ketu
-- forward/backward transit time controls
-- unique zodiac and planet colors
+- unique zodiac colors
+- unique planet colors
 
-No API key or environment variable is required.
+## Environment variables
+
+None required.

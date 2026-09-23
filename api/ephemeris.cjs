@@ -3,7 +3,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
-    const Astronomy = require('astronomy-engine/astronomy.min.js');
+    const Astronomy = require('astronomy-engine');
 
     if (!Astronomy?.GeoVector || !Astronomy?.Ecliptic || !Astronomy?.Body) {
       throw new Error(

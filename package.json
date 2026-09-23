@@ -1,6 +1,6 @@
 {
   "name": "earth-hazard-tracker",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "private": true,
   "description": "Interactive global weather and natural hazard tracker",
   "engines": {
