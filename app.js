@@ -55,6 +55,7 @@ map.addControl(new maplibregl.GlobeControl(), 'top-right');
 map.on('style.load', () => map.setProjection({ type: 'globe' }));
 
 map.on('load', async () => {
+  setupCollapsiblePanels();
   setupAtmosphericRiverLayer();
   initZodiacCompass(map, maplibregl);
   await Promise.allSettled([loadAllData(), loadAtmosphericRivers(0)]);
@@ -338,6 +339,21 @@ function setAtmosphericRiverVisibility() {
       map.setLayoutProperty(id, 'visibility', visibility);
     }
   }
+}
+
+
+function setupCollapsiblePanels() {
+  document.querySelectorAll('.collapse-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.collapse;
+      const panel = document.getElementById(id) || btn.closest('.panel');
+      if (!panel) return;
+      const collapsed = panel.classList.toggle('collapsed');
+      btn.textContent = collapsed ? '+' : '−';
+      btn.setAttribute('aria-label', collapsed ? 'Expand' : 'Collapse');
+    });
+  });
 }
 
 function startAutoRefresh() {

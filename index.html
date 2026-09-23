@@ -33,10 +33,11 @@
       <div id="map"></div>
 
       <section class="panel layers-panel">
-        <div class="panel-title">
+        <div class="panel-title collapsible-head">
           <span>LAYERS</span>
-          <span id="liveDot" class="live-pill">● LIVE</span>
+          <div class="head-actions"><span id="liveDot" class="live-pill">● LIVE</span><button class="collapse-btn" data-collapse="layers-panel" aria-label="Collapse">−</button></div>
         </div>
+        <div class="collapsible-body">
 
         <label class="layer-row">
           <span><i class="legend earthquake"></i>Earthquakes</span>
@@ -77,13 +78,15 @@
 
         <button id="projectionBtn" class="wide secondary">Switch to flat map</button>
         <button id="rotateBtn" class="wide secondary">Pause globe rotation</button>
+        </div>
       </section>
 
       <aside class="panel events-panel">
-        <div class="panel-title">
+        <div class="panel-title collapsible-head">
           <span>LIVE EVENTS</span>
-          <span id="updatedAt">Loading…</span>
+          <div class="head-actions"><span id="updatedAt">Loading…</span><button class="collapse-btn" data-collapse="events-panel" aria-label="Collapse">−</button></div>
         </div>
+        <div class="collapsible-body events-body">
 
         <div class="live-status-grid">
           <div class="source-status">
@@ -123,21 +126,26 @@
         <div id="eventsList" class="events-list">
           <div class="loading-card">Loading global events…</div>
         </div>
+        </div>
       </aside>
 
       <section id="detailPanel" class="panel detail-panel hidden">
-        <button id="closeDetail" class="close-btn" aria-label="Close">×</button>
-        <div id="detailContent"></div>
+        <div class="detail-head collapsible-head">
+          <span>DETAILS</span>
+          <div class="head-actions"><button class="collapse-btn" data-collapse="detail-panel" aria-label="Collapse">−</button><button id="closeDetail" class="close-btn" aria-label="Close">×</button></div>
+        </div>
+        <div class="collapsible-body"><div id="detailContent"></div></div>
       </section>
 
       <section id="zodiacPanel" class="panel zodiac-panel hidden">
-        <div class="zodiac-head">
+        <div class="zodiac-head collapsible-head">
           <div>
             <strong>ZODIACAL COMPASS</strong>
             <span id="zodiacStatus">Sidereal · Lahiri</span>
           </div>
-          <button id="zodiacCloseBtn" class="text-btn">Hide</button>
+          <div class="head-actions"><button id="zodiacCloseBtn" class="text-btn">Hide</button><button class="collapse-btn" data-collapse="zodiac-panel" aria-label="Collapse">−</button></div>
         </div>
+        <div class="collapsible-body">
 
         <div class="zodiac-readout">
           <div><small>ASC</small><strong id="zAsc">—</strong></div>
@@ -193,16 +201,18 @@
 
         <div id="zPlanetList" class="z-planet-list"></div>
         <div class="z-disclaimer">Great-circle geographic projection. Equal 30° houses from ASC. Sidereal planetary longitudes use Lahiri conversion.</div>
+        </div>
       </section>
 
       <section id="arControlPanel" class="panel ar-control-panel">
-        <div class="ar-control-head">
+        <div class="ar-control-head collapsible-head">
           <div>
             <strong>ATMOSPHERIC RIVERS</strong>
             <span id="arStatus">Loading model scan…</span>
           </div>
-          <button id="arRefreshBtn" class="text-btn">Refresh</button>
+          <div class="head-actions"><button id="arRefreshBtn" class="text-btn">Refresh</button><button class="collapse-btn" data-collapse="ar-control-panel" aria-label="Collapse">−</button></div>
         </div>
+        <div class="collapsible-body">
         <div class="ar-time-buttons">
           <button data-ar-hour="0" class="active">NOW</button>
           <button data-ar-hour="6">+6H</button>
@@ -219,35 +229,40 @@
           <span><i class="ar-dot ar5"></i>AR5</span>
           <span class="ar-note">Approximate IVT scan</span>
         </div>
+        </div>
       </section>
 
       <section class="panel auto-refresh-panel">
-        <div class="auto-refresh-row">
+        <div class="auto-refresh-row collapsible-head">
           <div>
             <strong>AUTO REFRESH</strong>
             <span id="autoRefreshText">Earthquakes 1 min · Hazards 5 min</span>
           </div>
+          <div class="head-actions"><button class="collapse-btn" data-collapse="auto-refresh-panel" aria-label="Collapse">−</button>
           <label class="switch">
             <input id="autoRefreshToggle" type="checkbox" checked />
             <span class="slider"></span>
-          </label>
+          </label></div>
         </div>
+        <div class="collapsible-body auto-body"></div>
       </section>
 
       <section class="panel timeline-panel">
-        <div class="timeline-top">
+        <div class="timeline-top collapsible-head">
           <div>
             <strong>PAST EVENT WINDOW</strong>
             <span id="timelineLabel">7 days</span>
           </div>
-          <div class="timeline-presets">
+          <div class="head-actions"><button class="collapse-btn" data-collapse="timeline-panel" aria-label="Collapse">−</button><div class="timeline-presets">
             <button data-days="1">24H</button>
             <button data-days="7" class="active">7D</button>
             <button data-days="30">30D</button>
-          </div>
+          </div></div>
         </div>
-        <input id="timelineRange" type="range" min="1" max="30" value="7" />
-        <div class="timeline-axis"><span>1 day</span><span>NOW</span></div>
+        <div class="collapsible-body">
+          <input id="timelineRange" type="range" min="1" max="30" value="7" />
+          <div class="timeline-axis"><span>1 day</span><span>NOW</span></div>
+        </div>
       </section>
 
       <div id="statusToast" class="toast hidden"></div>
@@ -258,7 +273,6 @@
     </footer>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

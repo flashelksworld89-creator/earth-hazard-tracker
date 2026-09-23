@@ -698,3 +698,90 @@ footer {
     max-height:48%;
   }
 }
+
+
+.head-actions {
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.collapse-btn {
+  min-width:24px;
+  height:24px;
+  padding:0 6px;
+  border-radius:6px;
+  background:rgba(8,21,35,.72);
+  color:#cbd5e1;
+  font-size:15px;
+  line-height:1;
+}
+
+.collapsible-head {
+  cursor:default;
+}
+
+.collapsible-body {
+  transition: opacity .18s ease;
+}
+
+.panel.collapsed .collapsible-body {
+  display:none !important;
+}
+
+.panel.collapsed {
+  min-height:0 !important;
+  height:auto !important;
+  bottom:auto !important;
+}
+
+.layers-panel.collapsed,
+.events-panel.collapsed,
+.zodiac-panel.collapsed {
+  width:auto;
+  min-width:180px;
+}
+
+.events-panel.collapsed {
+  right:14px;
+}
+
+.ar-control-panel.collapsed,
+.auto-refresh-panel.collapsed,
+.timeline-panel.collapsed {
+  right:auto;
+  width:auto;
+  min-width:210px;
+}
+
+.detail-panel.collapsed {
+  width:auto;
+  min-width:150px;
+}
+
+.detail-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:10px;
+  letter-spacing:.09em;
+  font-weight:800;
+  color:#d9edff;
+  margin-bottom:8px;
+}
+
+.detail-panel .close-btn {
+  position:static;
+  padding:0 7px;
+}
+
+.zodiac-error {
+  padding:8px;
+  border:1px solid rgba(251,113,133,.3);
+  background:rgba(80,16,28,.3);
+  border-radius:8px;
+  color:#fecdd3;
+  font-size:9px;
+  line-height:1.35;
+  margin-top:8px;
+}
