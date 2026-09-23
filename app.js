@@ -18,6 +18,8 @@ const state = {
   globe: true,
   rotating: true,
   rotationFrame: null,
+  celestialSpeed: 1,
+  celestialRunning: false,
   autoRefresh: true,
   timers: { earthquakes: null, gdacs: null },
   sourceUpdated: { earthquakes: null, gdacs: null },
@@ -170,11 +172,19 @@ document.getElementById('projectionBtn').addEventListener('click', () => {
   map.setProjection({ type: state.globe ? 'globe' : 'mercator' });
   document.getElementById('projectionBtn').textContent =
     state.globe ? 'Switch to flat map' : 'Switch to globe';
+  document.getElementById('rotateBtn').textContent = state.rotating
+    ? (state.globe ? 'Pause Earth rotation' : 'Pause Earth scroll')
+    : (state.globe ? 'Resume Earth rotation' : 'Resume Earth scroll');
 });
 
 document.getElementById('rotateBtn').addEventListener('click', () => {
   if (state.rotating) stopRotation(true);
   else startRotation();
+});
+
+window.addEventListener('zodiac-sim-time',(e)=>{
+  state.celestialSpeed=Math.max(1,Number(e.detail?.speed)||1);
+  state.celestialRunning=Boolean(e.detail?.running);
 });
 
 document.getElementById('searchForm').addEventListener('submit', async (e) => {
@@ -530,29 +540,42 @@ function updateAutoRefreshText() {
 
 function startRotation() {
   state.rotating = true;
-  document.getElementById('rotateBtn').textContent = 'Pause globe rotation';
+  document.getElementById('rotateBtn').textContent =
+    state.globe ? 'Pause Earth rotation' : 'Pause Earth scroll';
   cancelAnimationFrame(state.rotationFrame);
+
   let last = performance.now();
+  const SIDEREAL_DAY_MS = 86164.0905 * 1000;
 
   const tick = (now) => {
     if (!state.rotating) return;
-    if (now - last > 40) {
+
+    const elapsed = Math.min(250, Math.max(0, now - last));
+    last = now;
+
+    // Earth turns eastward once per sidereal day. At accelerated celestial
+    // speeds the map motion uses the same multiplier as the ephemeris clock.
+    const speed = state.celestialRunning ? state.celestialSpeed : 1;
+    const degrees = elapsed * speed * 360 / SIDEREAL_DAY_MS;
+
+    if (degrees > 0) {
       const c = map.getCenter();
-      map.setCenter([c.lng + 0.025, c.lat]);
-      last = now;
+      map.setCenter([c.lng + degrees, c.lat]);
     }
+
     state.rotationFrame = requestAnimationFrame(tick);
   };
+
   state.rotationFrame = requestAnimationFrame(tick);
 }
 
 function stopRotation(updateButton = true) {
   state.rotating = false;
   cancelAnimationFrame(state.rotationFrame);
-  if (updateButton) {
-    document.getElementById('rotateBtn').textContent = 'Resume globe rotation';
-  } else {
-    document.getElementById('rotateBtn').textContent = 'Resume globe rotation';
+  state.rotationFrame = null;
+  if (updateButton || document.getElementById('rotateBtn')) {
+    document.getElementById('rotateBtn').textContent =
+      state.globe ? 'Resume Earth rotation' : 'Resume Earth scroll';
   }
 }
 
