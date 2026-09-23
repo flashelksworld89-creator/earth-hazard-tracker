@@ -883,3 +883,41 @@ body {
 .z-planet-item b {
   color:var(--planet-color, #e9d5ff);
 }
+
+
+.z-sim-controls {
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  gap:6px;
+  align-items:center;
+  margin-top:7px;
+}
+.z-sim-controls button,
+.z-sim-controls select {
+  min-height:30px;
+  font-size:9px;
+}
+.z-sim-controls select {
+  min-width:0;
+  background:#081522;
+  color:#eaf4ff;
+  border:1px solid var(--border);
+  border-radius:7px;
+  padding:5px 7px;
+}
+.z-sim-controls label {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  color:#a9bdd0;
+  font-size:9px;
+  white-space:nowrap;
+}
+@media (max-width:700px){
+  .z-sim-controls {
+    grid-template-columns:1fr 1fr;
+  }
+  .z-sim-controls label {
+    grid-column:1 / -1;
+  }
+}
