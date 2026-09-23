@@ -209,13 +209,21 @@ export function initZodiacCompass(map, maplibregl) {
       if (!map.getSource(id)) map.addSource(id,{type:'geojson',data:empty});
     });
 
-    addLine(ids.nak,'#67e8f9',1.25,.48,[2,3]);
+    if (!map.getLayer(ids.nak)) map.addLayer({
+      id:ids.nak,type:'line',source:ids.nak,
+      paint:{
+        'line-color':'#67e8f9',
+        'line-width':1.25,
+        'line-opacity':['case',['==',['get','above'],true],.52,.16],
+        'line-dasharray':[2,3]
+      }
+    });
     if (!map.getLayer(ids.signs)) map.addLayer({
       id:ids.signs,type:'line',source:ids.signs,
       paint:{
         'line-color':signColorExpression(),
         'line-width':3.2,
-        'line-opacity':.92
+        'line-opacity':['case',['==',['get','above'],true],.94,.22]
       }
     });
     addLine(ids.houses,'#fde68a',1.8,.76,[5,3]);
@@ -225,8 +233,10 @@ export function initZodiacCompass(map, maplibregl) {
       id:ids.planetLines,type:'line',source:ids.planetLines,
       paint:{
         'line-color':planetColorExpression(),
-        'line-width':['case',['==',['get','highlighted'],true],4,1.6],
-        'line-opacity':.85
+        'line-width':['case',['==',['get','highlighted'],true],4,1.8],
+        'line-opacity':['case',
+          ['==',['get','highlighted'],true],.98,
+          ['==',['get','above'],true],.88,.24]
       }
     });
 
@@ -296,22 +306,25 @@ export function initZodiacCompass(map, maplibregl) {
       const asc = normalize360(tropicalAscendant(date,state.origin.lat,state.origin.lng)-aya);
       const dsc = normalize360(asc+180);
       const placements = computePlanetLongitudes(date,aya);
+      const localPlanets = computeLocalPlanetSky(date,placements);
+      const risingNak = nakshatraInfo(asc);
 
-      state.lastData={date,aya,asc,dsc,placements};
+      state.lastData={date,aya,asc,dsc,placements:localPlanets};
 
       document.getElementById('zAsc').textContent=zodiacDegree(asc);
       document.getElementById('zDsc').textContent=zodiacDegree(dsc);
       document.getElementById('zAya').textContent=degreeMinute(aya);
       document.getElementById('zTimeLabel').textContent=date.toLocaleString();
       document.getElementById('zOriginLabel').textContent=
-        `Origin: ${state.origin.lat.toFixed(4)}°, ${state.origin.lng.toFixed(4)}°`;
-      document.getElementById('zodiacStatus').textContent='VISIBLE · Sidereal · Lahiri · Great-circle';
+        `Observer: ${state.origin.lat.toFixed(4)}°, ${state.origin.lng.toFixed(4)}° · Rising ${SIGNS[Math.floor(asc/30)][1]} ${SIGNS[Math.floor(asc/30)][0]} · ${risingNak.name} P${risingNak.pada}`;
+      document.getElementById('zodiacStatus').textContent='LOCAL SKY · Sidereal · Lahiri';
       const ephemerisStatus=document.getElementById('zEphemerisStatus');
-      if(ephemerisStatus) ephemerisStatus.textContent='Browser ephemeris · geocentric · Lahiri · mean Rahu/Ketu';
+      if(ephemerisStatus) ephemerisStatus.textContent=
+        'Planet rays = true observer azimuth · altitude shown in list · dim rays are below horizon';
 
-      drawGeometry(asc);
+      drawGeometry(asc,date,aya);
       redrawPlanets();
-      updatePlanetList(placements);
+      updatePlanetList(localPlanets);
       updateOpacity();
       setVisibility();
     } catch (err) {
@@ -357,22 +370,36 @@ export function initZodiacCompass(map, maplibregl) {
     if(map.getLayer(ids.planets)) map.setPaintProperty(ids.planets,'text-opacity',state.opacity);
   }
 
-  function drawGeometry(asc) {
+  function drawGeometry(asc,date,aya) {
     const signs=[],nak=[],houses=[],dirs=[],labels=[];
 
     for(let i=0;i<12;i++){
       const lon=i*30;
-      signs.push(lineFeature(fullGreatCircle(longitudeToBearing(lon,asc)),{kind:'sign',signIndex:i}));
-      const pos=destination(state.origin,longitudeToBearing(lon+15,asc),10500);
-      labels.push(pointFeature(pos,{kind:'sign',signIndex:i,label:`${SIGNS[i][1]} ${SIGNS[i][0]}`}));
+      const edge=localEclipticDirection(date,lon,aya);
+      const mid=localEclipticDirection(date,lon+15,aya);
+      signs.push(lineFeature(rayCoordinates(edge.az,15000),{
+        kind:'sign',signIndex:i,above:edge.alt>=0,alt:edge.alt
+      }));
+      const pos=destination(state.origin,mid.az,10400);
+      labels.push(pointFeature(pos,{
+        kind:'sign',signIndex:i,
+        label:`${SIGNS[i][1]} ${SIGNS[i][0]} ${mid.alt>=0?'↑':'↓'}${Math.abs(mid.alt).toFixed(0)}°`
+      }));
     }
 
     const nsize=360/27;
     for(let i=0;i<27;i++){
       const lon=i*nsize;
-      nak.push(lineFeature(fullGreatCircle(longitudeToBearing(lon,asc)),{kind:'nak'}));
-      const pos=destination(state.origin,longitudeToBearing(lon+nsize/2,asc),i%2?7600:6900);
-      labels.push(pointFeature(pos,{kind:'nak',label:NAKSHATRAS[i]}));
+      const edge=localEclipticDirection(date,lon,aya);
+      const mid=localEclipticDirection(date,lon+nsize/2,aya);
+      nak.push(lineFeature(rayCoordinates(edge.az,11800),{
+        kind:'nak',nakIndex:i,above:edge.alt>=0,alt:edge.alt
+      }));
+      const pos=destination(state.origin,mid.az,i%2?7200:6500);
+      labels.push(pointFeature(pos,{
+        kind:'nak',
+        label:`${NAKSHATRAS[i]} ${mid.alt>=0?'↑':'↓'}`
+      }));
     }
 
     for(let i=0;i<12;i++){
@@ -402,15 +429,20 @@ export function initZodiacCompass(map, maplibregl) {
 
   function redrawPlanets() {
     if(!state.lastData) return;
-    const {asc,placements}=state.lastData;
+    const {placements}=state.lastData;
     const lines=[],points=[];
     placements.forEach(p=>{
-      const b=longitudeToBearing(p.lon,asc);
+      const b=p.az;
       const highlighted=state.highlightedPlanet===p.name;
       lines.push(lineFeature(rayCoordinates(b,highlighted?15000:11800),
-        {name:p.name,highlighted}));
+        {name:p.name,highlighted,above:p.alt>=0,alt:p.alt}));
       points.push(pointFeature(destination(state.origin,b,highlighted?9200:8500),
-        {name:p.name,highlighted,label:`${p.glyph} ${p.name} ${shortDegree(p.lon)}`}));
+        {
+          name:p.name,
+          highlighted,
+          above:p.alt>=0,
+          label:`${p.glyph} ${p.name} ${azToCompass(p.az)} ${p.alt>=0?'↑':'↓'}${Math.abs(p.alt).toFixed(0)}°`
+        }));
     });
     setData(ids.planetLines,lines);
     setData(ids.planets,points);
@@ -419,7 +451,13 @@ export function initZodiacCompass(map, maplibregl) {
   function updatePlanetList(placements) {
     document.getElementById('zPlanetList').innerHTML=placements.map(p=>{
       const color=PLANET_COLORS[p.name]||'#e9d5ff';
-      return `<div class="z-planet-item" style="--planet-color:${color}"><b>${p.glyph} ${p.name}</b><span>${zodiacDegree(p.lon)}</span></div>`;
+      const horizon=p.alt>=0
+        ? `${azToCompass(p.az)} · ${p.alt.toFixed(1)}° above`
+        : `${azToCompass(p.az)} · ${Math.abs(p.alt).toFixed(1)}° below`;
+      return `<div class="z-planet-item" style="--planet-color:${color}">
+        <b>${p.glyph} ${p.name}</b>
+        <span>${zodiacDegree(p.lon)} · ${horizon}</span>
+      </div>`;
     }).join('');
   }
 
@@ -434,6 +472,7 @@ export function initZodiacCompass(map, maplibregl) {
       const ecl=A.Ecliptic(vec);
       vals.push({
         name,
+        bodyKey,
         glyph,
         lon:normalize360(Number(ecl.elon)-aya),
         tropical:Number(ecl.elon),
@@ -446,6 +485,71 @@ export function initZodiacCompass(map, maplibregl) {
     vals.push({name:'Rahu',glyph:'☊',lon:rahu,tropical:rahuTropical,lat:0});
     vals.push({name:'Ketu',glyph:'☋',lon:normalize360(rahu+180),tropical:normalize360(rahuTropical+180),lat:0});
     return vals;
+  }
+
+  function computeLocalPlanetSky(date,placements) {
+    const A=window.Astronomy;
+    const observer=new A.Observer(state.origin.lat,state.origin.lng,0);
+
+    return placements.map(p=>{
+      if(p.bodyKey){
+        const equ=A.Equator(A.Body[p.bodyKey],date,observer,true,true);
+        const hor=A.Horizon(date,observer,equ.ra,equ.dec,'normal');
+        return {...p,az:normalize360(hor.azimuth),alt:hor.altitude};
+      }
+
+      // Rahu/Ketu: treat the node as an ecliptic point at latitude 0.
+      const eq=eclipticLonToEquatorial(p.tropical,date);
+      const hor=A.Horizon(date,observer,eq.raHours,eq.decDeg,'normal');
+      return {...p,az:normalize360(hor.azimuth),alt:hor.altitude};
+    });
+  }
+
+  function localEclipticDirection(date,siderealLon,aya) {
+    const tropical=normalize360(siderealLon+aya);
+    const jd=julianDate(date);
+    const T=(jd-2451545.0)/36525;
+    const theta=localSiderealDegrees(date,state.origin.lng);
+    const eps=meanObliquity(T);
+    return {
+      az:eclipticAzimuth(tropical,theta,state.origin.lat,eps),
+      alt:eclipticAltitude(tropical,theta,state.origin.lat,eps)
+    };
+  }
+
+  function eclipticLonToEquatorial(tropicalLon,date) {
+    const T=(julianDate(date)-2451545.0)/36525;
+    const eps=rad(meanObliquity(T));
+    const lam=rad(tropicalLon);
+    const ra=normalize360(deg(Math.atan2(Math.sin(lam)*Math.cos(eps),Math.cos(lam))));
+    const dec=deg(Math.asin(Math.sin(eps)*Math.sin(lam)));
+    return {raHours:ra/15,decDeg:dec};
+  }
+
+  function localSiderealDegrees(date,lonDeg) {
+    const jd=julianDate(date);
+    const T=(jd-2451545.0)/36525;
+    return normalize360(
+      280.46061837+
+      360.98564736629*(jd-2451545.0)+
+      .000387933*T*T-
+      (T*T*T)/38710000+
+      lonDeg
+    );
+  }
+
+  function nakshatraInfo(lon) {
+    const size=360/27;
+    const x=normalize360(lon);
+    const index=Math.floor(x/size);
+    const within=x-index*size;
+    const pada=Math.min(4,Math.floor(within/(size/4))+1);
+    return {index,name:NAKSHATRAS[index],pada};
+  }
+
+  function azToCompass(az) {
+    const names=['N','NE','E','SE','S','SW','W','NW'];
+    return names[Math.round(normalize360(az)/45)%8];
   }
 
   function tropicalAscendant(date,latDeg,lonDeg) {
