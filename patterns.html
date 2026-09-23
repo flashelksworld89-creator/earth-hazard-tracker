@@ -37,6 +37,7 @@ h1{font-size:clamp(28px,4vw,46px);margin:6px 0 8px}.hero p{max-width:820px;color
 <label>Time window<select id="days"><option value="7">7 days</option><option value="30" selected>30 days</option></select></label>
 <label>Minimum magnitude<select id="mag"><option value="0">All</option><option value="2.5">M2.5+</option><option value="4" selected>M4+</option><option value="5">M5+</option><option value="6">M6+</option></select></label>
 <label>Astrology sample<select id="astroMag"><option value="4" selected>M4+</option><option value="5">M5+</option><option value="6">M6+</option></select></label>
+<label>World region<select id="region"><option value="all" selected>All regions</option><option>Western Pacific</option><option>Americas Pacific</option><option>South & Central Asia</option><option>Mediterranean & Middle East</option><option>Africa</option><option>Indian Ocean</option><option>Atlantic</option><option>Polar</option><option>Other</option></select></label>
 </section>
 <div class="status"><span id="status">Loading current datasets…</span><span id="updated"></span></div>
 <section class="stats">
@@ -51,6 +52,8 @@ h1{font-size:clamp(28px,4vw,46px);margin:6px 0 8px}.hero p{max-width:820px;color
 <div class="panel"><h2>Geographic hotspots</h2><div class="sub">Top 15° × 15° latitude/longitude cells in the selected window.</div><div id="hotspots" class="hotspots"><div class="loading">Loading…</div></div></div>
 <div class="panel"><h2>Hazard mix</h2><div class="sub">Current GDACS event types returned by the tracker API.</div><div id="hazBars" class="bars"><div class="loading">Loading…</div></div></div>
 <div class="panel"><h2>Moon nakshatra experiment</h2><div class="sub">Observed earthquake timestamps versus an expected Moon-nakshatra distribution sampled uniformly across the same time window.</div><div id="nakGrid" class="nak-grid"><div class="loading">Loading astronomy…</div></div><div id="astroNote" class="note">This is an exploratory correlation screen. It does not show that lunar position causes earthquakes.</div></div>
+<div class="panel"><h2>Regional seismic activity</h2><div class="sub">Broad geographic regions for comparing where the selected seismic activity is concentrated.</div><div id="regionBars" class="bars"><div class="loading">Loading regions…</div></div></div>
+<div class="panel"><h2>Monthly seismic–nakshatra report</h2><div class="sub">Current calendar month. Ranks nakshatras by observed-versus-expected activity and shows where the events were concentrated.</div><div id="monthlyReport"><div class="loading">Building monthly report…</div></div></div>
 </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
@@ -60,7 +63,8 @@ const state={eq:[],haz:[]};
 document.getElementById('refresh').addEventListener('click',load);
 document.getElementById('days').addEventListener('change',render);
 document.getElementById('mag').addEventListener('change',render);
-document.getElementById('astroMag').addEventListener('change',renderAstro);
+document.getElementById('astroMag').addEventListener('change',()=>{renderAstro();renderMonthlyReport()});
+document.getElementById('region').addEventListener('change',render);
 load();
 
 async function load(){
@@ -83,15 +87,15 @@ function normalizeHaz(data){
  return features.map(x=>{const p=x.properties||x;return String(p.eventtype||p.eventtypecode||p.type||'').toUpperCase()}).filter(x=>['TC','VO','FL','WF','DR'].includes(x));
 }
 function filtered(){
- const days=Number(document.getElementById('days').value),mag=Number(document.getElementById('mag').value),cut=Date.now()-days*86400000;
- return state.eq.filter(x=>x.time>=cut&&(Number.isFinite(x.mag)?x.mag>=mag:mag===0));
+ const days=Number(document.getElementById('days').value),mag=Number(document.getElementById('mag').value),cut=Date.now()-days*86400000,region=document.getElementById('region').value;
+ return state.eq.filter(x=>x.time>=cut&&(Number.isFinite(x.mag)?x.mag>=mag:mag===0)&&(region==='all'||worldRegion(x.coords[1],x.coords[0])===region));
 }
 function render(){
  const a=filtered();
  document.getElementById('sEq').textContent=a.length;
  document.getElementById('sM6').textContent=a.filter(x=>x.mag>=6).length;
  document.getElementById('sHaz').textContent=state.haz.length;
- renderHours(a);renderHotspots(a);renderHaz();renderAstro();
+ renderHours(a);renderHotspots(a);renderHaz();renderRegions(a);renderAstro();renderMonthlyReport();
 }
 function renderHours(a){
  const counts=Array(24).fill(0);a.forEach(x=>counts[new Date(x.time).getUTCHours()]++);
@@ -107,9 +111,18 @@ function renderHaz(){
  const labels={TC:'Cyclones',VO:'Volcanoes',FL:'Floods',WF:'Wildfires',DR:'Droughts'},counts={TC:0,VO:0,FL:0,WF:0,DR:0};state.haz.forEach(x=>counts[x]++);
  const max=Math.max(1,...Object.values(counts));document.getElementById('hazBars').innerHTML=Object.entries(counts).map(([k,v])=>'<div class="barrow"><span>'+labels[k]+'</span><div class="track"><div class="fill alt" style="width:'+(v/max*100).toFixed(1)+'%"></div></div><span class="value">'+v+'</span></div>').join('');
 }
+function renderRegions(a){
+ const counts={};
+ a.forEach(x=>{const r=worldRegion(x.coords[1],x.coords[0]);counts[r]=(counts[r]||0)+1});
+ const rows=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+ const max=Math.max(1,...rows.map(x=>x[1]));
+ document.getElementById('regionBars').innerHTML=rows.length?rows.map(([name,v])=>'<div class="barrow"><span>'+name+'</span><div class="track"><div class="fill" style="width:'+(v/max*100).toFixed(1)+'%"></div></div><span class="value">'+v+'</span></div>').join(''):'<div class="loading">No events in this filter.</div>';
+}
+
 function renderAstro(){
  const days=Number(document.getElementById('days').value),minMag=Number(document.getElementById('astroMag').value),cut=Date.now()-days*86400000;
- const sample=state.eq.filter(x=>x.time>=cut&&x.mag>=minMag);document.getElementById('sAstro').textContent=sample.length;
+ const region=document.getElementById('region').value;
+ const sample=state.eq.filter(x=>x.time>=cut&&x.mag>=minMag&&(region==='all'||worldRegion(x.coords[1],x.coords[0])===region));document.getElementById('sAstro').textContent=sample.length;
  if(!window.Astronomy){document.getElementById('nakGrid').innerHTML='<div class="loading">Astronomy library unavailable.</div>';return}
  const obs=Array(27).fill(0);sample.forEach(x=>obs[moonNak(new Date(x.time))]++);
  const expCounts=Array(27).fill(0),controlN=720;
@@ -121,6 +134,42 @@ function renderAstro(){
  document.getElementById('nakGrid').innerHTML=order.map(x=>'<div class="nak"><strong>'+NAK[x.i]+'</strong><span>Observed '+x.v+' · expected '+x.e.toFixed(1)+'</span><span class="'+(x.r>=1.35?'ratio-hi':x.r<=.65?'ratio-lo':'')+'">ratio '+x.r.toFixed(2)+'×</span></div>').join('');
  document.getElementById('astroNote').textContent='Exploratory screen only. Control = '+controlN+' uniformly spaced timestamps across the same '+days+'-day window. Chi-square screening statistic: '+chi.toFixed(1)+' across 27 bins. This does not establish causation or predictive value; larger samples and out-of-sample testing are required.';
 }
+function renderMonthlyReport(){
+ if(!window.Astronomy){document.getElementById('monthlyReport').innerHTML='<div class="loading">Astronomy library unavailable.</div>';return}
+ const now=new Date(),start=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1),end=Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1);
+ const minMag=Number(document.getElementById('astroMag').value),region=document.getElementById('region').value;
+ const sample=state.eq.filter(x=>x.time>=start&&x.time<end&&x.mag>=minMag&&(region==='all'||worldRegion(x.coords[1],x.coords[0])===region));
+ if(!sample.length){document.getElementById('monthlyReport').innerHTML='<div class="loading">No matching earthquakes yet this month.</div>';return}
+
+ const obs=Array(27).fill(0),byNakRegion=Array.from({length:27},()=>({}));
+ sample.forEach(x=>{const n=moonNak(new Date(x.time));obs[n]++;const r=worldRegion(x.coords[1],x.coords[0]);byNakRegion[n][r]=(byNakRegion[n][r]||0)+1});
+ const controlN=1440,expCounts=Array(27).fill(0);
+ for(let i=0;i<controlN;i++){const t=start+(i+.5)*(Math.min(Date.now(),end)-start)/controlN;expCounts[moonNak(new Date(t))]++}
+ const total=sample.length,exp=expCounts.map(x=>x/controlN*total);
+ const ranked=obs.map((v,i)=>({i,v,e:exp[i],r:exp[i]?v/exp[i]:0,regions:byNakRegion[i]})).sort((a,b)=>b.r-a.r).slice(0,8);
+ const month=now.toLocaleString(undefined,{month:'long',year:'numeric'});
+ document.getElementById('monthlyReport').innerHTML=
+  '<div class="note"><strong>'+month+' · '+(region==='all'?'Global':region)+' · M'+minMag+'+</strong><br>'+sample.length+' earthquakes in the current monthly sample. Ratios compare observed counts with expected lunar exposure during the same month.</div>'+
+  '<div class="nak-grid" style="margin-top:8px">'+ranked.map(x=>{
+    const top=Object.entries(x.regions).sort((a,b)=>b[1]-a[1])[0];
+    return '<div class="nak"><strong>'+NAK[x.i]+'</strong><span>Observed '+x.v+' · expected '+x.e.toFixed(1)+'</span><span class="'+(x.r>=1.35?'ratio-hi':x.r<=.65?'ratio-lo':'')+'">ratio '+x.r.toFixed(2)+'×</span><span>Top region: '+(top?top[0]+' ('+top[1]+')':'—')+'</span></div>'
+  }).join('')+'</div>';
+}
+
+function worldRegion(lat,lon){
+ if(lat>=66||lat<=-60) return 'Polar';
+ if(lon>=100||lon<=-150) {
+   if(lat>=-60&&lat<=70) return 'Western Pacific';
+ }
+ if(lon>=-150&&lon<=-65) return 'Americas Pacific';
+ if(lon>=60&&lon<100&&lat>=5&&lat<=55) return 'South & Central Asia';
+ if(lon>=-20&&lon<60&&lat>=25&&lat<=55) return 'Mediterranean & Middle East';
+ if(lon>=-20&&lon<55&&lat>-40&&lat<25) return 'Africa';
+ if(lon>=20&&lon<120&&lat<=25&&lat>-60) return 'Indian Ocean';
+ if((lon<-20&&lon>-65)||(lon>120&&lon<180&&lat<0)) return 'Atlantic';
+ return 'Other';
+}
+
 function moonNak(date){
  const A=window.Astronomy,vec=A.GeoVector(A.Body.Moon,date,true),ecl=A.Ecliptic(vec),sid=norm(Number(ecl.elon)-lahiri(date));return Math.min(26,Math.floor(sid/(360/27)));
 }
