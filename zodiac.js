@@ -58,10 +58,20 @@ export function initZodiacCompass(map, maplibregl) {
     state.enabled = true;
     refresh();
     setVisibility();
-    document.getElementById('zodiacStatus').textContent = 'Ready · Sidereal · Lahiri';
+    document.getElementById('zodiacStatus').textContent = 'VISIBLE · Sidereal · Lahiri';
   } catch (err) {
     console.error('Zodiacal Compass init error:', err);
     showVisibleError(err);
+
+    // Fallback: ensure controls remain bound and attempt geometry-only rendering.
+    try {
+      bindControlsSafe();
+      state.enabled = true;
+      refresh();
+      setVisibility();
+    } catch (fallbackErr) {
+      console.error('Zodiacal Compass fallback error:', fallbackErr);
+    }
   }
 
   setInterval(() => {
@@ -70,6 +80,7 @@ export function initZodiacCompass(map, maplibregl) {
 
   function bindControls() {
     const toggle = document.getElementById('zodiacLayerToggle');
+    toggle.dataset.zBound = '1';
     toggle.addEventListener('change', () => {
       state.enabled = toggle.checked;
       document.getElementById('zodiacPanel').classList.toggle('hidden', !state.enabled);
@@ -127,6 +138,19 @@ export function initZodiacCompass(map, maplibregl) {
     document.getElementById('zPlanetSelect').addEventListener('change', (e) => {
       state.highlightedPlanet = e.target.value;
       redrawPlanets();
+    });
+  }
+
+
+  function bindControlsSafe() {
+    const toggle = document.getElementById('zodiacLayerToggle');
+    if (!toggle || toggle.dataset.zBound === '1') return;
+    toggle.dataset.zBound = '1';
+    toggle.addEventListener('change', () => {
+      state.enabled = toggle.checked;
+      document.getElementById('zodiacPanel')?.classList.toggle('hidden', !state.enabled);
+      setVisibility();
+      if (state.enabled) refresh();
     });
   }
 

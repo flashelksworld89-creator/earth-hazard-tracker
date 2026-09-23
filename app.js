@@ -43,6 +43,7 @@ const map = new maplibregl.Map({
   container: 'map',
   style: {
     version: 8,
+    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
     sources: {
       osm: {
         type: 'raster',
@@ -87,6 +88,7 @@ map.on('load', async () => {
   setupDarkMapControls();
   setupAtmosphericRiverLayer();
   window.__zodiacCompass = initZodiacCompass(map, maplibregl);
+  setTimeout(() => verifyZodiacCompass(), 500);
   await Promise.allSettled([loadAllData(), loadAtmosphericRivers(0)]);
   state.firstLoadComplete = true;
   const zToggle = document.getElementById('zodiacLayerToggle');
@@ -377,6 +379,38 @@ function setAtmosphericRiverVisibility() {
 }
 
 
+
+
+function verifyZodiacCompass() {
+  const requiredLayers = [
+    'zodiac-sign-lines',
+    'zodiac-nak-lines',
+    'zodiac-house-lines',
+    'zodiac-direction-lines',
+    'zodiac-labels',
+    'zodiac-planets'
+  ];
+
+  const missing = requiredLayers.filter(id => !map.getLayer(id));
+  const status = document.getElementById('zodiacStatus');
+
+  if (missing.length) {
+    console.error('Zodiac Compass missing layers:', missing);
+    if (status) status.textContent = 'Compass layer error';
+    showToast('Zodiac Compass did not initialize correctly.', 4000);
+    return false;
+  }
+
+  const signSource = map.getSource('zodiac-sign-lines');
+  const panel = document.getElementById('zodiacPanel');
+  if (panel) panel.classList.remove('hidden');
+
+  if (status && !status.textContent.includes('error')) {
+    status.textContent = 'VISIBLE · Sidereal · Lahiri · Great-circle';
+  }
+
+  return Boolean(signSource);
+}
 
 function setupDarkMapControls() {
   const slider = document.getElementById('mapBrightness');
