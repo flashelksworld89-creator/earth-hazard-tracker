@@ -69,6 +69,13 @@ export function initZodiacCompass(map, maplibregl) {
     globalZones:true,
     globalNak:true,
     globalSign:'',
+    dayNight:true,
+    simRunning:false,
+    simSpeed:1,
+    simEpochReal:Date.now(),
+    simEpochAstro:Date.now(),
+    simTimer:null,
+    lastGlobalFieldMs:0,
     lastData:null
   };
 
@@ -84,7 +91,8 @@ export function initZodiacCompass(map, maplibregl) {
     globalZones:'zodiac-global-zones',
     globalBounds:'zodiac-global-bounds',
     globalNak:'zodiac-global-nak',
-    globalLabels:'zodiac-global-labels'
+    globalLabels:'zodiac-global-labels',
+    dayNight:'zodiac-day-night'
   };
 
   try {
@@ -117,7 +125,7 @@ export function initZodiacCompass(map, maplibregl) {
   }
 
   setInterval(() => {
-    if (state.enabled && state.timeOffsetMs === 0) refresh();
+    if (state.enabled && !state.simRunning && state.timeOffsetMs === 0) refresh();
   }, 60_000);
 
   function bindControls() {
@@ -162,14 +170,37 @@ export function initZodiacCompass(map, maplibregl) {
 
     document.querySelectorAll('[data-ztime]').forEach(btn => {
       btn.addEventListener('click', () => {
+        stopSimulation();
         state.timeOffsetMs += Number(btn.dataset.ztime) * 60000;
         refresh();
       });
     });
 
     document.getElementById('zNowBtn').addEventListener('click', () => {
+      stopSimulation();
       state.timeOffsetMs = 0;
+      state.simEpochAstro = Date.now();
+      state.simEpochReal = Date.now();
       refresh();
+    });
+
+    document.getElementById('zSimPlayBtn')?.addEventListener('click',()=>{
+      if(state.simRunning) stopSimulation();
+      else startSimulation();
+    });
+
+    document.getElementById('zSimSpeed')?.addEventListener('change',(e)=>{
+      const next=Math.max(1,Number(e.target.value)||1);
+      const current=getSimulationDate().getTime();
+      state.simSpeed=next;
+      state.simEpochAstro=current;
+      state.simEpochReal=Date.now();
+    });
+
+    document.getElementById('zDayNight')?.addEventListener('change',(e)=>{
+      state.dayNight=e.target.checked;
+      drawDayNight();
+      setVisibility();
     });
 
     document.getElementById('zOpacity').addEventListener('input', (e) => {
@@ -346,6 +377,14 @@ export function initZodiacCompass(map, maplibregl) {
         'text-halo-width':2
       }
     });
+
+    if (!map.getLayer(ids.dayNight)) map.addLayer({
+      id:ids.dayNight,type:'fill',source:ids.dayNight,
+      paint:{
+        'fill-color':'#000000',
+        'fill-opacity':['case',['==',['get','night'],true],.28,0]
+      }
+    });
   }
 
   function addLine(id,color,width,opacity,dash=null) {
@@ -361,7 +400,7 @@ export function initZodiacCompass(map, maplibregl) {
 
   function refresh() {
     try {
-      const date = new Date(Date.now()+state.timeOffsetMs);
+      const date = getSimulationDate();
       state.origin.lat = clamp(state.origin.lat,-89,89);
       state.origin.lng = normalizeLng(state.origin.lng);
 
@@ -386,9 +425,21 @@ export function initZodiacCompass(map, maplibregl) {
         'Planet rays = true observer azimuth · altitude shown in list · dim rays are below horizon';
 
       drawGeometry(asc,date,aya);
-      drawGlobalRisingField();
+      if(!state.simRunning || Math.abs(date.getTime()-state.lastGlobalFieldMs) >= 300000){
+        drawGlobalRisingField();
+        state.lastGlobalFieldMs=date.getTime();
+      }
+      drawDayNight();
       redrawPlanets();
       updatePlanetList(localPlanets);
+
+      window.dispatchEvent(new CustomEvent('zodiac-sim-time',{
+        detail:{
+          timestamp:date.getTime(),
+          running:state.simRunning,
+          speed:state.simSpeed
+        }
+      }));
       updateOpacity();
       setVisibility();
     } catch (err) {
@@ -425,6 +476,10 @@ export function initZodiacCompass(map, maplibregl) {
     if(map.getLayer(ids.globalNak)){
       map.setLayoutProperty(ids.globalNak,'visibility',
         state.enabled && state.globalNak ? 'visible':'none');
+    }
+    if(map.getLayer(ids.dayNight)){
+      map.setLayoutProperty(ids.dayNight,'visibility',
+        state.enabled && state.dayNight ? 'visible':'none');
     }
   }
 
@@ -505,6 +560,88 @@ export function initZodiacCompass(map, maplibregl) {
     setData(ids.dirs,dirs);
     setData(ids.labels,labels);
     setData(ids.origin,[pointFeature(state.origin,{kind:'origin'})]);
+  }
+
+  function getSimulationDate(){
+    if(state.simRunning){
+      const elapsed=Date.now()-state.simEpochReal;
+      return new Date(state.simEpochAstro + elapsed*state.simSpeed);
+    }
+    return new Date(Date.now()+state.timeOffsetMs);
+  }
+
+  function startSimulation(){
+    const start=getSimulationDate().getTime();
+    state.simEpochAstro=start;
+    state.simEpochReal=Date.now();
+    state.timeOffsetMs=start-Date.now();
+    state.simRunning=true;
+    const btn=document.getElementById('zSimPlayBtn');
+    if(btn) btn.textContent='⏸ Pause';
+    clearInterval(state.simTimer);
+    state.simTimer=setInterval(()=>refresh(),1000);
+    refresh();
+  }
+
+  function stopSimulation(){
+    if(!state.simRunning){
+      const btn=document.getElementById('zSimPlayBtn');
+      if(btn) btn.textContent='▶ Play';
+      return;
+    }
+    const now=getSimulationDate().getTime();
+    state.simRunning=false;
+    state.timeOffsetMs=now-Date.now();
+    clearInterval(state.simTimer);
+    state.simTimer=null;
+    const btn=document.getElementById('zSimPlayBtn');
+    if(btn) btn.textContent='▶ Play';
+    refresh();
+  }
+
+  function drawDayNight(){
+    if(!state.lastData) return;
+    if(!state.dayNight){
+      setData(ids.dayNight,[]);
+      return;
+    }
+
+    const {date}=state.lastData;
+    const A=window.Astronomy;
+    const vec=A.GeoVector(A.Body.Sun,date,true);
+    const eq=A.EquatorFromVector(vec);
+    const sunRaDeg=Number(eq.ra)*15;
+    const sunDec=Number(eq.dec);
+    const subsolarLon=normalizeLng(sunRaDeg-localSiderealDegrees(date,0));
+
+    const features=[];
+    const step=10;
+    for(let lat=-80;lat<80;lat+=step){
+      for(let lon=-180;lon<180;lon+=step){
+        const cLat=lat+step/2;
+        const cLon=lon+step/2;
+        const H=rad(normalize180(cLon-subsolarLon));
+        const phi=rad(cLat);
+        const dec=rad(sunDec);
+        const sinAlt=
+          Math.sin(phi)*Math.sin(dec)+
+          Math.cos(phi)*Math.cos(dec)*Math.cos(H);
+        const night=sinAlt<0;
+        if(!night) continue;
+        features.push({
+          type:'Feature',
+          properties:{night:true},
+          geometry:{
+            type:'Polygon',
+            coordinates:[[
+              [lon,lat],[lon+step,lat],[lon+step,lat+step],
+              [lon,lat+step],[lon,lat]
+            ]]
+          }
+        });
+      }
+    }
+    setData(ids.dayNight,features);
   }
 
   function drawGlobalRisingField() {
@@ -928,5 +1065,16 @@ export function initZodiacCompass(map, maplibregl) {
     setTimeout(()=>t.classList.add('hidden'),2200);
   }
 
-  return {refresh};
+  return {
+    refresh,
+    play:startSimulation,
+    pause:stopSimulation,
+    getDate:getSimulationDate,
+    setSpeed(speed){
+      const current=getSimulationDate().getTime();
+      state.simSpeed=Math.max(1,Number(speed)||1);
+      state.simEpochAstro=current;
+      state.simEpochReal=Date.now();
+    }
+  };
 }
