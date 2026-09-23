@@ -282,6 +282,31 @@
         </div>
       </section>
 
+      <section id="schumannPanel" class="panel schumann-panel">
+        <div class="schumann-head collapsible-head">
+          <div>
+            <strong>SCHUMANN RESONANCE</strong>
+            <span id="schumannStatus">Loading…</span>
+          </div>
+          <div class="head-actions">
+            <button id="schumannRefreshBtn" class="text-btn">Refresh</button>
+            <button class="collapse-btn" data-collapse="schumann-panel" aria-label="Collapse">−</button>
+          </div>
+        </div>
+        <div class="collapsible-body">
+          <div class="schumann-readout">
+            <div><small>Fundamental</small><strong id="schumannFreq">7.83 Hz</strong></div>
+            <div><small>Activity</small><strong id="schumannScore">—</strong></div>
+          </div>
+          <div id="schumannStations" class="schumann-stations">Observatories: —</div>
+          <div id="schumannUpdated" class="schumann-updated">Source time: —</div>
+          <div class="schumann-actions">
+            <a href="https://schumannresonancelive.com/en/live-spectrogram/" target="_blank" rel="noopener noreferrer">Live spectrogram ↗</a>
+          </div>
+          <div class="schumann-note">Activity is signal-strength status, not a change in the 7.83 Hz fundamental frequency.</div>
+        </div>
+      </section>
+
       <section class="panel auto-refresh-panel">
         <div class="auto-refresh-row collapsible-head">
           <div>
