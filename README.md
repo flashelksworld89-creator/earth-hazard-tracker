@@ -1,31 +1,26 @@
-# Earth Hazard Tracker v1.11 — Ephemeris Server Fix
+# Earth Hazard Tracker v1.13 — Direct CommonJS Astronomy Build
 
-This version fixes the Vercel `/api/ephemeris` `FUNCTION_INVOCATION_FAILED` error.
+## Why v1.12 still failed
 
-## Fix
+Vercel was still resolving the `astronomy-engine` package through an ESM path, which produced:
 
-Astronomy Engine is now loaded dynamically inside the serverless request handler and supports both ESM and CommonJS export shapes:
+`Unexpected token 'export'`
 
-- `mod.default`
-- named module exports
+## Fix in v1.13
 
-The function also validates that `GeoVector`, `Ecliptic`, and `Body` are available before calculating transits.
+The ephemeris function no longer imports the package by its default entry point.
 
-If the endpoint fails again, it now returns a useful JSON error message instead of crashing with only `FUNCTION_INVOCATION_FAILED`.
+It now directly requires Astronomy Engine's precompiled Node/CommonJS build:
 
-## Compass behavior retained
+`astronomy-engine/astronomy.min.js`
 
-- true geocentric transit calculation through Astronomy Engine
-- sidereal Lahiri conversion
-- current-time and forward/backward transit requests
-- mean Rahu / Ketu
-- unique zodiac sign colors
-- unique planet colors
-- global great-circle compass
-- OpenFreeMap no-key map
+That file is compiled for Node/browser use and uses CommonJS exports internally.
 
-## Deployment
-
-Replace all repository files with this package and commit. Vercel will install `astronomy-engine` from `package.json`.
+The accurate geocentric transit calculations remain the same:
+- Sun through Pluto
+- Lahiri sidereal conversion
+- mean Rahu/Ketu
+- forward/backward transit time controls
+- unique zodiac and planet colors
 
 No API key or environment variable is required.

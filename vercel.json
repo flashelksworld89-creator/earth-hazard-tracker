@@ -6,7 +6,7 @@
     "api/atmospheric-rivers.js": {
       "maxDuration": 30
     },
-    "api/ephemeris.js": {
+    "api/ephemeris.cjs": {
       "maxDuration": 10
     }
   },
