@@ -1,39 +1,80 @@
-# Earth Hazard Tracker
+# Earth Hazard Tracker v1.3 — Global Zodiacal Compass
 
-A global natural-hazard and weather monitoring web app.
+This version adds a globe-scale Zodiacal Compass to the existing worldwide hazard tracker.
 
-## Version 1 features
+## New Zodiacal Compass features
 
-- Interactive MapLibre 3D globe / flat map toggle
-- USGS earthquakes (up to 30 days)
+- Toggle the entire Zodiacal Compass on/off
+- Sidereal zodiac using Lahiri ayanamsa conversion
+- ASC and DSC with degree readouts
+- ASC fixed to geographic East and DSC fixed to geographic West
+- 12 zodiac sign boundaries
+- 27 nakshatra boundaries and labels
+- 12 equal 30° house divisions from the Ascendant
+- Physical N / NE / E / SE / S / SW / W / NW reference lines
+- Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto
+- Rahu and Ketu
+- Planet degree labels
+- Select a planet to highlight its global direction
+- Opacity control
+- Forward/backward time controls:
+  - −1 day
+  - −1 hour
+  - NOW
+  - +1 hour
+  - +1 day
+- Use the current map center as the compass origin
+- Shift+Click anywhere on Earth to move the compass origin
+- Geodesic great-circle geometry extending across the globe
+
+## Mathematical/geographic behavior
+
+The overlay does not draw simple straight lines on a flat map.
+
+Every zodiac, nakshatra, house, direction, and planet ray is sampled as a spherical great-circle path using an Earth radius of 6371.0088 km. The rays extend nearly to the antipode, so the compass can cross oceans and continents while following Earth curvature.
+
+The compass relationship is:
+
+- Ascendant = East
+- Descendant = West
+- zodiac longitude increases counterclockwise around the geographic compass
+
+## Astronomy
+
+Planetary geocentric ecliptic coordinates are calculated in the browser with Astronomy Engine 2.1.19, then converted from tropical to sidereal longitude.
+
+Rahu uses the mean ascending lunar node; Ketu is 180° opposite.
+
+Lahiri ayanamsa is calculated from a J2000 Lahiri anchor with an IAU-2006-style general-precession polynomial.
+
+## Important precision note
+
+"Mathematical precision" here refers to the geometry and astronomy calculations used by this implementation, not to a claim of official ephemeris or surveying certification.
+
+Astronomy Engine documents planetary positional accuracy of about ±1 arcminute for supported bodies. The Lahiri conversion and mean lunar-node calculation are implemented locally and may differ slightly from Swiss Ephemeris or specific panchanga software.
+
+The globe itself uses a spherical great-circle model. For exact cadastral/geodetic surveying over Earth, an ellipsoidal WGS84 geodesic solver would be the next upgrade.
+
+## Existing v1.2 features retained
+
+- Interactive 3D globe / flat map
+- USGS earthquakes
 - GDACS tropical cyclones, volcanoes, floods, wildfires and droughts
-- Open-Meteo current weather by clicking anywhere on Earth
-- Place search
-- Event filtering
-- 1–30 day event time window
-- Live-event sidebar
-- Automatic slow globe rotation
-- Vercel serverless proxy for GDACS
+- Open-Meteo weather
+- Approximate atmospheric-river IVT layer
+- 1–30 day event window
+- automatic refresh
+- search and hazard filters
 
-## Data sources
+## Deployment
 
-- USGS Earthquake Hazards Program
-- GDACS (Global Disaster Alert and Coordination System)
-- Open-Meteo
-- MapLibre GL JS
+Upload/replace all repository files, including the new:
 
-This app is for situational awareness and exploration. It is not an emergency warning service. Always follow official local emergency agencies and weather services.
+- `zodiac.js`
 
-## Deploy on Vercel
+Keep:
 
-1. Upload all files and folders in this project to your GitHub repository.
-2. In Vercel, choose **Add New → Project**.
-3. Import the GitHub repository.
-4. Framework preset can remain **Other**.
-5. Click **Deploy**.
+- `api/gdacs.js`
+- `api/atmospheric-rivers.js`
 
-No API keys are required for Version 1.
-
-## Important
-
-The `/api/gdacs.js` function should remain in the `api` folder. It avoids browser cross-origin problems when requesting the GDACS API.
+No environment variables are required.

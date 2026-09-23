@@ -25,7 +25,7 @@
           <input id="searchInput" type="search" placeholder="Search city, country, volcano…" autocomplete="off" />
           <button type="submit">Search</button>
         </form>
-        <button id="refreshBtn" class="secondary">Refresh live data</button>
+        <button id="refreshBtn" class="secondary">Refresh now</button>
       </div>
     </header>
 
@@ -63,6 +63,16 @@
           <input class="layer-toggle" type="checkbox" data-layer="DR" />
         </label>
 
+        <label class="layer-row">
+          <span><i class="legend atmospheric-river"></i>Atmospheric Rivers</span>
+          <input id="arLayerToggle" type="checkbox" checked />
+        </label>
+
+        <label class="layer-row">
+          <span><i class="legend zodiac"></i>Zodiacal Compass</span>
+          <input id="zodiacLayerToggle" type="checkbox" />
+        </label>
+
         <div class="divider"></div>
 
         <button id="projectionBtn" class="wide secondary">Switch to flat map</button>
@@ -73,6 +83,22 @@
         <div class="panel-title">
           <span>LIVE EVENTS</span>
           <span id="updatedAt">Loading…</span>
+        </div>
+
+        <div class="live-status-grid">
+          <div class="source-status">
+            <span class="status-dot" id="usgsStatusDot"></span>
+            <div><strong>USGS</strong><small id="usgsUpdated">Waiting…</small></div>
+          </div>
+          <div class="source-status">
+            <span class="status-dot" id="gdacsStatusDot"></span>
+            <div><strong>GDACS</strong><small id="gdacsUpdated">Waiting…</small></div>
+          </div>
+        </div>
+
+        <div id="newEventBanner" class="new-event-banner hidden">
+          <strong id="newEventCount">0 new events</strong>
+          <button id="showNewEventsBtn">Show</button>
         </div>
 
         <div class="stat-grid">
@@ -104,6 +130,110 @@
         <div id="detailContent"></div>
       </section>
 
+      <section id="zodiacPanel" class="panel zodiac-panel hidden">
+        <div class="zodiac-head">
+          <div>
+            <strong>ZODIACAL COMPASS</strong>
+            <span id="zodiacStatus">Sidereal · Lahiri</span>
+          </div>
+          <button id="zodiacCloseBtn" class="text-btn">Hide</button>
+        </div>
+
+        <div class="zodiac-readout">
+          <div><small>ASC</small><strong id="zAsc">—</strong></div>
+          <div><small>DSC</small><strong id="zDsc">—</strong></div>
+          <div><small>Ayanamsa</small><strong id="zAya">—</strong></div>
+        </div>
+
+        <div class="zodiac-time">
+          <button data-ztime="-1440">−1D</button>
+          <button data-ztime="-60">−1H</button>
+          <button id="zNowBtn">NOW</button>
+          <button data-ztime="60">+1H</button>
+          <button data-ztime="1440">+1D</button>
+        </div>
+        <div id="zTimeLabel" class="z-time-label">—</div>
+
+        <div class="zodiac-actions">
+          <button id="zUseCenterBtn" class="secondary">Use map center</button>
+          <button id="zUseHereBtn" class="secondary">Set by Shift+Click</button>
+        </div>
+        <div id="zOriginLabel" class="z-origin-label">Origin: —</div>
+
+        <label class="z-row">
+          <span>Opacity</span>
+          <input id="zOpacity" type="range" min="15" max="100" value="72" />
+        </label>
+
+        <label class="z-row">
+          <span>Highlight planet</span>
+          <select id="zPlanetSelect">
+            <option value="">None</option>
+            <option value="Sun">Sun</option>
+            <option value="Moon">Moon</option>
+            <option value="Mercury">Mercury</option>
+            <option value="Venus">Venus</option>
+            <option value="Mars">Mars</option>
+            <option value="Jupiter">Jupiter</option>
+            <option value="Saturn">Saturn</option>
+            <option value="Uranus">Uranus</option>
+            <option value="Neptune">Neptune</option>
+            <option value="Pluto">Pluto</option>
+            <option value="Rahu">Rahu</option>
+            <option value="Ketu">Ketu</option>
+          </select>
+        </label>
+
+        <div class="zodiac-key">
+          <span><i class="zkey sign"></i>Signs</span>
+          <span><i class="zkey nak"></i>Nakshatras</span>
+          <span><i class="zkey house"></i>Houses</span>
+          <span><i class="zkey direction"></i>Directions</span>
+        </div>
+
+        <div id="zPlanetList" class="z-planet-list"></div>
+        <div class="z-disclaimer">Great-circle geographic projection. Equal 30° houses from ASC. Sidereal planetary longitudes use Lahiri conversion.</div>
+      </section>
+
+      <section id="arControlPanel" class="panel ar-control-panel">
+        <div class="ar-control-head">
+          <div>
+            <strong>ATMOSPHERIC RIVERS</strong>
+            <span id="arStatus">Loading model scan…</span>
+          </div>
+          <button id="arRefreshBtn" class="text-btn">Refresh</button>
+        </div>
+        <div class="ar-time-buttons">
+          <button data-ar-hour="0" class="active">NOW</button>
+          <button data-ar-hour="6">+6H</button>
+          <button data-ar-hour="12">+12H</button>
+          <button data-ar-hour="24">+24H</button>
+          <button data-ar-hour="48">+48H</button>
+          <button data-ar-hour="72">+72H</button>
+        </div>
+        <div class="ar-legend">
+          <span><i class="ar-dot ar1"></i>AR1</span>
+          <span><i class="ar-dot ar2"></i>AR2</span>
+          <span><i class="ar-dot ar3"></i>AR3</span>
+          <span><i class="ar-dot ar4"></i>AR4</span>
+          <span><i class="ar-dot ar5"></i>AR5</span>
+          <span class="ar-note">Approximate IVT scan</span>
+        </div>
+      </section>
+
+      <section class="panel auto-refresh-panel">
+        <div class="auto-refresh-row">
+          <div>
+            <strong>AUTO REFRESH</strong>
+            <span id="autoRefreshText">Earthquakes 1 min · Hazards 5 min</span>
+          </div>
+          <label class="switch">
+            <input id="autoRefreshToggle" type="checkbox" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </section>
+
       <section class="panel timeline-panel">
         <div class="timeline-top">
           <div>
@@ -128,6 +258,7 @@
     </footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
