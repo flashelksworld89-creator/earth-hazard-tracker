@@ -41,36 +41,7 @@ const typeNames = {
 
 const map = new maplibregl.Map({
   container: 'map',
-  style: {
-    version: 8,
-    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-    sources: {
-      osm: {
-        type: 'raster',
-        tiles: [
-          'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-          'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-          'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-        ],
-        tileSize: 256,
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-      }
-    },
-    layers: [
-      {
-        id: 'dark-basemap',
-        type: 'raster',
-        source: 'osm',
-        paint: {
-          'raster-opacity': 0.58,
-          'raster-saturation': -0.55,
-          'raster-contrast': 0.18,
-          'raster-brightness-min': 0.02,
-          'raster-brightness-max': 0.60
-        }
-      }
-    ]
-  },
+  style: 'https://tiles.openfreemap.org/styles/liberty',
   center: [0, 18],
   zoom: 1.45,
   pitch: 0,
@@ -472,7 +443,7 @@ function setupDarkMapControls() {
       source: 'map-dimmer-source',
       paint: {
         'fill-color': '#000814',
-        'fill-opacity': 0.44
+        'fill-opacity': 0.30
       }
     });
   }

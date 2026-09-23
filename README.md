@@ -1,34 +1,42 @@
-# Earth Hazard Tracker v1.8 — OpenFreeMap Rendering Fix
+# Earth Hazard Tracker v1.9 — Corrected OpenFreeMap Build
 
-## What was fixed
+## Critical fix
 
-The previous build used an OpenFreeMap `dark` style URL that was not the style URL shown in OpenFreeMap's current official quick-start documentation.
+Earlier builds still contained leftover CARTO URLs in `app.js`, which is why the site continued to display an API-key requirement.
 
-This version uses the officially documented style:
+This build removes CARTO completely.
+
+The map now initializes directly with the official OpenFreeMap style:
 
 `https://tiles.openfreemap.org/styles/liberty`
 
-Then the app applies its own darkening layer above the basemap and below the weather/hazard/zodiac overlays.
+OpenFreeMap's public service requires no API key and no registration.
 
-## Result
+## Dark appearance
 
-- No API key
-- No OpenFreeMap account
-- Reliable official OpenFreeMap style URL
-- Dark visual appearance preserved
-- Zodiacal Compass stays bright above the dimmed map
-- Hazard markers remain bright
-- Map Brightness slider still works
-- Collapsible widgets retained
+The app keeps the dark presentation with its own semi-transparent dimming layer above the OpenFreeMap basemap and below the hazard / zodiac overlays.
 
-## Diagnostics
+The Map Brightness slider controls that dimming layer.
 
-The app now surfaces MapLibre style/source errors in the UI instead of failing silently.
+## Zodiacal Compass
+
+The compass rendering fix remains included:
+- visible by default
+- header ON/OFF button
+- layer toggle
+- great-circle lines
+- sidereal / Lahiri
+- ASC / DSC
+- 12 signs
+- 27 nakshatras
+- 12 houses
+- planets + Rahu/Ketu
+- collapsible panel
 
 ## Environment variables
 
-None required for the basemap.
+No basemap environment variable or API key is required.
 
 ## Install
 
-Replace the current repository files with this package and commit. Vercel should redeploy automatically.
+Replace all current repository files with this package, then commit and let Vercel redeploy.
