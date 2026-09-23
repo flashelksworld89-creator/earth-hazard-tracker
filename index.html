@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#06111f" />
+  <title>Earth Hazard Tracker</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.0/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="planet-mark">◎</div>
+        <div>
+          <h1>Earth Hazard Tracker</h1>
+          <p>Global weather & natural hazards</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <form id="searchForm" class="search">
+          <input id="searchInput" type="search" placeholder="Search city, country, volcano…" autocomplete="off" />
+          <button type="submit">Search</button>
+        </form>
+        <button id="refreshBtn" class="secondary">Refresh live data</button>
+      </div>
+    </header>
+
+    <main>
+      <div id="map"></div>
+
+      <section class="panel layers-panel">
+        <div class="panel-title">
+          <span>LAYERS</span>
+          <span id="liveDot" class="live-pill">● LIVE</span>
+        </div>
+
+        <label class="layer-row">
+          <span><i class="legend earthquake"></i>Earthquakes</span>
+          <input class="layer-toggle" type="checkbox" data-layer="earthquakes" checked />
+        </label>
+        <label class="layer-row">
+          <span><i class="legend cyclone"></i>Cyclones / Hurricanes</span>
+          <input class="layer-toggle" type="checkbox" data-layer="TC" checked />
+        </label>
+        <label class="layer-row">
+          <span><i class="legend volcano"></i>Volcanoes</span>
+          <input class="layer-toggle" type="checkbox" data-layer="VO" checked />
+        </label>
+        <label class="layer-row">
+          <span><i class="legend flood"></i>Floods</span>
+          <input class="layer-toggle" type="checkbox" data-layer="FL" checked />
+        </label>
+        <label class="layer-row">
+          <span><i class="legend wildfire"></i>Wildfires</span>
+          <input class="layer-toggle" type="checkbox" data-layer="WF" checked />
+        </label>
+        <label class="layer-row">
+          <span><i class="legend drought"></i>Droughts</span>
+          <input class="layer-toggle" type="checkbox" data-layer="DR" />
+        </label>
+
+        <div class="divider"></div>
+
+        <button id="projectionBtn" class="wide secondary">Switch to flat map</button>
+        <button id="rotateBtn" class="wide secondary">Pause globe rotation</button>
+      </section>
+
+      <aside class="panel events-panel">
+        <div class="panel-title">
+          <span>LIVE EVENTS</span>
+          <span id="updatedAt">Loading…</span>
+        </div>
+
+        <div class="stat-grid">
+          <button class="stat-card" data-filter="earthquakes">
+            <strong id="eqCount">—</strong><span>Earthquakes</span>
+          </button>
+          <button class="stat-card" data-filter="TC">
+            <strong id="tcCount">—</strong><span>Cyclones</span>
+          </button>
+          <button class="stat-card" data-filter="VO">
+            <strong id="voCount">—</strong><span>Volcanoes</span>
+          </button>
+          <button class="stat-card" data-filter="FL">
+            <strong id="flCount">—</strong><span>Floods</span>
+          </button>
+        </div>
+
+        <div class="events-heading">
+          <strong id="eventListTitle">Recent events</strong>
+          <button id="clearFilterBtn" class="text-btn">Show all</button>
+        </div>
+        <div id="eventsList" class="events-list">
+          <div class="loading-card">Loading global events…</div>
+        </div>
+      </aside>
+
+      <section id="detailPanel" class="panel detail-panel hidden">
+        <button id="closeDetail" class="close-btn" aria-label="Close">×</button>
+        <div id="detailContent"></div>
+      </section>
+
+      <section class="panel timeline-panel">
+        <div class="timeline-top">
+          <div>
+            <strong>PAST EVENT WINDOW</strong>
+            <span id="timelineLabel">7 days</span>
+          </div>
+          <div class="timeline-presets">
+            <button data-days="1">24H</button>
+            <button data-days="7" class="active">7D</button>
+            <button data-days="30">30D</button>
+          </div>
+        </div>
+        <input id="timelineRange" type="range" min="1" max="30" value="7" />
+        <div class="timeline-axis"><span>1 day</span><span>NOW</span></div>
+      </section>
+
+      <div id="statusToast" class="toast hidden"></div>
+    </main>
+
+    <footer>
+      Live data: USGS · GDACS · Open-Meteo. For situational awareness only; follow official local authorities for warnings.
+    </footer>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
