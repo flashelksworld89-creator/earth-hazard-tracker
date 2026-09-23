@@ -285,8 +285,14 @@ export function initZodiacCompass(map, maplibregl) {
       });
 
       if(!response.ok){
-        const text=await response.text();
-        throw new Error(`Ephemeris HTTP ${response.status}: ${text.slice(0,180)}`);
+        let detail='';
+        try {
+          const problem=await response.json();
+          detail=problem.detail || problem.error || JSON.stringify(problem);
+        } catch {
+          detail=await response.text();
+        }
+        throw new Error(`Ephemeris HTTP ${response.status}: ${String(detail).slice(0,260)}`);
       }
 
       const eph=await response.json();

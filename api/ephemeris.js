@@ -1,23 +1,18 @@
-import * as Astronomy from 'astronomy-engine';
-
-const PLANETS = [
-  ['Sun', Astronomy.Body.Sun, '☉'],
-  ['Moon', Astronomy.Body.Moon, '☽'],
-  ['Mercury', Astronomy.Body.Mercury, '☿'],
-  ['Venus', Astronomy.Body.Venus, '♀'],
-  ['Mars', Astronomy.Body.Mars, '♂'],
-  ['Jupiter', Astronomy.Body.Jupiter, '♃'],
-  ['Saturn', Astronomy.Body.Saturn, '♄'],
-  ['Uranus', Astronomy.Body.Uranus, '♅'],
-  ['Neptune', Astronomy.Body.Neptune, '♆'],
-  ['Pluto', Astronomy.Body.Pluto, '♇']
-];
-
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
+    // Dynamic import is more reliable across Vercel's ESM/CommonJS serverless runtime.
+    const mod = await import('astronomy-engine');
+    const Astronomy = mod.default ?? mod;
+
+    if (!Astronomy?.GeoVector || !Astronomy?.Ecliptic || !Astronomy?.Body) {
+      throw new Error(
+        `Astronomy Engine loaded but expected exports are missing. Available: ${Object.keys(Astronomy || {}).slice(0, 20).join(', ')}`
+      );
+    }
+
     const raw = req.query?.time;
     const date = raw ? new Date(raw) : new Date();
 
@@ -27,20 +22,42 @@ export default async function handler(req, res) {
 
     const ayanamsa = lahiriAyanamsa(date);
 
-    const placements = PLANETS.map(([name, body, glyph]) => {
+    const planetDefs = [
+      ['Sun', 'Sun', '☉'],
+      ['Moon', 'Moon', '☽'],
+      ['Mercury', 'Mercury', '☿'],
+      ['Venus', 'Venus', '♀'],
+      ['Mars', 'Mars', '♂'],
+      ['Jupiter', 'Jupiter', '♃'],
+      ['Saturn', 'Saturn', '♄'],
+      ['Uranus', 'Uranus', '♅'],
+      ['Neptune', 'Neptune', '♆'],
+      ['Pluto', 'Pluto', '♇']
+    ];
+
+    const placements = [];
+
+    for (const [name, bodyKey, glyph] of planetDefs) {
+      const body = Astronomy.Body[bodyKey];
+
+      if (body === undefined || body === null) {
+        throw new Error(`Astronomy Engine body not found: ${bodyKey}`);
+      }
+
       const vec = Astronomy.GeoVector(body, date, true);
       const ecl = Astronomy.Ecliptic(vec);
-      const tropical = normalize360(ecl.elon);
+
+      const tropical = normalize360(Number(ecl.elon));
       const sidereal = normalize360(tropical - ayanamsa);
 
-      return {
+      placements.push({
         name,
         glyph,
         tropical_longitude: round(tropical, 8),
         sidereal_longitude: round(sidereal, 8),
-        ecliptic_latitude: round(ecl.elat, 8)
-      };
-    });
+        ecliptic_latitude: round(Number(ecl.elat), 8)
+      });
+    }
 
     const rahuTropical = meanAscendingNode(date);
     const rahuSidereal = normalize360(rahuTropical - ayanamsa);
@@ -64,19 +81,26 @@ export default async function handler(req, res) {
     });
 
     return res.status(200).json({
+      ok: true,
       timestamp_utc: date.toISOString(),
       zodiac: 'sidereal',
       ayanamsa: 'Lahiri',
       ayanamsa_degrees: round(ayanamsa, 8),
       observer_frame: 'geocentric',
       node: 'mean',
+      engine: 'astronomy-engine',
+      engine_version: '2.1.19',
       placements
     });
   } catch (error) {
-    console.error(error);
+    console.error('EPHEMERIS_ERROR', error);
+
+    // Return JSON instead of allowing the function to crash without a useful body.
     return res.status(500).json({
+      ok: false,
       error: 'Ephemeris calculation failed',
-      detail: error?.message || String(error)
+      detail: error?.message || String(error),
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
     });
   }
 }
@@ -85,8 +109,6 @@ function lahiriAyanamsa(date) {
   const jd = julianDate(date);
   const T = (jd - 2451545.0) / 36525.0;
 
-  // Lahiri anchor at J2000 with general precession polynomial.
-  // Kept consistent with the compass ASC conversion.
   const arcsec =
     85885.53 +
     5028.796195 * T +
@@ -98,6 +120,7 @@ function lahiriAyanamsa(date) {
 
 function meanAscendingNode(date) {
   const T = (julianDate(date) - 2451545.0) / 36525.0;
+
   return normalize360(
     125.0445479 -
     1934.1362891*T +
