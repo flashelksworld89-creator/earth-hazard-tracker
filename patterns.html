@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#06111f">
+<title>Pattern Lab · Earth Hazard Tracker</title>
+<style>
+:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.15);--text:#eaf4ff;--muted:#91a8bf;--accent:#38bdf8;--warn:#fde68a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 20%,#0b1b2c 0,#02070d 42%);color:var(--text);font-family:Inter,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:8;display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 20px;background:rgba(2,7,13,.96);border-bottom:1px solid var(--border)}
+.brand{color:inherit;text-decoration:none;font-weight:800;letter-spacing:.05em}.brand small{display:block;color:var(--muted);font-size:10px;font-weight:500;margin-top:2px}
+nav{display:flex;gap:8px;flex-wrap:wrap}nav a{color:#cbe7fa;text-decoration:none;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:11px;font-weight:700}nav a.active{border-color:var(--accent);color:#7dd3fc}
+main{width:min(1320px,calc(100% - 28px));margin:auto;padding:26px 0 52px}
+.hero{display:flex;justify-content:space-between;gap:18px;align-items:end}.eyebrow{color:#67e8f9;font-size:10px;font-weight:800;letter-spacing:.13em}
+h1{font-size:clamp(28px,4vw,46px);margin:6px 0 8px}.hero p{max-width:820px;color:var(--muted);font-size:12px;line-height:1.5}.hero button,.controls button{background:#0b1b2b;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;font-weight:700}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:18px 0 12px;padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(7,20,32,.82)}
+.controls label{display:grid;gap:5px;color:var(--muted);font-size:9px}.controls select{min-width:130px;padding:8px;background:#06111f;color:var(--text);border:1px solid var(--border);border-radius:8px}
+.status{display:flex;justify-content:space-between;gap:12px;margin:8px 2px 14px;color:#71869a;font-size:10px}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}.stat{padding:13px;border:1px solid var(--border);border-radius:11px;background:linear-gradient(180deg,#071420,#030a11)}.stat small{display:block;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.08em}.stat strong{display:block;margin-top:4px;font-size:22px}
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px}.panel{padding:14px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,#071420,#030a11)}.panel h2{margin:0 0 4px;font-size:15px}.panel .sub{color:var(--muted);font-size:9px;line-height:1.45;margin-bottom:11px}
+.bars{display:grid;gap:6px}.barrow{display:grid;grid-template-columns:115px 1fr 52px;gap:8px;align-items:center;font-size:9px}.track{height:10px;background:#06111f;border-radius:999px;overflow:hidden;border:1px solid rgba(124,185,255,.08)}.fill{height:100%;background:linear-gradient(90deg,#0ea5e9,#67e8f9)}.fill.alt{background:linear-gradient(90deg,#8b5cf6,#d8b4fe)}.value{text-align:right;color:#cfe7fb}
+.hotspots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.hotspot{padding:9px;border:1px solid rgba(124,185,255,.1);border-radius:8px;background:rgba(4,14,24,.72)}.hotspot strong{display:block;font-size:11px}.hotspot span{display:block;margin-top:3px;color:var(--muted);font-size:9px}
+.nak-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.nak{padding:7px;border:1px solid rgba(124,185,255,.1);border-radius:7px;background:rgba(4,14,24,.72)}.nak strong{font-size:9px}.nak span{display:block;margin-top:2px;font-size:8px;color:var(--muted)}.ratio-hi{color:#fde68a!important}.ratio-lo{color:#93c5fd!important}
+.note{margin-top:10px;padding:10px;border:1px solid rgba(250,204,21,.18);border-radius:8px;background:rgba(85,55,5,.18);color:#c6b98c;font-size:9px;line-height:1.45}
+.loading{padding:28px;text-align:center;color:var(--muted)}
+@media(max-width:1000px){.stats{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}@media(max-width:650px){header,.hero,.status{align-items:stretch;flex-direction:column}.stats{grid-template-columns:repeat(2,1fr)}.nak-grid{grid-template-columns:repeat(2,1fr)}.barrow{grid-template-columns:86px 1fr 45px}}
+</style>
+</head>
+<body>
+<header>
+<a class="brand" href="/">◎ EARTH HAZARD TRACKER<small>Pattern recognition & hypothesis testing</small></a>
+<nav><a href="/">🌎 Earth Tracker</a><a href="/news.html">📰 World News</a><a class="active" href="/patterns.html">◫ Pattern Lab</a></nav>
+</header>
+<main>
+<section class="hero"><div><span class="eyebrow">PAGE 3 · ANALYSIS</span><h1>Pattern Lab</h1><p>Explore temporal, geographic and experimental sidereal correlations in the live data. Correlation screens are descriptive and do not establish causation.</p></div><button id="refresh">Recalculate</button></section>
+<section class="controls">
+<label>Time window<select id="days"><option value="7">7 days</option><option value="30" selected>30 days</option></select></label>
+<label>Minimum magnitude<select id="mag"><option value="0">All</option><option value="2.5">M2.5+</option><option value="4" selected>M4+</option><option value="5">M5+</option><option value="6">M6+</option></select></label>
+<label>Astrology sample<select id="astroMag"><option value="4" selected>M4+</option><option value="5">M5+</option><option value="6">M6+</option></select></label>
+</section>
+<div class="status"><span id="status">Loading current datasets…</span><span id="updated"></span></div>
+<section class="stats">
+<div class="stat"><small>Earthquakes</small><strong id="sEq">—</strong></div>
+<div class="stat"><small>M6+</small><strong id="sM6">—</strong></div>
+<div class="stat"><small>Current GDACS</small><strong id="sHaz">—</strong></div>
+<div class="stat"><small>Top grid count</small><strong id="sHot">—</strong></div>
+<div class="stat"><small>Astro sample</small><strong id="sAstro">—</strong></div>
+</section>
+<section class="grid">
+<div class="panel"><h2>Earthquake activity by UTC hour</h2><div class="sub">Counts events by occurrence hour. Useful for spotting ingestion artifacts or unusual temporal clustering.</div><div id="hourBars" class="bars"><div class="loading">Loading…</div></div></div>
+<div class="panel"><h2>Geographic hotspots</h2><div class="sub">Top 15° × 15° latitude/longitude cells in the selected window.</div><div id="hotspots" class="hotspots"><div class="loading">Loading…</div></div></div>
+<div class="panel"><h2>Hazard mix</h2><div class="sub">Current GDACS event types returned by the tracker API.</div><div id="hazBars" class="bars"><div class="loading">Loading…</div></div></div>
+<div class="panel"><h2>Moon nakshatra experiment</h2><div class="sub">Observed earthquake timestamps versus an expected Moon-nakshatra distribution sampled uniformly across the same time window.</div><div id="nakGrid" class="nak-grid"><div class="loading">Loading astronomy…</div></div><div id="astroNote" class="note">This is an exploratory correlation screen. It does not show that lunar position causes earthquakes.</div></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+<script>
+const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
+const state={eq:[],haz:[]};
+document.getElementById('refresh').addEventListener('click',load);
+document.getElementById('days').addEventListener('change',render);
+document.getElementById('mag').addEventListener('change',render);
+document.getElementById('astroMag').addEventListener('change',renderAstro);
+load();
+
+async function load(){
+ document.getElementById('status').textContent='Loading current datasets…';
+ try{
+  const [u,g]=await Promise.allSettled([
+   fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson',{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('USGS '+r.status);return r.json()}),
+   fetch('/api/gdacs?ts='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('GDACS '+r.status);return r.json()})
+  ]);
+  if(u.status==='fulfilled') state.eq=(u.value.features||[]).map(f=>({time:Number(f.properties?.time),mag:Number(f.properties?.mag),coords:f.geometry?.coordinates||[],place:f.properties?.place||''})).filter(x=>Number.isFinite(x.time)&&Number.isFinite(x.coords[0])&&Number.isFinite(x.coords[1]));
+  if(g.status==='fulfilled') state.haz=normalizeHaz(g.value);
+  const problems=[u,g].filter(x=>x.status==='rejected').length;
+  document.getElementById('status').textContent=problems?'Analysis ready · '+problems+' source unavailable':'Analysis ready';
+  document.getElementById('updated').textContent='Updated '+new Date().toLocaleString();
+  render();
+ }catch(e){console.error(e);document.getElementById('status').textContent='Pattern data unavailable'}
+}
+function normalizeHaz(data){
+ const features=Array.isArray(data?.features)?data.features:Array.isArray(data)?data:[];
+ return features.map(x=>{const p=x.properties||x;return String(p.eventtype||p.eventtypecode||p.type||'').toUpperCase()}).filter(x=>['TC','VO','FL','WF','DR'].includes(x));
+}
+function filtered(){
+ const days=Number(document.getElementById('days').value),mag=Number(document.getElementById('mag').value),cut=Date.now()-days*86400000;
+ return state.eq.filter(x=>x.time>=cut&&(Number.isFinite(x.mag)?x.mag>=mag:mag===0));
+}
+function render(){
+ const a=filtered();
+ document.getElementById('sEq').textContent=a.length;
+ document.getElementById('sM6').textContent=a.filter(x=>x.mag>=6).length;
+ document.getElementById('sHaz').textContent=state.haz.length;
+ renderHours(a);renderHotspots(a);renderHaz();renderAstro();
+}
+function renderHours(a){
+ const counts=Array(24).fill(0);a.forEach(x=>counts[new Date(x.time).getUTCHours()]++);
+ const max=Math.max(1,...counts);
+ document.getElementById('hourBars').innerHTML=counts.map((v,i)=>'<div class="barrow"><span>'+String(i).padStart(2,'0')+':00 UTC</span><div class="track"><div class="fill" style="width:'+(v/max*100).toFixed(1)+'%"></div></div><span class="value">'+v+'</span></div>').join('');
+}
+function renderHotspots(a){
+ const bins=new Map();a.forEach(x=>{const lat=Math.floor((x.coords[1]+90)/15)*15-90,lon=Math.floor((x.coords[0]+180)/15)*15-180,k=lat+','+lon;bins.set(k,(bins.get(k)||0)+1)});
+ const top=[...bins.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8);document.getElementById('sHot').textContent=top[0]?.[1]||0;
+ document.getElementById('hotspots').innerHTML=top.length?top.map(([k,v])=>{const [lat,lon]=k.split(',').map(Number);return '<div class="hotspot"><strong>'+v+' events</strong><span>'+fmtLat(lat)+' to '+fmtLat(lat+15)+' · '+fmtLon(lon)+' to '+fmtLon(lon+15)+'</span></div>'}).join(''):'<div class="loading">No events in this filter.</div>';
+}
+function renderHaz(){
+ const labels={TC:'Cyclones',VO:'Volcanoes',FL:'Floods',WF:'Wildfires',DR:'Droughts'},counts={TC:0,VO:0,FL:0,WF:0,DR:0};state.haz.forEach(x=>counts[x]++);
+ const max=Math.max(1,...Object.values(counts));document.getElementById('hazBars').innerHTML=Object.entries(counts).map(([k,v])=>'<div class="barrow"><span>'+labels[k]+'</span><div class="track"><div class="fill alt" style="width:'+(v/max*100).toFixed(1)+'%"></div></div><span class="value">'+v+'</span></div>').join('');
+}
+function renderAstro(){
+ const days=Number(document.getElementById('days').value),minMag=Number(document.getElementById('astroMag').value),cut=Date.now()-days*86400000;
+ const sample=state.eq.filter(x=>x.time>=cut&&x.mag>=minMag);document.getElementById('sAstro').textContent=sample.length;
+ if(!window.Astronomy){document.getElementById('nakGrid').innerHTML='<div class="loading">Astronomy library unavailable.</div>';return}
+ const obs=Array(27).fill(0);sample.forEach(x=>obs[moonNak(new Date(x.time))]++);
+ const expCounts=Array(27).fill(0),controlN=720;
+ for(let i=0;i<controlN;i++){const t=cut+(i+.5)*(days*86400000/controlN);expCounts[moonNak(new Date(t))]++}
+ const total=Math.max(1,sample.length);
+ const exp=expCounts.map(x=>x/controlN*total);
+ let chi=0;for(let i=0;i<27;i++)if(exp[i]>0)chi+=(obs[i]-exp[i])**2/exp[i];
+ const order=obs.map((v,i)=>({i,v,e:exp[i],r:exp[i]?v/exp[i]:0})).sort((a,b)=>b.r-a.r);
+ document.getElementById('nakGrid').innerHTML=order.map(x=>'<div class="nak"><strong>'+NAK[x.i]+'</strong><span>Observed '+x.v+' · expected '+x.e.toFixed(1)+'</span><span class="'+(x.r>=1.35?'ratio-hi':x.r<=.65?'ratio-lo':'')+'">ratio '+x.r.toFixed(2)+'×</span></div>').join('');
+ document.getElementById('astroNote').textContent='Exploratory screen only. Control = '+controlN+' uniformly spaced timestamps across the same '+days+'-day window. Chi-square screening statistic: '+chi.toFixed(1)+' across 27 bins. This does not establish causation or predictive value; larger samples and out-of-sample testing are required.';
+}
+function moonNak(date){
+ const A=window.Astronomy,vec=A.GeoVector(A.Body.Moon,date,true),ecl=A.Ecliptic(vec),sid=norm(Number(ecl.elon)-lahiri(date));return Math.min(26,Math.floor(sid/(360/27)));
+}
+function lahiri(date){const jd=date.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
+function norm(x){return((x%360)+360)%360}
+function fmtLat(x){return Math.abs(x)+'°'+(x>=0?'N':'S')}function fmtLon(x){return Math.abs(x)+'°'+(x>=0?'E':'W')}
+</script>
+</body></html>
