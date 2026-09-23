@@ -291,7 +291,7 @@ async function loadAtmosphericRivers(hour = 0, userInitiated = false) {
   if (userInitiated) showToast('Updating atmospheric river model scan…', 0);
 
   try {
-    const response = await fetch(`/api/atmospheric-rivers.cjs?hour=${hour}&ts=${Date.now()}`, {
+    const response = await fetch(`/api/atmospheric-rivers?hour=${hour}&ts=${Date.now()}`, {
       cache: 'no-store'
     });
 
@@ -727,7 +727,7 @@ async function fetchUSGS() {
 }
 
 async function fetchGDACS() {
-  const response = await fetch(`/api/gdacs.cjs?ts=${Date.now()}`, { cache: 'no-store' });
+  const response = await fetch(`/api/gdacs?ts=${Date.now()}`, { cache: 'no-store' });
   if (!response.ok) throw new Error(`GDACS proxy HTTP ${response.status}`);
   const data = await response.json();
   return normalizeGdacs(data);

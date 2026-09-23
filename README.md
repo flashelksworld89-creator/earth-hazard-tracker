@@ -1,45 +1,44 @@
-# Earth Hazard Tracker v1.14 — Unified Vercel Server Fix
+# Earth Hazard Tracker v1.15 — Vercel API Route Fix
 
-## Root cause
+## Why v1.14 could fail deployment
 
-Previous builds mixed two incompatible server module systems:
+Vercel's documented zero-config Node Function convention uses JavaScript files such as:
 
-- `api/ephemeris.cjs` used CommonJS
-- `api/gdacs.js` and `api/atmospheric-rivers.js` still used `export default`
-- `package.json` no longer declared ESM
+`api/my-function.js`
 
-That can make Vercel parse one or more server functions incorrectly and cause:
-- `Unexpected token 'export'`
-- `FUNCTION_INVOCATION_FAILED`
-- deployment failures
+v1.14 used `.cjs` files in `/api`. While `.cjs` is valid Node syntax, it is not the normal documented Vercel `/api` route convention and can fail route/function detection or configuration.
 
-## Fix in v1.14
+## Fix in v1.15
 
-All Vercel server functions now use one format: CommonJS `.cjs`.
+All API files now use `.js` filenames:
 
-Files:
-- `api/gdacs.cjs`
-- `api/atmospheric-rivers.cjs`
-- `api/ephemeris.cjs`
+- `api/gdacs.js`
+- `api/atmospheric-rivers.js`
+- `api/ephemeris.js`
 
-All use `module.exports`.
+Internally they still use CommonJS:
 
-The browser app now calls those exact `.cjs` endpoints.
+`module.exports = async function handler(...) { ... }`
 
-The ephemeris function uses:
-`require('astronomy-engine')`
+`package.json` does NOT contain `"type": "module"`, so Node parses those server files as CommonJS and does not choke on `export`.
 
-Astronomy Engine's own Node documentation supports CommonJS `require`, avoiding the broken ESM resolution path.
+Client URLs are back to clean routes:
+
+- `/api/gdacs`
+- `/api/atmospheric-rivers`
+- `/api/ephemeris`
+
+Node is set to 22.x.
 
 ## Retained features
 
 - OpenFreeMap no-key basemap
-- dark graphics
+- dark interface
 - collapsible widgets
-- earthquakes / GDACS hazards
-- atmospheric river scan
+- earthquakes and GDACS hazards
+- atmospheric river layer
 - Zodiacal Compass
-- current geocentric sidereal transits
+- geocentric sidereal planetary transits
 - Lahiri conversion
 - mean Rahu/Ketu
 - unique zodiac colors

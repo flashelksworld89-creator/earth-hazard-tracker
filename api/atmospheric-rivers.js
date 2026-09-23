@@ -2,7 +2,7 @@ const LEVELS = [1000, 925, 850, 700, 500, 300];
 const G = 9.80665;
 const VALID_HOURS = new Set([0, 6, 12, 24, 48, 72]);
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       detail: error?.message || String(error)
     });
   }
-}
+};
 
 function buildGlobalGrid() {
   const lats = [-50, -35, -20, 20, 35, 50];

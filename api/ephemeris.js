@@ -1,11 +1,9 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   try {
-    // Dynamic import is more reliable across Vercel's ESM/CommonJS serverless runtime.
-    const mod = await import('astronomy-engine');
-    const Astronomy = mod.default ?? mod;
+    const Astronomy = require('astronomy-engine');
 
     if (!Astronomy?.GeoVector || !Astronomy?.Ecliptic || !Astronomy?.Body) {
       throw new Error(
@@ -39,7 +37,6 @@ export default async function handler(req, res) {
 
     for (const [name, bodyKey, glyph] of planetDefs) {
       const body = Astronomy.Body[bodyKey];
-
       if (body === undefined || body === null) {
         throw new Error(`Astronomy Engine body not found: ${bodyKey}`);
       }
@@ -94,16 +91,13 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('EPHEMERIS_ERROR', error);
-
-    // Return JSON instead of allowing the function to crash without a useful body.
     return res.status(500).json({
       ok: false,
       error: 'Ephemeris calculation failed',
-      detail: error?.message || String(error),
-      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+      detail: error?.message || String(error)
     });
   }
-}
+};
 
 function lahiriAyanamsa(date) {
   const jd = julianDate(date);

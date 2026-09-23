@@ -280,7 +280,7 @@ export function initZodiacCompass(map, maplibregl) {
     if(status) status.textContent='Calculating true geocentric sidereal transits…';
 
     try {
-      const response=await fetch(`/api/ephemeris.cjs?time=${encodeURIComponent(date.toISOString())}`,{
+      const response=await fetch(`/api/ephemeris?time=${encodeURIComponent(date.toISOString())}`,{
         cache:'no-store'
       });
 

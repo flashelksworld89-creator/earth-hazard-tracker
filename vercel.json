@@ -1,12 +1,12 @@
 {
   "functions": {
-    "api/gdacs.cjs": {
+    "api/gdacs.js": {
       "maxDuration": 10
     },
-    "api/atmospheric-rivers.cjs": {
+    "api/atmospheric-rivers.js": {
       "maxDuration": 30
     },
-    "api/ephemeris.cjs": {
+    "api/ephemeris.js": {
       "maxDuration": 10
     }
   },
