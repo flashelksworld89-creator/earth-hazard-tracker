@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#02070d">
+<title>Earth Hazard Tracker Dashboard</title>
+<style>
+:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.18);--text:#eaf4ff;--muted:#91a8bf;--accent:#38bdf8}
+*{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--bg);font-family:Inter,system-ui,sans-serif;color:var(--text);overflow:hidden}
+#siteFrame{width:100%;height:100%;border:0;background:#02070d}
+.player{position:fixed;right:16px;bottom:16px;z-index:9999;width:min(390px,calc(100vw - 32px));border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#06111f;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+.player.hidden{display:none}.player.minimized .video,.player.minimized .controls{display:none}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;background:#071420;border-bottom:1px solid var(--border)}
+.head strong{font-size:10px;letter-spacing:.09em}.head span{color:#67e8f9}.head button{background:#0b1b2b;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer}
+.video{aspect-ratio:16/9;background:#000}.video iframe{width:100%;height:100%;border:0;display:block}
+.controls{display:grid;grid-template-columns:1fr auto;gap:7px;padding:9px}
+.controls input{min-width:0;padding:9px;background:#020b13;color:var(--text);border:1px solid var(--border);border-radius:7px}
+.controls button{padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:#0b1b2b;color:var(--text);cursor:pointer;font-weight:700}
+.note{grid-column:1/-1;color:var(--muted);font-size:8px;line-height:1.35}
+.launch{position:fixed;right:16px;bottom:16px;z-index:9998;border:1px solid var(--border);border-radius:999px;background:#071420;color:#eaf4ff;padding:10px 13px;cursor:pointer;font-weight:800;box-shadow:0 12px 35px rgba(0,0,0,.45)}
+.launch.hidden{display:none}
+@media(max-width:650px){.player{right:8px;bottom:8px;width:calc(100vw - 16px)}.launch{right:8px;bottom:8px}}
+</style>
+</head>
+<body>
+<iframe id="siteFrame" title="Earth Hazard Tracker"></iframe>
+<div id="player" class="player hidden">
+  <div class="head"><strong>▶ PERSISTENT VIDEO <span id="playerStatus">READY</span></strong><div><button id="minBtn" title="Minimize">−</button><button id="closeBtn" title="Close">×</button></div></div>
+  <div class="video"><iframe id="videoFrame" title="Persistent YouTube player" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+  <div class="controls">
+    <input id="videoInput" placeholder="Paste YouTube URL or video ID">
+    <button id="loadBtn">Play</button>
+    <div class="note">This player stays alive while you switch between Earth Tracker, World News and Pattern Lab.</div>
+  </div>
+</div>
+<button id="launch" class="launch">▶ Video Player</button>
+<script>
+const frame=document.getElementById('siteFrame'),player=document.getElementById('player'),launch=document.getElementById('launch');
+const params=new URLSearchParams(location.search);
+const allowed=['/','/news.html','/patterns.html'];
+const initial=allowed.includes(params.get('page'))?params.get('page'):'/';
+frame.src=initial;
+
+function extractYouTubeId(value){
+ const v=String(value||'').trim();
+ if(/^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+ try{
+  const u=new URL(v);
+  if(u.hostname.includes('youtu.be')) return u.pathname.split('/').filter(Boolean)[0]||'';
+  if(u.hostname.includes('youtube.com')){
+   if(u.searchParams.get('v')) return u.searchParams.get('v');
+   const m=u.pathname.match(/\/(?:embed|live|shorts)\/([A-Za-z0-9_-]{11})/); if(m)return m[1];
+  }
+ }catch{}
+ return '';
+}
+function playVideo(value){
+ const id=extractYouTubeId(value); if(!id)return;
+ document.getElementById('videoFrame').src='https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0';
+ document.getElementById('videoInput').value=value;
+ document.getElementById('playerStatus').textContent='PLAYING';
+ player.classList.remove('hidden','minimized');launch.classList.add('hidden');
+ try{localStorage.setItem('eht-video',value)}catch{}
+}
+document.getElementById('loadBtn').onclick=()=>playVideo(document.getElementById('videoInput').value);
+document.getElementById('videoInput').addEventListener('keydown',e=>{if(e.key==='Enter')playVideo(e.target.value)});
+document.getElementById('minBtn').onclick=()=>player.classList.toggle('minimized');
+document.getElementById('closeBtn').onclick=()=>{document.getElementById('videoFrame').src='';player.classList.add('hidden');launch.classList.remove('hidden');document.getElementById('playerStatus').textContent='READY'};
+launch.onclick=()=>{launch.classList.add('hidden');player.classList.remove('hidden')};
+
+addEventListener('message',e=>{
+ if(e.origin!==location.origin||!e.data)return;
+ if(e.data.type==='play-youtube') playVideo(e.data.value);
+ if(e.data.type==='site-page'&&allowed.includes(e.data.page)){frame.src=e.data.page;history.replaceState(null,'','/dashboard.html?page='+encodeURIComponent(e.data.page))}
+});
+</script>
+</body>
+</html>
