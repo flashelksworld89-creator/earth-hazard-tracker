@@ -1,5 +1,6 @@
 import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.11.0/dist/maplibre-gl.mjs';
 import { initZodiacCompass } from '/zodiac.js';
+import { initHazardGlobe3D } from '/globe3d.js';
 
 const REFRESH = {
   earthquakesMs: 60_000,
@@ -52,9 +53,12 @@ const map = new maplibregl.Map({
 });
 
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+const globe3d = initHazardGlobe3D(document.getElementById('globe3d'));
+window.__hazardGlobe3D = globe3d;
 map.addControl(new maplibregl.GlobeControl(), 'top-right');
 
-map.on('style.load', () => map.setProjection({ type: 'globe' }));
+map.on('style.load', () => map.setProjection({ type: 'mercator' }));
 
 map.on('error', (e) => {
   console.error('MapLibre error:', e?.error || e);
@@ -171,12 +175,13 @@ document.getElementById('closeDetail').addEventListener('click', () => {
 
 document.getElementById('projectionBtn').addEventListener('click', () => {
   state.globe = !state.globe;
-  map.setProjection({ type: state.globe ? 'globe' : 'mercator' });
+  globe3d?.setVisible(state.globe);
+  map.setProjection({ type: 'mercator' });
   document.getElementById('projectionBtn').textContent =
-    state.globe ? 'Switch to flat map' : 'Switch to globe';
+    state.globe ? 'Switch to flat map' : 'Switch to 3D globe';
   document.getElementById('rotateBtn').textContent = state.rotating
-    ? (state.globe ? 'Pause Earth rotation' : 'Pause Earth scroll')
-    : (state.globe ? 'Resume Earth rotation' : 'Resume Earth scroll');
+    ? (state.globe ? 'Pause Earth rotation' : 'Pause flat-map scroll')
+    : (state.globe ? 'Resume Earth rotation' : 'Resume flat-map scroll');
 });
 
 document.getElementById('rotateBtn').addEventListener('click', () => {
@@ -187,6 +192,7 @@ document.getElementById('rotateBtn').addEventListener('click', () => {
 window.addEventListener('zodiac-sim-time',(e)=>{
   state.celestialSpeed=Math.max(1,Number(e.detail?.speed)||1);
   state.celestialRunning=Boolean(e.detail?.running);
+  globe3d?.setSpeed(state.celestialRunning ? state.celestialSpeed : 1);
 });
 
 document.getElementById('searchForm').addEventListener('submit', async (e) => {
@@ -543,42 +549,38 @@ function updateAutoRefreshText() {
 function startRotation() {
   state.rotating = true;
   document.getElementById('rotateBtn').textContent =
-    state.globe ? 'Pause Earth rotation' : 'Pause Earth scroll';
+    state.globe ? 'Pause Earth rotation' : 'Pause flat-map scroll';
   cancelAnimationFrame(state.rotationFrame);
+  globe3d?.setRotating(true);
+
+  if (state.globe) return;
 
   let last = performance.now();
   const SIDEREAL_DAY_MS = 86164.0905 * 1000;
 
   const tick = (now) => {
-    if (!state.rotating) return;
-
+    if (!state.rotating || state.globe) return;
     const elapsed = Math.min(250, Math.max(0, now - last));
     last = now;
-
-    // Visual globe rotation: move the surface eastward (west -> east).
-    // With MapLibre's camera-centered globe, decreasing the center longitude
-    // makes land features travel toward screen-right, matching eastward Earth rotation.
     const speed = state.celestialRunning ? state.celestialSpeed : 1;
     const degrees = elapsed * speed * 360 / SIDEREAL_DAY_MS;
-
     if (degrees > 0) {
       const c = map.getCenter();
       map.setCenter([c.lng - degrees, c.lat]);
     }
-
     state.rotationFrame = requestAnimationFrame(tick);
   };
-
   state.rotationFrame = requestAnimationFrame(tick);
 }
 
 function stopRotation(updateButton = true) {
   state.rotating = false;
+  globe3d?.setRotating(false);
   cancelAnimationFrame(state.rotationFrame);
   state.rotationFrame = null;
   if (updateButton || document.getElementById('rotateBtn')) {
     document.getElementById('rotateBtn').textContent =
-      state.globe ? 'Resume Earth rotation' : 'Resume Earth scroll';
+      state.globe ? 'Resume Earth rotation' : 'Resume flat-map scroll';
   }
 }
 
@@ -873,6 +875,8 @@ function renderMarkers() {
     .sort((a,b) => eventPriority(b) - eventPriority(a))
     .slice(0, maxMarkers);
 
+  globe3d?.setEvents(prioritized);
+
   prioritized.forEach(event => {
     const el = document.createElement('div');
     const cls = event.type === 'earthquakes' ? 'eq' : event.type;
@@ -966,11 +970,15 @@ function renderEventList() {
     `;
 
     btn.addEventListener('click', () => {
-      map.flyTo({
-        center: event.coords,
-        zoom: Math.max(map.getZoom(), 4.2),
-        duration: 1200
-      });
+      if (state.globe) {
+        globe3d?.focus(event.coords[1], event.coords[0], 2.2);
+      } else {
+        map.flyTo({
+          center: event.coords,
+          zoom: Math.max(map.getZoom(), 4.2),
+          duration: 1200
+        });
+      }
       stopRotation();
       acknowledgeEvent(event);
       showEventDetail(event);
@@ -1146,11 +1154,15 @@ async function searchPlace(query) {
 
     if (!place) throw new Error('No place found');
 
-    map.flyTo({
-      center: [place.longitude, place.latitude],
-      zoom: 5.2,
-      duration: 1500
-    });
+    if (state.globe) {
+      globe3d?.focus(place.latitude, place.longitude, 2.15);
+    } else {
+      map.flyTo({
+        center: [place.longitude, place.latitude],
+        zoom: 5.2,
+        duration: 1500
+      });
+    }
 
     stopRotation();
     await showWeatherAt(place.latitude, place.longitude);
