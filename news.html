@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#06111f"><title>World News · Earth Hazard Tracker</title>
+<meta name="theme-color" content="#06111f"><title>World News & Live Video · Earth Hazard Tracker</title>
+<meta name="description" content="Follow current U.S., world, politics, weather and Earth-event headlines alongside live video and internal YouTube search.">
 <style>
 :root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.15);--text:#eaf4ff;--muted:#91a8bf;--accent:#38bdf8}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
@@ -40,6 +41,23 @@ h1{font-size:clamp(28px,4vw,46px);margin:6px 0 8px}.hero p{max-width:760px;color
 .youtube-note{color:#71869a;font-size:9px;line-height:1.45}.player-send-btn{background:#0b1b2b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:7px 9px;cursor:pointer;font-size:10px;font-weight:700}
 .youtube-results{display:grid;gap:8px;margin-top:4px}.youtube-result{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:8px;border:1px solid var(--border);border-radius:9px;background:#06111f}.youtube-result img{width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:6px}.youtube-result strong{display:block;font-size:11px;line-height:1.3}.youtube-result span{display:block;margin:4px 0 7px;color:var(--muted);font-size:9px}.youtube-result button{background:#0b1b2b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:7px 9px;cursor:pointer;font-size:10px;font-weight:700}@media(max-width:650px){.youtube-result{grid-template-columns:1fr}.youtube-result img{width:100%}}
 @media(max-width:900px){.grid,.live-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){header,.hero,.toolbar,.meta{align-items:stretch;flex-direction:column}.toolbar input{width:100%;font-size:16px}.grid{grid-template-columns:1fr}}
+
+/* public polish */
+body{background:radial-gradient(circle at 50% 0,#0b1b2c 0,#02070d 36%);letter-spacing:.005em}
+header{padding:12px 18px;box-shadow:0 8px 30px rgba(0,0,0,.22)}
+nav a{border-radius:999px;background:rgba(8,20,32,.7)}
+main{width:min(1240px,calc(100% - 32px));padding-top:34px}
+.hero{padding:8px 2px 4px}
+.hero p{font-size:13px}
+.toolbar{position:sticky;top:70px;z-index:4;backdrop-filter:blur(14px);background:rgba(7,20,32,.92)}
+.tabs button{border-radius:999px;font-size:10px}
+.card,.live-card{border-radius:14px;box-shadow:0 14px 36px rgba(0,0,0,.22)}
+.card{min-height:205px}
+.card h2{font-size:15px}
+.card:hover{border-color:rgba(125,211,252,.28)}
+.youtube-result{transition:border-color .16s ease,background .16s ease}
+.youtube-result:hover{border-color:rgba(125,211,252,.28);background:#081725}
+@media(max-width:650px){main{width:min(100% - 20px,1240px);padding-top:20px}.toolbar{top:58px}}
 </style>
 </head>
 <body>
