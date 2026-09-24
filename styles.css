@@ -720,3 +720,62 @@ button:hover,select:hover{border-color:rgba(103,232,249,.5)}
   color:#9fc7da;
   background:rgba(111,180,211,.07);
 }
+
+.correlation-head{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  margin-bottom:7px;
+}
+.correlation-head>span{
+  color:#7f9bad;
+  font-size:8px;
+  line-height:1.35;
+}
+.observed-events{
+  display:grid;
+  gap:5px;
+  margin-top:8px;
+  padding-top:7px;
+  border-top:1px solid rgba(255,255,255,.055);
+}
+.observed-events>b{
+  color:#d6edf8;
+  font-size:8px;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.observed-events>span{
+  color:#7f99aa;
+  font-size:8px;
+  line-height:1.35;
+}
+.observed-story{
+  display:grid;
+  gap:2px;
+  padding:6px 7px;
+  border:1px solid rgba(116,190,221,.09);
+  border-radius:7px;
+  background:rgba(74,140,171,.035);
+  text-decoration:none;
+}
+.observed-story:hover{
+  border-color:rgba(125,211,252,.22);
+  background:rgba(74,140,171,.07);
+}
+.observed-story span{
+  color:#cfe9f5;
+  font-size:9px;
+  line-height:1.3;
+}
+.observed-story small{
+  color:#7899ab;
+  font-size:7.5px;
+  line-height:1.25;
+}
+.observed-events.loading span{
+  color:#8ba4b4;
+}
+.observed-events.empty span{
+  color:#708797;
+}
