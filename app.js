@@ -1,8 +1,4 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'https://esm.sh/three@0.183.2/examples/jsm/controls/OrbitControls.js?external=three';
-
 const A = window.Astronomy;
-const SIDEREAL_DAY_MS = 86164.0905 * 1000;
 
 const SIGNS = [
   ['Aries','♈','#ff5a5f'],['Taurus','♉','#59c36a'],['Gemini','♊','#ffd166'],
@@ -27,142 +23,96 @@ const PLANETS = [
   ['Neptune','Neptune','♆','#4361ee'],['Pluto','Pluto','♇','#9d4edd']
 ];
 
-const NAK_SIZE = 360 / 27;
-const EARTH_R = 100;
-const SKIN_R = 102.2;
-const BAND_R = 145;
-const BAND_TUBE = 4.2;
+const NAK_SIZE = 360/27;
+const canvas = document.getElementById('worldCanvas');
+const ctx = canvas.getContext('2d');
 
 const state = {
-  offsetMs: 0,
+  land: [],
   playing: false,
   speed: 1,
-  epochReal: performance.now(),
+  offsetMs: 0,
   epochAstro: Date.now(),
-  rotateEarth: true,
-  frozenEarthRotation: 0,
-  observer: { lat: 0, lng: 0 },
-  lastFrame: performance.now(),
-  currentAya: 0,
-  lastBandAya: null,
-  currentObliquity: THREE.MathUtils.degToRad(23.4393),
-  zoneCenters: Array(27).fill(null),
-  lastSkinUpdate: 0,
-  lastAstroRefresh: 0,
-  placements: []
+  epochReal: performance.now(),
+  lastDraw: 0,
+  astro: null,
+  mapReady: false
 };
 
-const sceneEl = document.getElementById('scene');
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x020812);
+init();
 
-const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 2500);
-camera.position.set(0, 35, 340);
+async function init(){
+  buildNakshatraKey();
+  bindControls();
+  resize();
+  window.addEventListener('resize', resize);
 
-const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.setClearColor(0x020812,1);
-sceneEl.appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.06;
-controls.enablePan = false;
-controls.minDistance = 185;
-controls.maxDistance = 650;
-
-scene.add(new THREE.AmbientLight(0x8ba0b5, 1.35));
-const keyLight = new THREE.DirectionalLight(0xffffff, 2.25);
-keyLight.position.set(170, 90, 150);
-scene.add(keyLight);
-
-const earthGroup = new THREE.Group();
-const celestialGroup = new THREE.Group();
-scene.add(earthGroup);
-scene.add(celestialGroup);
-
-const earthMaterial = new THREE.MeshPhongMaterial({
-  color:0xffffff,
-  shininess:14,
-  specular:0x25445d
-});
-const earth = new THREE.Mesh(
-  new THREE.SphereGeometry(EARTH_R, 128, 64),
-  earthMaterial
-);
-earthGroup.add(earth);
-
-const textureLoader = new THREE.TextureLoader();
-textureLoader.load(
-  'https://cdn.jsdelivr.net/npm/three-globe@2.45.2/example/img/earth-blue-marble.jpg',
-  tex => {
-    tex.colorSpace = THREE.SRGBColorSpace;
-    earthMaterial.map = tex;
-    earthMaterial.needsUpdate = true;
-    document.getElementById('statusText').textContent = 'Earth texture loaded · calculating sky';
-  },
-  undefined,
-  err => {
-    console.error('Earth texture failed',err);
-    earthMaterial.color.set(0x163451);
+  try{
+    const r = await fetch(
+      'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@ca96624a/geojson/ne_110m_land.geojson',
+      { cache:'force-cache' }
+    );
+    if(!r.ok) throw new Error('World map HTTP '+r.status);
+    const geo = await r.json();
+    state.land = extractPolygons(geo);
+    state.mapReady = true;
+    document.getElementById('statusText').textContent='World geometry loaded · Lahiri sidereal';
+  }catch(err){
+    console.error(err);
+    document.getElementById('statusText').textContent='World geometry failed to load';
   }
-);
 
-const equator = makeGeoLine(
-  Array.from({length:181},(_,i)=>({lat:0,lng:-180+i*2})),
-  0x7dd3fc,.56,EARTH_R*1.008
-);
-earthGroup.add(equator);
+  refreshAstronomy();
+  requestAnimationFrame(loop);
+}
 
-const primeMeridian = makeGeoLine(
-  Array.from({length:181},(_,i)=>({lat:-90+i,lng:0})),
-  0xffffff,.62,EARTH_R*1.01
-);
-earthGroup.add(primeMeridian);
+function bindControls(){
+  document.querySelectorAll('[data-minutes]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      freezePlayback();
+      state.offsetMs += Number(btn.dataset.minutes)*60000;
+      refreshAstronomy();
+    });
+  });
 
-const axisLine = new THREE.Line(
-  new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0,-132,0),new THREE.Vector3(0,132,0)
-  ]),
-  new THREE.LineBasicMaterial({color:0x8fb8cf,transparent:true,opacity:.35})
-);
-earthGroup.add(axisLine);
+  document.getElementById('resetBtn').addEventListener('click',()=>{
+    state.playing=false;
+    state.offsetMs=0;
+    document.getElementById('playBtn').textContent='▶ Play';
+    refreshAstronomy();
+  });
 
-const observerGroup = new THREE.Group();
-earthGroup.add(observerGroup);
-const observerMarker = new THREE.Mesh(
-  new THREE.SphereGeometry(2.5,18,18),
-  new THREE.MeshBasicMaterial({color:0xffffff})
-);
-const observerHalo = new THREE.Mesh(
-  new THREE.RingGeometry(4.2,6.4,40),
-  new THREE.MeshBasicMaterial({
-    color:0x67e8f9,side:THREE.DoubleSide,transparent:true,opacity:.85,depthWrite:false
-  })
-);
-observerGroup.add(observerMarker,observerHalo);
+  document.getElementById('playBtn').addEventListener('click',()=>{
+    if(!state.playing){
+      state.epochAstro=currentDate().getTime();
+      state.epochReal=performance.now();
+      state.playing=true;
+      document.getElementById('playBtn').textContent='⏸ Pause';
+    }else{
+      freezePlayback();
+    }
+  });
 
-const starGroup = new THREE.Group();
-celestialGroup.add(starGroup);
-buildFixedStars();
+  document.getElementById('speedSelect').addEventListener('change',e=>{
+    const astroNow=currentDate().getTime();
+    state.speed=Math.max(1,Number(e.target.value)||1);
+    if(state.playing){
+      state.epochAstro=astroNow;
+      state.epochReal=performance.now();
+    }
+  });
 
-const bandGroup = new THREE.Group();
-const planetGroup = new THREE.Group();
-const angleGroup = new THREE.Group();
-celestialGroup.add(bandGroup,planetGroup,angleGroup);
+  ['showDayNight','showZodiac','showNakshatras','showPlanets','showGrid']
+    .forEach(id=>document.getElementById(id).addEventListener('change',draw));
+}
 
-const skinGroup = new THREE.Group();
-const skinLabelGroup = new THREE.Group();
-const projectedPlanetGroup = new THREE.Group();
-earthGroup.add(skinGroup,skinLabelGroup,projectedPlanetGroup);
-
-buildNakshatraKey();
-refreshAstronomy(true);
-resize();
-resetView();
-updateObserverMarker();
-requestAnimationFrame(animate);
+function freezePlayback(){
+  if(state.playing){
+    state.offsetMs=currentDate().getTime()-Date.now();
+  }
+  state.playing=false;
+  document.getElementById('playBtn').textContent='▶ Play';
+}
 
 function currentDate(){
   if(state.playing){
@@ -171,540 +121,415 @@ function currentDate(){
   return new Date(Date.now()+state.offsetMs);
 }
 
-function refreshAstronomy(forceSkin=false){
-  try{
-    if(!A) throw new Error('Astronomy Engine did not load.');
+function loop(now){
+  requestAnimationFrame(loop);
+  if(now-state.lastDraw<33) return;
+  state.lastDraw=now;
 
-    const date=currentDate();
-    const aya=lahiriAyanamsa(date);
-    const obl=THREE.MathUtils.degToRad(meanObliquityFromDate(date));
-    const {lat,lng}=state.observer;
-
-    state.currentAya=aya;
-    state.currentObliquity=obl;
-
-    const asc=normalize360(tropicalAscendant(date,lat,lng)-aya);
-    const dsc=normalize360(asc+180);
-    const mc=normalize360(tropicalMidheaven(date,lng)-aya);
-    const ic=normalize360(mc+180);
-    const placements=computePlanets(date,aya);
-    state.placements=placements;
-
-    if(state.lastBandAya===null || Math.abs(aya-state.lastBandAya)>.01){
-      buildEclipticBand();
-      state.lastBandAya=aya;
-    }
-    updatePlanets(placements);
-    updateAngles({asc,dsc,mc,ic});
-    updateReadouts(date,asc,dsc,mc,ic,placements);
-
-    const skinInterval = state.playing
-      ? (state.speed>=360 ? 350 : state.speed>=60 ? 550 : 900)
-      : 4000;
-    const skinDue=forceSkin || performance.now()-state.lastSkinUpdate>skinInterval;
-    if(skinDue){
-      updateNakshatraSkin(date,aya);
-      state.lastSkinUpdate=performance.now();
-    }
-
-    document.getElementById('statusText').textContent=
-      `Sidereal · Lahiri · Observer ${lat.toFixed(2)}°, ${lng.toFixed(2)}°`;
-  }catch(err){
-    console.error(err);
-    document.getElementById('statusText').textContent='Astronomy error';
+  if(state.playing || !state.astro || now-(state.astro.realStamp||0)>1000){
+    refreshAstronomy();
+  }else{
+    draw();
   }
 }
 
-function buildEclipticBand(){
-  bandGroup.clear();
-  for(let i=0;i<12;i++){
-    const points=[];
-    for(let j=0;j<=20;j++){
-      const lon=i*30+j*1.5;
-      points.push(eclipticPoint(lon,BAND_R));
-    }
-    const curve=new THREE.CatmullRomCurve3(points);
-    const geometry=new THREE.TubeGeometry(curve,32,BAND_TUBE,8,false);
-    const color=SIGNS[i][2];
-    const material=new THREE.MeshPhongMaterial({
-      color,
-      emissive:new THREE.Color(color),
-      emissiveIntensity:.17,
-      transparent:true,
-      opacity:.82,
-      depthWrite:true
-    });
-    bandGroup.add(new THREE.Mesh(geometry,material));
-
-    const label=makeLabel(SIGNS[i][1],color,58,'700');
-    label.position.copy(eclipticPoint(i*30+15,BAND_R+11));
-    label.scale.set(14,7,1);
-    bandGroup.add(label);
+function refreshAstronomy(){
+  const date=currentDate();
+  if(!A){
+    document.getElementById('statusText').textContent='Astronomy Engine unavailable';
+    return;
   }
-  bandGroup.visible=document.getElementById('showSigns').checked;
-}
 
-function buildFixedStars(){
-  const count=1300;
-  const pos=new Float32Array(count*3);
-  let seed=123456789;
-  const rand=()=>{
-    seed=(1664525*seed+1013904223)>>>0;
-    return seed/4294967296;
-  };
-  for(let i=0;i<count;i++){
-    const u=rand()*2-1;
-    const t=rand()*Math.PI*2;
-    const r=700+rand()*120;
-    const s=Math.sqrt(1-u*u);
-    pos[i*3]=r*s*Math.cos(t);
-    pos[i*3+1]=r*u;
-    pos[i*3+2]=r*s*Math.sin(t);
-  }
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  const m=new THREE.PointsMaterial({
-    color:0xdcecff,size:1.35,sizeAttenuation:false,transparent:true,opacity:.72
-  });
-  starGroup.add(new THREE.Points(g,m));
-}
+  const aya=lahiriAyanamsa(date);
+  const eps=meanObliquityFromDate(date);
+  const gmst=greenwichSiderealDegrees(date);
+  const sun=solarCoordinates(date);
 
-function computePlanets(date,aya){
-  const list=PLANETS.map(([name,bodyKey,glyph,color])=>{
+  const placements=PLANETS.map(([name,bodyKey,glyph,color])=>{
     const vec=A.GeoVector(A.Body[bodyKey],date,true);
     const ecl=A.Ecliptic(vec);
     return {name,glyph,color,lon:normalize360(Number(ecl.elon)-aya)};
   });
 
   const rahu=normalize360(meanNodeTropicalLongitude(date)-aya);
-  list.push(
+  placements.push(
     {name:'Rahu',glyph:'☊',color:'#06d6a0',lon:rahu},
     {name:'Ketu',glyph:'☋',color:'#ef476f',lon:normalize360(rahu+180)}
   );
-  return list;
+
+  state.astro={date,aya,eps,gmst,sun,placements,realStamp:performance.now()};
+  updateText();
+  draw();
 }
 
-function updatePlanets(placements){
-  planetGroup.clear();
-  if(!document.getElementById('showPlanets').checked) return;
+function draw(){
+  const w=canvas.clientWidth;
+  const h=canvas.clientHeight;
+  if(!w||!h||!state.astro) return;
 
-  placements.forEach((p,index)=>{
-    const sprite=makeLabel(
-      `${p.glyph} ${degreeInSign(p.lon)}`,
-      p.color,34,'700'
-    );
-    sprite.position.copy(eclipticPoint(p.lon,BAND_R+18+(index%3)*7));
-    sprite.scale.set(24,10,1);
-    planetGroup.add(sprite);
-  });
+  ctx.clearRect(0,0,w,h);
+  drawBackground(w,h);
+
+  const phase = normalize360(state.astro.gmst);
+  // Split the daily apparent motion between the two frames so the combined
+  // Earth-vs-sky relative motion remains one real sidereal rotation.
+  const earthShiftDeg = phase * 0.5;
+  const skyShiftDeg = -phase * 0.5;
+
+  if(document.getElementById('showGrid').checked) drawGrid(w,h,earthShiftDeg);
+
+  if(state.mapReady) drawLand(w,h,earthShiftDeg);
+
+  if(document.getElementById('showDayNight').checked){
+    drawDayNight(w,h,earthShiftDeg);
+  }
+
+  drawEclipticBand(w,h,skyShiftDeg);
+
+  if(document.getElementById('showPlanets').checked){
+    drawPlanets(w,h,skyShiftDeg);
+  }
+
+  drawEdgeFade(w,h);
 }
 
-function updateAngles({asc,dsc,mc,ic}){
-  angleGroup.clear();
-  if(!document.getElementById('showAngles').checked) return;
-
-  [
-    ['ASC',asc,'#a7f3d0'],['DSC',dsc,'#f9a8d4'],
-    ['MC',mc,'#fff3b0'],['IC',ic,'#c4b5fd']
-  ].forEach(([name,lon,color])=>{
-    const sprite=makeLabel(`${name} ${degreeInSign(lon)}`,color,30,'800');
-    sprite.position.copy(eclipticPoint(lon,BAND_R-16));
-    sprite.scale.set(24,9,1);
-    angleGroup.add(sprite);
-  });
+function drawBackground(w,h){
+  const g=ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'#071321');
+  g.addColorStop(.5,'#05101c');
+  g.addColorStop(1,'#020812');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,w,h);
 }
 
-function updateNakshatraSkin(date,aya){
-  skinGroup.clear();
-  skinLabelGroup.clear();
-  projectedPlanetGroup.clear();
-  state.zoneCenters=Array(27).fill(null);
+function drawGrid(w,h,shiftDeg){
+  ctx.save();
+  ctx.strokeStyle='rgba(130,180,210,.13)';
+  ctx.lineWidth=1;
 
-  const verts=[];
-  const colors=[];
-  const stepLat=10;
-  const stepLng=10;
-  const colorCache=NAKSHATRAS.map((_,i)=>nakColor(i));
+  for(let lat=-60;lat<=60;lat+=30){
+    const y=latToY(lat,h);
+    ctx.beginPath();
+    ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
+  }
 
-  for(let lat=-90;lat<90;lat+=stepLat){
-    const lat2=Math.min(90,lat+stepLat);
-    const centerLat=(lat+lat2)/2;
+  for(let lng=-180;lng<180;lng+=30){
+    const x=lonToX(lng+shiftDeg,w);
+    for(const xx of wrappedXs(x,w)){
+      ctx.beginPath();
+      ctx.moveTo(xx,0);ctx.lineTo(xx,h);ctx.stroke();
+    }
+  }
 
-    for(let lng=-180;lng<180;lng+=stepLng){
-      const lng2=lng+stepLng;
-      const centerLng=lng+stepLng/2;
-      const asc=normalize360(tropicalAscendant(date,centerLat,centerLng)-aya);
-      const ni=Math.min(26,Math.floor(asc/NAK_SIZE));
-      const c=colorCache[ni];
+  ctx.restore();
+}
 
-      const p00=geoPoint(lat,lng,SKIN_R);
-      const p10=geoPoint(lat2,lng,SKIN_R);
-      const p11=geoPoint(lat2,lng2,SKIN_R);
-      const p01=geoPoint(lat,lng2,SKIN_R);
+function drawLand(w,h,shiftDeg){
+  ctx.save();
+  ctx.fillStyle='#183c52';
+  ctx.strokeStyle='rgba(135,201,229,.48)';
+  ctx.lineWidth=.8;
 
-      pushTri(p00,p10,p11,c);
-      pushTri(p00,p11,p01,c);
+  for(const poly of state.land){
+    drawPolygon(poly,w,h,shiftDeg);
+  }
 
-      const old=state.zoneCenters[ni];
-      if(!old || Math.abs(centerLat)<Math.abs(old.lat)){
-        state.zoneCenters[ni]={lat:centerLat,lng:centerLng};
+  ctx.restore();
+}
+
+function drawPolygon(rings,w,h,shiftDeg){
+  for(const copy of [-1,0,1]){
+    const dx=copy*w;
+    ctx.beginPath();
+
+    for(const ring of rings){
+      if(!ring.length) continue;
+      let started=false;
+      let lastX=null;
+
+      for(const coord of ring){
+        const lng=normalize180(coord[0]+shiftDeg);
+        let x=lonToX(lng,w)+dx;
+        const y=latToY(coord[1],h);
+
+        if(lastX!==null && Math.abs(x-lastX)>w*.5){
+          started=false;
+        }
+
+        if(!started){ctx.moveTo(x,y);started=true;}
+        else ctx.lineTo(x,y);
+
+        lastX=x;
+      }
+      ctx.closePath();
+    }
+
+    ctx.fill('evenodd');
+    ctx.stroke();
+  }
+}
+
+function drawDayNight(w,h,earthShiftDeg){
+  const {subsolarLat,subsolarLon}=state.astro.sun;
+
+  const image=ctx.getImageData(0,0,w,h);
+  const data=image.data;
+
+  for(let py=0;py<h;py+=3){
+    const lat=yToLat(py,h);
+    const latR=rad(lat);
+    const sunLatR=rad(subsolarLat);
+
+    for(let px=0;px<w;px+=3){
+      const mapLng=xToLon(px,w);
+      const earthLng=normalize180(mapLng-earthShiftDeg);
+      const H=rad(normalize180(earthLng-subsolarLon));
+      const cosZ=
+        Math.sin(latR)*Math.sin(sunLatR)+
+        Math.cos(latR)*Math.cos(sunLatR)*Math.cos(H);
+
+      if(cosZ<0){
+        const darkness=Math.min(.68,.22+(-cosZ)*.5);
+        ctx.fillStyle=`rgba(0,4,12,${darkness})`;
+        ctx.fillRect(px,py,3,3);
       }
     }
   }
 
-  const geom=new THREE.BufferGeometry();
-  geom.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
-  geom.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
-  geom.computeVertexNormals();
+  // Terminator line.
+  ctx.save();
+  ctx.strokeStyle='rgba(148,210,236,.48)';
+  ctx.lineWidth=1.2;
+  ctx.beginPath();
+  let pen=false;
+  for(let x=0;x<=w;x+=2){
+    const mapLng=xToLon(x,w);
+    const earthLng=normalize180(mapLng-earthShiftDeg);
+    const H=rad(normalize180(earthLng-subsolarLon));
+    const sunLatR=rad(subsolarLat);
+    const denom=Math.tan(sunLatR);
+    if(Math.abs(denom)<1e-5) continue;
+    const lat=Math.atan(-Math.cos(H)/denom)*180/Math.PI;
+    if(!Number.isFinite(lat) || Math.abs(lat)>90){pen=false;continue;}
+    const y=latToY(lat,h);
+    if(!pen){ctx.moveTo(x,y);pen=true;}else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
 
-  const mat=new THREE.MeshBasicMaterial({
-    vertexColors:true,
-    transparent:true,
-    opacity:.22,
-    side:THREE.DoubleSide,
-    depthWrite:false
+function drawEclipticBand(w,h,skyShiftDeg){
+  const bandHalf=Math.max(18,h*.052);
+
+  if(document.getElementById('showZodiac').checked){
+    for(let i=0;i<12;i++){
+      drawCelestialSegment(i*30,(i+1)*30,SIGNS[i][2],bandHalf,w,h,skyShiftDeg,.54);
+      drawCelestialLabel(i*30+15,`${SIGNS[i][1]} ${SIGNS[i][0]}`,SIGNS[i][2],w,h,skyShiftDeg,-bandHalf*.55);
+    }
+  }
+
+  if(document.getElementById('showNakshatras').checked){
+    for(let i=0;i<27;i++){
+      const a=i*NAK_SIZE,b=(i+1)*NAK_SIZE;
+      const color=nakColorCss(i);
+      drawCelestialSegment(a,b,color,bandHalf*.58,w,h,skyShiftDeg,.44);
+
+      if(w>760 || i%2===0){
+        drawCelestialLabel(
+          a+NAK_SIZE/2,
+          NAKSHATRAS[i],
+          color,w,h,skyShiftDeg,bandHalf*.58
+        );
+      }
+    }
+  }
+}
+
+function drawCelestialSegment(lonA,lonB,color,halfWidth,w,h,skyShiftDeg,alpha){
+  const top=[],bottom=[];
+  const steps=18;
+
+  for(let j=0;j<=steps;j++){
+    const lon=lonA+(lonB-lonA)*(j/steps);
+    const pt=bandPoint(lon,w,h,skyShiftDeg);
+    top.push([pt.x,pt.y-halfWidth]);
+    bottom.push([pt.x,pt.y+halfWidth]);
+  }
+
+  for(const copy of [-1,0,1]){
+    const dx=copy*w;
+    ctx.beginPath();
+    top.forEach((p,k)=>k?ctx.lineTo(p[0]+dx,p[1]):ctx.moveTo(p[0]+dx,p[1]));
+    bottom.slice().reverse().forEach(p=>ctx.lineTo(p[0]+dx,p[1]));
+    ctx.closePath();
+    ctx.fillStyle=hexToRgba(color,alpha);
+    ctx.fill();
+
+    ctx.strokeStyle=hexToRgba(color,.78);
+    ctx.lineWidth=1.1;
+    ctx.stroke();
+  }
+}
+
+function drawCelestialLabel(lon,text,color,w,h,skyShiftDeg,yOffset){
+  const p=bandPoint(lon,w,h,skyShiftDeg);
+  ctx.save();
+  ctx.font=`600 ${Math.max(9,Math.min(13,w/95))}px system-ui,Segoe UI Symbol,sans-serif`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillStyle=color;
+  ctx.shadowColor='rgba(0,0,0,.95)';
+  ctx.shadowBlur=5;
+  for(const x of wrappedXs(p.x,w)){
+    ctx.fillText(text,x,p.y+yOffset);
+  }
+  ctx.restore();
+}
+
+function drawPlanets(w,h,skyShiftDeg){
+  const occupied=new Map();
+
+  state.astro.placements.forEach((p,index)=>{
+    const pt=bandPoint(p.lon,w,h,skyShiftDeg);
+    const bucket=Math.round(pt.x/55);
+    const slot=occupied.get(bucket)||0;
+    occupied.set(bucket,slot+1);
+    const y=pt.y-(36+slot*20);
+
+    ctx.save();
+    ctx.font='700 15px system-ui,Segoe UI Symbol,sans-serif';
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillStyle=p.color;
+    ctx.shadowColor='rgba(0,0,0,.95)';
+    ctx.shadowBlur=6;
+
+    const label=`${p.glyph} ${degreeInSign(p.lon)}`;
+    for(const x of wrappedXs(pt.x,w)){
+      ctx.fillText(label,x,y);
+    }
+    ctx.restore();
   });
+}
 
-  const mesh=new THREE.Mesh(geom,mat);
-  skinGroup.add(mesh);
-  skinGroup.visible=document.getElementById('showNakSkin').checked;
+function bandPoint(siderealLon,w,h,skyShiftDeg){
+  const tropicalLon=normalize360(siderealLon+state.astro.aya);
+  const lambda=rad(tropicalLon);
+  const eps=rad(state.astro.eps);
 
-  if(document.getElementById('showNakLabels').checked){
-    state.zoneCenters.forEach((center,i)=>{
-      if(!center) return;
-      const sprite=makeLabel(NAKSHATRAS[i],colorToCss(colorCache[i]),24,'700');
-      sprite.position.copy(geoPoint(center.lat,center.lng,EARTH_R*1.075));
-      sprite.scale.set(26,8,1);
-      skinLabelGroup.add(sprite);
-    });
-  }
+  const ra=Math.atan2(
+    Math.sin(lambda)*Math.cos(eps),
+    Math.cos(lambda)
+  )*180/Math.PI;
 
-  if(document.getElementById('showProjectedPlanets').checked){
-    const occupancy=new Map();
-    state.placements.forEach(p=>{
-      const ni=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
-      const center=state.zoneCenters[ni];
-      if(!center) return;
-      const slot=occupancy.get(ni)||0;
-      occupancy.set(ni,slot+1);
-      const lat=Math.max(-78,Math.min(78,center.lat+(slot-1)*4.5));
-      const sprite=makeLabel(`${p.glyph} ${p.name}`,p.color,25,'800');
-      sprite.position.copy(geoPoint(lat,center.lng,EARTH_R*1.105));
-      sprite.scale.set(22,8,1);
-      projectedPlanetGroup.add(sprite);
-    });
-  }
+  const dec=Math.asin(
+    Math.sin(eps)*Math.sin(lambda)
+  )*180/Math.PI;
 
-  function pushTri(a,b,c,col){
-    [a,b,c].forEach(p=>{
-      verts.push(p.x,p.y,p.z);
-      colors.push(col.r,col.g,col.b);
-    });
-  }
+  const displayLon=normalize180(ra+skyShiftDeg);
+  return {
+    x:lonToX(displayLon,w),
+    y:latToY(dec,h)
+  };
+}
+
+function drawEdgeFade(w,h){
+  const left=ctx.createLinearGradient(0,0,34,0);
+  left.addColorStop(0,'rgba(2,8,18,.9)');
+  left.addColorStop(1,'rgba(2,8,18,0)');
+  ctx.fillStyle=left;ctx.fillRect(0,0,34,h);
+
+  const right=ctx.createLinearGradient(w-34,0,w,0);
+  right.addColorStop(0,'rgba(2,8,18,0)');
+  right.addColorStop(1,'rgba(2,8,18,.9)');
+  ctx.fillStyle=right;ctx.fillRect(w-34,0,34,h);
+}
+
+function updateText(){
+  const {date,placements}=state.astro;
+  document.getElementById('timeText').textContent=date.toLocaleString();
+  document.getElementById('planetList').innerHTML=placements.map(p=>{
+    const ni=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
+    return `<div><span style="color:${p.color}">${p.glyph}</span><b>${p.name}</b><span>${fullZodiac(p.lon)} · ${NAKSHATRAS[ni]}</span></div>`;
+  }).join('');
 }
 
 function buildNakshatraKey(){
-  const key=document.getElementById('nakshatraKey');
-  key.innerHTML=NAKSHATRAS.map((name,i)=>{
-    const c=colorToCss(nakColor(i));
-    return `<span><i style="background:${c}"></i>${name}</span>`;
-  }).join('');
-}
-
-function nakColor(index){
-  return new THREE.Color().setHSL(index/27,.72,.55);
-}
-
-function colorToCss(c){
-  return '#'+c.getHexString();
-}
-
-function eclipticPoint(siderealLonDeg,radius){
-  const tropicalLon=siderealLonDeg+state.currentAya;
-  const a=THREE.MathUtils.degToRad(tropicalLon);
-  const eps=state.currentObliquity;
-  const x=radius*Math.cos(a);
-  const equatorialZ=radius*Math.sin(a)*Math.cos(eps);
-  const northY=radius*Math.sin(a)*Math.sin(eps);
-  return new THREE.Vector3(x,northY,equatorialZ);
-}
-
-function geoPoint(latDeg,lngDeg,radius){
-  const lat=THREE.MathUtils.degToRad(latDeg);
-  const lng=THREE.MathUtils.degToRad(lngDeg);
-  const cl=Math.cos(lat);
-  return new THREE.Vector3(
-    radius*cl*Math.cos(lng),
-    radius*Math.sin(lat),
-    radius*cl*Math.sin(lng)
-  );
-}
-
-function makeGeoLine(points,color,opacity,radius){
-  const verts=points.map(p=>geoPoint(p.lat,p.lng,radius));
-  return new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(verts),
-    new THREE.LineBasicMaterial({color,transparent:true,opacity})
-  );
-}
-
-function makeLabel(text,color='#fff',size=38,weight='600'){
-  const canvas=document.createElement('canvas');
-  canvas.width=420;
-  canvas.height=128;
-  const ctx=canvas.getContext('2d');
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.font=`${weight} ${size}px system-ui, Segoe UI Symbol, sans-serif`;
-  ctx.textAlign='center';
-  ctx.textBaseline='middle';
-  ctx.shadowColor='rgba(0,0,0,.98)';
-  ctx.shadowBlur=9;
-  ctx.fillStyle=color;
-  ctx.fillText(text,canvas.width/2,canvas.height/2);
-
-  const texture=new THREE.CanvasTexture(canvas);
-  texture.colorSpace=THREE.SRGBColorSpace;
-  texture.minFilter=THREE.LinearFilter;
-
-  return new THREE.Sprite(new THREE.SpriteMaterial({
-    map:texture,transparent:true,depthTest:false,depthWrite:false
-  }));
-}
-
-function updateObserverMarker(){
-  observerGroup.position.copy(
-    geoPoint(state.observer.lat,state.observer.lng,EARTH_R*1.035)
-  );
-  observerGroup.lookAt(0,0,0);
-  observerGroup.rotateY(Math.PI);
-}
-
-function applyObserver(lat,lng){
-  const nextLat=Number(lat);
-  const rawLng=Number(lng);
-  if(!Number.isFinite(nextLat)||!Number.isFinite(rawLng)) return false;
-
-  const clampedLat=Math.max(-89.9,Math.min(89.9,nextLat));
-  const nextLng=((rawLng+180)%360+360)%360-180;
-  state.observer={lat:clampedLat,lng:nextLng};
-
-  document.getElementById('latitudeInput').value=clampedLat.toFixed(4);
-  document.getElementById('longitudeInput').value=nextLng.toFixed(4);
-  document.getElementById('observerStatus').textContent=
-    `${clampedLat.toFixed(4)}°, ${nextLng.toFixed(4)}°`;
-
-  updateObserverMarker();
-  refreshAstronomy(true);
-  return true;
-}
-
-function syncEarthToSiderealTime(date){
-  const gmst=greenwichSiderealDegrees(date);
-  earthGroup.rotation.y=THREE.MathUtils.degToRad(-gmst);
-}
-
-function animate(now){
-  requestAnimationFrame(animate);
-  state.lastFrame=now;
-
-  if(state.rotateEarth){
-    syncEarthToSiderealTime(currentDate());
-  }else{
-    earthGroup.rotation.y=state.frozenEarthRotation;
-  }
-
-  controls.update();
-  renderer.render(scene,camera);
-
-  const refreshEvery=state.playing ? 350 : 1200;
-  if(now-state.lastAstroRefresh>refreshEvery){
-    state.lastAstroRefresh=now;
-    refreshAstronomy(false);
-  }
-}
-
-function updateReadouts(date,asc,dsc,mc,ic,placements){
-  document.getElementById('ascText').textContent=fullZodiac(asc);
-  document.getElementById('dscText').textContent=fullZodiac(dsc);
-  document.getElementById('mcText').textContent=fullZodiac(mc);
-  document.getElementById('icText').textContent=fullZodiac(ic);
-  document.getElementById('timeText').textContent=date.toLocaleString();
-
-  document.getElementById('planetList').innerHTML=placements.map(p=>{
-    const ni=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
-    return `<div>
-      <span style="color:${p.color}">${p.glyph}</span>
-      <b>${p.name}</b>
-      <span>${fullZodiac(p.lon)} · ${NAKSHATRAS[ni]}</span>
-    </div>`;
-  }).join('');
+  document.getElementById('nakshatraKey').innerHTML=
+    NAKSHATRAS.map((name,i)=>`<span><i style="background:${nakColorCss(i)}"></i>${name}</span>`).join('');
 }
 
 function resize(){
-  const w=Math.max(1,sceneEl.clientWidth);
-  const h=Math.max(1,sceneEl.clientHeight);
-  renderer.setSize(w,h,false);
-  camera.aspect=w/h;
-  camera.updateProjectionMatrix();
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=Math.max(1,Math.round(rect.width*dpr));
+  canvas.height=Math.max(1,Math.round(rect.height*dpr));
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
 }
 
-function resetView(){
-  camera.position.set(0,35,340);
-  controls.target.set(0,0,0);
-  controls.update();
+function extractPolygons(geo){
+  const out=[];
+  for(const f of geo.features||[]){
+    const g=f.geometry;
+    if(!g) continue;
+    if(g.type==='Polygon') out.push(g.coordinates);
+    if(g.type==='MultiPolygon') g.coordinates.forEach(p=>out.push(p));
+  }
+  return out;
 }
 
-document.querySelectorAll('[data-minutes]').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    if(state.playing){
-      state.offsetMs=currentDate().getTime()-Date.now();
-      state.playing=false;
-      document.getElementById('playBtn').textContent='▶ Play';
-    }
-    state.offsetMs+=Number(btn.dataset.minutes)*60000;
-    syncEarthToSiderealTime(currentDate());
-    refreshAstronomy(true);
-  });
-});
+function solarCoordinates(date){
+  const sun=A.Equator(A.Body.Sun,date,null,true,true);
+  const raDeg=Number(sun.ra)*15;
+  const dec=Number(sun.dec);
+  const subsolarLon=normalize180(raDeg-greenwichSiderealDegrees(date));
+  return {subsolarLat:dec,subsolarLon};
+}
 
-document.getElementById('nowBtn').addEventListener('click',()=>{
-  state.playing=false;
-  state.offsetMs=0;
-  document.getElementById('playBtn').textContent='▶ Play';
-  syncEarthToSiderealTime(currentDate());
-  refreshAstronomy(true);
-});
-
-document.getElementById('playBtn').addEventListener('click',()=>{
-  if(!state.playing){
-    state.epochAstro=currentDate().getTime();
-    state.epochReal=performance.now();
-    state.playing=true;
-    document.getElementById('playBtn').textContent='⏸ Pause';
-  }else{
-    state.offsetMs=currentDate().getTime()-Date.now();
-    state.playing=false;
-    document.getElementById('playBtn').textContent='▶ Play';
-  }
-});
-
-document.getElementById('speedSelect').addEventListener('change',e=>{
-  const astroNow=currentDate().getTime();
-  state.speed=Math.max(1,Number(e.target.value)||1);
-  if(state.playing){
-    state.epochAstro=astroNow;
-    state.epochReal=performance.now();
-  }
-});
-
-document.getElementById('rotateEarth').addEventListener('change',e=>{
-  state.rotateEarth=e.target.checked;
-  if(!state.rotateEarth) state.frozenEarthRotation=earthGroup.rotation.y;
-});
-
-document.getElementById('showPlanets').addEventListener('change',()=>refreshAstronomy(false));
-document.getElementById('showAngles').addEventListener('change',()=>refreshAstronomy(false));
-document.getElementById('showSigns').addEventListener('change',e=>{bandGroup.visible=e.target.checked;});
-document.getElementById('showStars').addEventListener('change',e=>{starGroup.visible=e.target.checked;});
-document.getElementById('showNakSkin').addEventListener('change',e=>{skinGroup.visible=e.target.checked;});
-document.getElementById('showNakLabels').addEventListener('change',()=>refreshAstronomy(true));
-document.getElementById('showProjectedPlanets').addEventListener('change',()=>refreshAstronomy(true));
-
-document.getElementById('applyLocationBtn').addEventListener('click',()=>{
-  applyObserver(
-    document.getElementById('latitudeInput').value,
-    document.getElementById('longitudeInput').value
-  );
-});
-
-document.getElementById('useLocationBtn').addEventListener('click',()=>{
-  const status=document.getElementById('observerStatus');
-  if(!navigator.geolocation){
-    status.textContent='Geolocation unavailable';
-    return;
-  }
-  status.textContent='Requesting location…';
-  navigator.geolocation.getCurrentPosition(
-    pos=>applyObserver(pos.coords.latitude,pos.coords.longitude),
-    err=>{
-      console.error(err);
-      status.textContent='Location permission denied';
-    },
-    {enableHighAccuracy:true,timeout:10000,maximumAge:60000}
-  );
-});
-
-document.getElementById('resetViewBtn').addEventListener('click',resetView);
-window.addEventListener('resize',resize);
+function lonToX(lon,w){
+  return (normalize180(lon)+180)/360*w;
+}
+function xToLon(x,w){
+  return x/w*360-180;
+}
+function latToY(lat,h){
+  return (90-lat)/180*h;
+}
+function yToLat(y,h){
+  return 90-y/h*180;
+}
+function wrappedXs(x,w){
+  return [x-w,x,x+w].filter(v=>v>-90&&v<w+90);
+}
 
 function lahiriAyanamsa(date){
   const jd=julianDate(date);
   const T=(jd-2451545.0)/36525;
-  const arcsec=85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T;
-  return arcsec/3600;
+  return (85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600;
 }
-
-function julianDate(date){
-  return date.getTime()/86400000+2440587.5;
-}
-
-function localSiderealDegrees(date,lonDeg){
+function julianDate(date){return date.getTime()/86400000+2440587.5;}
+function greenwichSiderealDegrees(date){
   const jd=julianDate(date);
   const T=(jd-2451545.0)/36525;
   return normalize360(
     280.46061837+
     360.98564736629*(jd-2451545.0)+
     .000387933*T*T-
-    (T*T*T)/38710000+
-    lonDeg
+    (T*T*T)/38710000
   );
 }
-
 function meanObliquityFromDate(date){
   const T=(julianDate(date)-2451545.0)/36525;
   return 23.43929111-(46.8150*T+.00059*T*T-.001813*T*T*T)/3600;
 }
-
-function tropicalMidheaven(date,lonDeg){
-  const theta=THREE.MathUtils.degToRad(localSiderealDegrees(date,lonDeg));
-  const eps=THREE.MathUtils.degToRad(meanObliquityFromDate(date));
-  return normalize360(THREE.MathUtils.radToDeg(
-    Math.atan2(Math.sin(theta),Math.cos(theta)*Math.cos(eps))
-  ));
-}
-
-function tropicalAscendant(date,latDeg,lonDeg){
-  const theta=THREE.MathUtils.degToRad(localSiderealDegrees(date,lonDeg));
-  const phi=THREE.MathUtils.degToRad(latDeg);
-  const eps=THREE.MathUtils.degToRad(meanObliquityFromDate(date));
-
-  return normalize360(
-    THREE.MathUtils.radToDeg(
-      Math.atan2(
-        -Math.cos(theta),
-        Math.sin(theta)*Math.cos(eps)+Math.tan(phi)*Math.sin(eps)
-      )
-    )+180
-  );
-}
-
 function meanNodeTropicalLongitude(date){
   const T=(julianDate(date)-2451545.0)/36525;
-  return normalize360(
-    125.04452-
-    1934.136261*T+
-    .0020708*T*T+
-    (T*T*T)/450000
-  );
+  return normalize360(125.04452-1934.136261*T+.0020708*T*T+(T*T*T)/450000);
 }
-
-function greenwichSiderealDegrees(date){
-  return localSiderealDegrees(date,0);
-}
-
-function normalize360(x){
-  return ((x%360)+360)%360;
-}
+function normalize360(x){return ((x%360)+360)%360;}
+function normalize180(x){return ((x+180)%360+360)%360-180;}
+function rad(x){return x*Math.PI/180;}
 
 function fullZodiac(lon){
   const x=normalize360(lon);
@@ -714,10 +539,18 @@ function fullZodiac(lon){
   const m=Math.floor((within-d)*60);
   return `${SIGNS[i][1]} ${SIGNS[i][0]} ${d}°${String(m).padStart(2,'0')}′`;
 }
-
 function degreeInSign(lon){
   const x=normalize360(lon)%30;
   const d=Math.floor(x);
   const m=Math.floor((x-d)*60);
   return `${d}°${String(m).padStart(2,'0')}′`;
+}
+function nakColorCss(i){
+  return `hsl(${Math.round(i/27*360)} 72% 58%)`;
+}
+function hexToRgba(color,a){
+  if(color.startsWith('hsl')) return color.replace('hsl(','hsla(').replace(')',` / ${a})`);
+  const h=color.replace('#','');
+  const n=parseInt(h,16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
 }
