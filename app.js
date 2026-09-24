@@ -555,14 +555,15 @@ function startRotation() {
     const elapsed = Math.min(250, Math.max(0, now - last));
     last = now;
 
-    // Earth turns eastward once per sidereal day. At accelerated celestial
-    // speeds the map motion uses the same multiplier as the ephemeris clock.
+    // Visual globe rotation: move the surface eastward (west -> east).
+    // With MapLibre's camera-centered globe, decreasing the center longitude
+    // makes land features travel toward screen-right, matching eastward Earth rotation.
     const speed = state.celestialRunning ? state.celestialSpeed : 1;
     const degrees = elapsed * speed * 360 / SIDEREAL_DAY_MS;
 
     if (degrees > 0) {
       const c = map.getCenter();
-      map.setCenter([c.lng + degrees, c.lat]);
+      map.setCenter([c.lng - degrees, c.lat]);
     }
 
     state.rotationFrame = requestAnimationFrame(tick);
