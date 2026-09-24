@@ -109,7 +109,11 @@ const state = {
   selectedPoint: null,
   countryLabels: [],
   admin1Labels: [],
+  countryRegions: [],
+  admin1Regions: [],
   labelsReady: false,
+  newsCache: new Map(),
+  newsSeq: 0,
   zoom: 1,
   viewOffsetX: 0,
   viewOffsetY: 0
@@ -385,6 +389,9 @@ function refreshAstronomy(){
     document.getElementById('statusText').textContent=
       `World loaded · Lahiri sidereal · ${placements.length} bodies`;
     updateText();
+    if(state.selectedPoint){
+      updateLocationReading(state.selectedPoint.lat,state.selectedPoint.lon,date);
+    }
     draw();
   }catch(err){
     console.error('Astronomy refresh failed:',err);
@@ -1159,7 +1166,8 @@ async function loadPoliticalLabels(){
     if(!countriesRes.ok) throw new Error('Country labels HTTP '+countriesRes.status);
     const countries=await countriesRes.json();
 
-    state.countryLabels=(countries.features||[])
+    state.countryRegions=(countries.features||[]).filter(f=>f?.geometry);
+    state.countryLabels=state.countryRegions
       .map(f=>featureLabelPoint(f,'country'))
       .filter(Boolean);
 
@@ -1174,6 +1182,7 @@ async function loadPoliticalLabels(){
         return code==='USA'||code==='CAN'||admin==='united states of america'||admin==='canada';
       });
 
+      state.admin1Regions=usaCan;
       state.admin1Labels=usaCan
         .map(f=>featureLabelPoint(f,'admin1'))
         .filter(Boolean);
@@ -1397,19 +1406,8 @@ function updateLocationReading(lat,lon,date){
     </div>`;
   }).join('');
 
-  document.getElementById('inspectCoreForecast').innerHTML=coreForecast.map(item=>`
-    <article class="forecast-card">
-      <div class="forecast-card-head">
-        <span class="forecast-house">H${item.house}</span>
-        <div>
-          <b>${item.title}</b>
-          <small>${item.signText} · lord ${item.lord}</small>
-        </div>
-        <span class="forecast-balance ${item.tone}">${item.balanceText}</span>
-      </div>
-      <p>${item.message}</p>
-      <div class="forecast-reasons">${item.reasons.map(r=>`<span class="${r.kind}">${r.text}</span>`).join('')}</div>
-    </article>`).join('');
+  renderNewsCorrelatedForecast(coreForecast,null);
+  updateNewsCorrelation(lat,lon,date,coreForecast);
 
   const influenceEl=document.getElementById('inspectInfluences');
   influenceEl.innerHTML=influences.length
@@ -1421,6 +1419,280 @@ function updateLocationReading(lat,lon,date){
     `${SIGNS[signIndex][0]} rises here in ${NAKSHATRAS[nakIndex]} pada ${pada}. `+
     `The sign lord is ${signLord}; the nakshatra lord is ${nakLord}. `+
     `Current planets occupy ${occupied||'no listed houses'} in the local whole-sign chart.`;
+}
+
+function renderNewsCorrelatedForecast(forecast,correlation){
+  const container=document.getElementById('inspectCoreForecast');
+  if(!container) return;
+
+  container.innerHTML=forecast.map(item=>{
+    const matches=correlation?.byHouse?.get(item.house)||[];
+    const observed=correlation
+      ? matches.length
+        ? `<div class="observed-events">
+            <b>Observed examples</b>
+            ${matches.slice(0,3).map(m=>`
+              <a class="observed-story" href="${escapeAttr(m.article.url)}" target="_blank" rel="noopener noreferrer">
+                <span>${escapeHtml(m.article.title)}</span>
+                <small>${escapeHtml(m.matchWhy)} · ${formatStoryTime(m.article.publishedAt)}</small>
+              </a>`).join('')}
+          </div>`
+        : `<div class="observed-events empty"><b>Observed examples</b><span>No strong match found in the fetched area headlines.</span></div>`
+      : `<div class="observed-events loading"><b>Observed examples</b><span>Checking current area news…</span></div>`;
+
+    return `
+      <article class="forecast-card">
+        <div class="forecast-card-head">
+          <span class="forecast-house">H${item.house}</span>
+          <div>
+            <b>${escapeHtml(item.title)}</b>
+            <small>${escapeHtml(item.signText)} · lord ${escapeHtml(item.lord)}</small>
+          </div>
+          <span class="forecast-balance ${escapeAttr(item.tone)}">${escapeHtml(item.balanceText)}</span>
+        </div>
+        <p>${escapeHtml(item.message)}</p>
+        <div class="forecast-reasons">${item.reasons.map(r=>`<span class="${escapeAttr(r.kind)}">${escapeHtml(r.text)}</span>`).join('')}</div>
+        ${observed}
+      </article>`;
+  }).join('');
+}
+
+async function updateNewsCorrelation(lat,lon,date,forecast){
+  const status=document.getElementById('inspectNewsStatus');
+  if(!status) return;
+
+  const area=resolvePoliticalArea(lat,lon);
+  if(!area){
+    status.textContent='Area could not be resolved for news comparison';
+    renderNewsCorrelatedForecast(forecast,{byHouse:new Map()});
+    return;
+  }
+
+  const ageDays=Math.abs(Date.now()-date.getTime())/86400000;
+  if(ageDays>7){
+    status.textContent=`${area.label} · current-news comparison unavailable more than 7 days from now`;
+    renderNewsCorrelatedForecast(forecast,{byHouse:new Map()});
+    return;
+  }
+
+  const seq=++state.newsSeq;
+  status.textContent=`${area.label} · checking current headlines…`;
+
+  try{
+    const articles=await fetchAreaNews(area.query);
+    if(seq!==state.newsSeq) return;
+
+    const correlation=correlateNewsToForecast(articles,forecast,date);
+    renderNewsCorrelatedForecast(forecast,correlation);
+
+    const matched=new Set();
+    for(const arr of correlation.byHouse.values()){
+      arr.forEach(x=>matched.add(x.article.id||x.article.url));
+    }
+    status.textContent=
+      `${area.label} · ${matched.size} matching example${matched.size===1?'':'s'} from ${articles.length} current headline${articles.length===1?'':'s'}`;
+  }catch(err){
+    console.error('Area news correlation failed:',err);
+    if(seq!==state.newsSeq) return;
+    status.textContent=`${area.label} · live news unavailable`;
+    renderNewsCorrelatedForecast(forecast,{byHouse:new Map()});
+  }
+}
+
+async function fetchAreaNews(areaQuery){
+  const key=areaQuery.toLowerCase();
+  const cached=state.newsCache.get(key);
+  if(cached && Date.now()-cached.stamp<300000) return cached.articles;
+
+  const r=await fetch('/api/news?q='+encodeURIComponent(areaQuery),{cache:'no-store'});
+  if(!r.ok) throw new Error('Area news HTTP '+r.status);
+  const data=await r.json();
+  const articles=Array.isArray(data.articles)?data.articles:[];
+  state.newsCache.set(key,{stamp:Date.now(),articles});
+  return articles;
+}
+
+function correlateNewsToForecast(articles,forecast,chartDate){
+  const byHouse=new Map(forecast.map(f=>[f.house,[]]));
+  const maxWindowMs=96*3600000;
+
+  for(const article of articles){
+    const published=new Date(article.publishedAt).getTime();
+    if(Number.isFinite(published) && Math.abs(published-chartDate.getTime())>maxWindowMs) continue;
+
+    const classified=classifyNewsEvent(article);
+    for(const item of forecast){
+      const houseScore=classified.houseScores.get(item.house)||0;
+      if(houseScore<=0) continue;
+
+      const signals=forecastSignalPlanets(item);
+      const planetHits=classified.planetScores
+        .filter(x=>signals.has(x.name))
+        .sort((a,b)=>b.score-a.score);
+
+      const evidenceScore=Math.min(3,Math.abs(item.score)/2);
+      const planetScore=planetHits.reduce((sum,x)=>sum+Math.min(1.2,x.score*.35),0);
+      const matchScore=houseScore+planetScore+evidenceScore*.25;
+      if(matchScore<2.1) continue;
+
+      const topic=classified.houseReasons.get(item.house)?.[0]||`H${item.house} topic`;
+      const planetText=planetHits.length?` + ${planetHits.slice(0,2).map(x=>x.name).join('/')}`:'';
+      byHouse.get(item.house).push({
+        article,
+        score:matchScore,
+        matchWhy:`${topic}${planetText}`
+      });
+    }
+  }
+
+  for(const list of byHouse.values()){
+    list.sort((a,b)=>b.score-a.score);
+  }
+  return {byHouse};
+}
+
+function classifyNewsEvent(article){
+  const text=`${article.title||''} ${article.description||''}`.toLowerCase();
+  const houseRules={
+    1:[
+      ['residents',1.2],['community',1.2],['public health',1.4],['health',.8],
+      ['population',1.2],['local emergency',1.4],['citywide',1.1],['statewide',1.1],
+      ['opening',.8],['launch',.8],['begins',.6]
+    ],
+    3:[
+      ['road',1.2],['traffic',1.4],['crash',1.5],['train',1.3],['transit',1.4],
+      ['bus',1.1],['communication',1.3],['internet',1.2],['phone',1.0],
+      ['neighborhood',1.4],['neighbors',1.4],['delivery',.9],['mail',.9],
+      ['school district',.8],['local travel',1.4]
+    ],
+    7:[
+      ['agreement',1.5],['deal',1.1],['partnership',1.4],['lawsuit',1.5],
+      ['court',1.2],['hearing',1.1],['negotiation',1.4],['settlement',1.4],
+      ['dispute',1.3],['conflict',1.0],['meeting',.9],['contract',1.3],
+      ['diplomatic',1.2]
+    ],
+    9:[
+      ['university',1.3],['college',1.2],['international',1.4],['foreign',1.2],
+      ['airline',1.2],['airport',1.1],['long-distance',1.5],['travel',.9],
+      ['religion',1.2],['church',.8],['temple',.8],['law',.9],
+      ['education',1.0],['research',1.0],['professor',1.0],['tourism',1.0]
+    ]
+  };
+  const planetRules={
+    Sun:[['mayor',1.3],['governor',1.3],['president',1.3],['authority',1],['government',1],['leader',1]],
+    Moon:[['family',1],['children',.9],['water',1],['flood',1.2],['public',.7],['housing',.8]],
+    Mercury:[['internet',1.3],['communication',1.3],['data',1],['technology',1],['traffic',.9],['transit',.9],['business',.8],['report',.7]],
+    Venus:[['agreement',1.2],['arts',1],['music',1],['finance',.9],['market',.8],['relationship',1],['festival',.8]],
+    Mars:[['fire',1.3],['crash',1.4],['shooting',1.5],['attack',1.4],['military',1.2],['injury',1.1],['explosion',1.4],['police',.8]],
+    Jupiter:[['university',1.2],['education',1.1],['court',.9],['judge',1],['law',1],['religion',1],['growth',.8],['expansion',.8]],
+    Saturn:[['delay',1.3],['closure',1.2],['restriction',1.3],['infrastructure',1.2],['labor',1],['strike',1.2],['construction',.9],['shortage',1]],
+    Rahu:[['unusual',1],['scandal',1.2],['cyber',1.3],['ai ',1],['foreign',.9],['surge',.9],['record',.7]],
+    Ketu:[['outage',1.3],['shutdown',1.3],['separation',1],['cancellation',1.1],['technical',.9],['disconnect',1.1]]
+  };
+
+  const houseScores=new Map();
+  const houseReasons=new Map();
+  for(const [house,rules] of Object.entries(houseRules)){
+    let score=0;
+    const reasons=[];
+    for(const [term,weight] of rules){
+      if(text.includes(term)){
+        score+=weight;
+        reasons.push(term);
+      }
+    }
+    if(score>0){
+      houseScores.set(Number(house),score);
+      houseReasons.set(Number(house),reasons);
+    }
+  }
+
+  const planetScores=[];
+  for(const [name,rules] of Object.entries(planetRules)){
+    let score=0;
+    for(const [term,weight] of rules){
+      if(text.includes(term)) score+=weight;
+    }
+    if(score>0) planetScores.push({name,score});
+  }
+
+  return {houseScores,houseReasons,planetScores};
+}
+
+function forecastSignalPlanets(item){
+  const names=['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Rahu','Ketu'];
+  const text=item.reasons.map(r=>r.text).join(' ');
+  return new Set(names.filter(name=>text.includes(name)));
+}
+
+function resolvePoliticalArea(lat,lon){
+  for(const f of state.admin1Regions){
+    if(pointInGeometry(lon,lat,f.geometry)){
+      const p=f.properties||{};
+      const name=String(p.name_en||p.NAME_EN||p.name||p.NAME||'').trim();
+      const country=String(p.admin||p.ADMIN||'').trim();
+      if(name) return {label:country?`${name}, ${country}`:name,query:country?`${name} ${country}`:name};
+    }
+  }
+
+  for(const f of state.countryRegions){
+    if(pointInGeometry(lon,lat,f.geometry)){
+      const p=f.properties||{};
+      const name=String(p.NAME_EN||p.name_en||p.ADMIN||p.admin||p.NAME||p.name||'').trim();
+      if(name) return {label:name,query:name};
+    }
+  }
+  return null;
+}
+
+function pointInGeometry(lon,lat,geometry){
+  if(!geometry) return false;
+  if(geometry.type==='Polygon') return pointInPolygonCoordinates(lon,lat,geometry.coordinates);
+  if(geometry.type==='MultiPolygon') return geometry.coordinates.some(poly=>pointInPolygonCoordinates(lon,lat,poly));
+  return false;
+}
+
+function pointInPolygonCoordinates(lon,lat,rings){
+  if(!rings?.length || !pointInRing(lon,lat,rings[0])) return false;
+  for(let i=1;i<rings.length;i++){
+    if(pointInRing(lon,lat,rings[i])) return false;
+  }
+  return true;
+}
+
+function pointInRing(lon,lat,ring){
+  let inside=false;
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    let xi=ring[i][0], yi=ring[i][1];
+    let xj=ring[j][0], yj=ring[j][1];
+
+    // Normalize rings crossing the date line around the tested longitude.
+    while(xi-lon>180) xi-=360;
+    while(xi-lon<-180) xi+=360;
+    while(xj-lon>180) xj-=360;
+    while(xj-lon<-180) xj+=360;
+
+    const intersects=((yi>lat)!==(yj>lat)) &&
+      (lon < (xj-xi)*(lat-yi)/((yj-yi)||1e-12)+xi);
+    if(intersects) inside=!inside;
+  }
+  return inside;
+}
+
+function formatStoryTime(value){
+  const d=new Date(value);
+  if(!Number.isFinite(d.getTime())) return 'recent';
+  return d.toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+}
+
+function escapeHtml(value){
+  return String(value??'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function escapeAttr(value){
+  return escapeHtml(value).replace(/`/g,'&#96;');
 }
 
 function localAngles(date,lat,lon,aya){
