@@ -11,14 +11,22 @@ export default async function handler(req,res){
   res.setHeader('Cache-Control','s-maxage=300, stale-while-revalidate=900');
   res.setHeader('Access-Control-Allow-Origin','*');
   try{
-    const settled=await Promise.allSettled(FEEDS.map(fetchFeed));
+    const area=cleanAreaQuery(req.query?.q);
+    const feeds=area
+      ? [{
+          category:'local',
+          source:'Google News · '+area,
+          url:'https://news.google.com/rss/search?q='+encodeURIComponent(area+' news')+'&hl=en-US&gl=US&ceid=US:en'
+        }]
+      : FEEDS;
+    const settled=await Promise.allSettled(feeds.map(fetchFeed));
     const articles=[]; const failures=[];
     settled.forEach((result,index)=>{
       if(result.status==='fulfilled') articles.push(...result.value);
-      else failures.push({source:FEEDS[index].source,error:result.reason?.message||String(result.reason)});
+      else failures.push({source:feeds[index].source,error:result.reason?.message||String(result.reason)});
     });
     const unique=dedupe(articles).sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt)).slice(0,120);
-    return res.status(200).json({updatedAt:new Date().toISOString(),count:unique.length,failures,articles:unique});
+    return res.status(200).json({updatedAt:new Date().toISOString(),area:area||null,count:unique.length,failures,articles:unique});
   }catch(error){
     return res.status(500).json({error:'News aggregation failed',detail:error?.message||String(error)});
   }
@@ -53,3 +61,7 @@ function validDate(value){const d=new Date(value);return Number.isFinite(d.getTi
 function safeHttpUrl(value){try{const u=new URL(value);return ['http:','https:'].includes(u.protocol)?u.href:'';}catch{return'';}}
 function dedupe(items){const seen=new Set();return items.filter(item=>{const k=item.url||item.title.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});}
 function simpleHash(text){let h=2166136261;for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}return(h>>>0).toString(36);}
+function cleanAreaQuery(value){
+  const q=String(value||'').replace(/[<>]/g,' ').replace(/\s+/g,' ').trim();
+  return q.slice(0,90);
+}
