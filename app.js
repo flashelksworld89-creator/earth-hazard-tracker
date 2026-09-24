@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OrbitControls } from 'https://esm.sh/three@0.183.2/examples/jsm/controls/OrbitControls.js?external=three';
 
 const A = window.Astronomy;
 const OBLIQUITY = THREE.MathUtils.degToRad(23.4393);
