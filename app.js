@@ -405,12 +405,12 @@ function drawRisingField(w,h,earthShiftDeg,frameDate){
   ctx.drawImage(risingCanvas,0,0,w,h);
   ctx.restore();
 
-  drawRisingLabels(w,h,earthShiftDeg,showZodiac,showNak);
+  drawRisingLabels(w,h,earthShiftDeg,showZodiac,showNak,frameDate);
 }
 
-function drawRisingLabels(w,h,earthShiftDeg,showZodiac,showNak){
-  const date=state.astro.date;
-  const aya=state.astro.aya;
+function drawRisingLabels(w,h,earthShiftDeg,showZodiac,showNak,frameDate){
+  const date=frameDate;
+  const aya=lahiriAyanamsa(date);
 
   if(showZodiac){
     const seen=new Set();
