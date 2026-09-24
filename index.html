@@ -45,6 +45,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 
     <main>
       <div id="map"></div>
+      <canvas id="eclipticBandCanvas" aria-label="3D ecliptic band"></canvas>
 
       <section class="panel layers-panel">
         <div class="panel-title collapsible-head">
@@ -176,8 +177,8 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         <label class="z-row z-orientation-row">
           <span>Compass view</span>
           <select id="zOrientation">
-            <option value="ecliptic" selected>Ecliptic · MC ↑ ASC →</option>
-            <option value="geographic">Geographic · N ↑ E →</option>
+            <option value="ecliptic3d" selected>3D Ecliptic Band</option>
+            <option value="geographic">Geographic projection</option>
           </select>
         </label>
         <div id="zOrientationNote" class="z-orientation-note">Ecliptic view: the sidereal zodiac is the compass. MC is top, ASC is east/right, and true N/E/S/W remain on the outer geographic ring.</div>
