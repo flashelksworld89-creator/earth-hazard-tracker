@@ -1425,6 +1425,10 @@ function renderRisingLordReport(report,correlation){
   const container=document.getElementById('inspectCoreForecast');
   if(!container) return;
 
+  const categorySummary=correlation?.categories?.length
+    ? `<div class="breaking-category-summary"><b>Today's breaking-news categories</b><span>${correlation.categories.slice(0,5).map(c=>escapeHtml(c.name)+' ('+c.count+')').join(' · ')}</span></div>`
+    : '';
+
   const observed=correlation
     ? correlation.matches.length
       ? `<div class="observed-events">
@@ -1458,6 +1462,7 @@ function renderRisingLordReport(report,correlation){
           </section>`).join('')}
       </div>
       ${report.learnedText?`<div class="learning-note"><b>Pattern memory</b><span>${escapeHtml(report.learnedText)}</span></div>`:''}
+      ${categorySummary}
       ${observed}
     </article>`;
 }
@@ -1473,10 +1478,14 @@ async function updateRisingLordNewsCorrelation(lat,lon,date,report){
     return;
   }
 
-  const ageDays=Math.abs(Date.now()-date.getTime())/86400000;
-  if(ageDays>7){
-    status.textContent=`${area.label} · current-news comparison unavailable more than 7 days from now`;
-    renderRisingLordReport(report,{matches:[]});
+  const now=new Date();
+  const sameCalendarDay=
+    now.getFullYear()===date.getFullYear() &&
+    now.getMonth()===date.getMonth() &&
+    now.getDate()===date.getDate();
+  if(!sameCalendarDay){
+    status.textContent=`${area.label} · breaking-news comparison only runs for today's chart`;
+    renderRisingLordReport(report,{matches:[],categories:[]});
     return;
   }
 
@@ -1493,7 +1502,7 @@ async function updateRisingLordNewsCorrelation(lat,lon,date,report){
     renderRisingLordReport(report,correlation);
 
     status.textContent=
-      `${area.label} · ${correlation.matches.length} rising-lord match${correlation.matches.length===1?'':'es'} from ${articles.length} current headlines`;
+      `${area.label} · ${correlation.matches.length} rising-lord match${correlation.matches.length===1?'':'es'} from today's breaking headlines`;
   }catch(err){
     console.error('Rising-lord news correlation failed:',err);
     if(seq!==state.newsSeq) return;
@@ -1503,12 +1512,11 @@ async function updateRisingLordNewsCorrelation(lat,lon,date,report){
 }
 
 function correlateNewsToRisingLord(articles,report,chartDate){
-  const maxWindowMs=96*3600000;
   const matches=[];
+  const categoryMap=new Map();
 
   for(const article of articles){
-    const published=new Date(article.publishedAt).getTime();
-    if(Number.isFinite(published) && Math.abs(published-chartDate.getTime())>maxWindowMs) continue;
+    if(!isSameCalendarDay(article.publishedAt,chartDate)) continue;
 
     const classified=classifyNewsEvent(article);
     let score=0;
@@ -1530,17 +1538,36 @@ function correlateNewsToRisingLord(articles,report,chartDate){
       }
     }
 
-    if(score>=1.8){
+    score+=classified.breakingScore*.35;
+
+    for(const category of classified.categories){
+      categoryMap.set(category,(categoryMap.get(category)||0)+1);
+    }
+
+    if(score>=1.7){
       matches.push({
         article,
         score,
-        matchWhy:`${report.lordName} signature → ${[...new Set(reasons)].slice(0,4).join(' + ')}`
+        category:classified.categories[0]||'General breaking news',
+        matchWhy:`${classified.categories[0]||'Breaking news'} · ${report.lordName} signature → ${[...new Set(reasons)].slice(0,4).join(' + ')}`
       });
     }
   }
 
   matches.sort((a,b)=>b.score-a.score);
-  return {matches};
+  const categories=[...categoryMap.entries()]
+    .sort((a,b)=>b[1]-a[1])
+    .map(([name,count])=>({name,count}));
+
+  return {matches,categories};
+}
+
+function isSameCalendarDay(value,referenceDate){
+  const d=new Date(value);
+  if(!Number.isFinite(d.getTime())) return false;
+  return d.getFullYear()===referenceDate.getFullYear() &&
+    d.getMonth()===referenceDate.getMonth() &&
+    d.getDate()===referenceDate.getDate();
 }
 
 function rememberRisingLordMatches(report,matches){
@@ -1594,45 +1621,6 @@ async function fetchAreaNews(areaQuery){
   return articles;
 }
 
-function correlateNewsToForecast(articles,forecast,chartDate){
-  const byHouse=new Map(forecast.map(f=>[f.house,[]]));
-  const maxWindowMs=96*3600000;
-
-  for(const article of articles){
-    const published=new Date(article.publishedAt).getTime();
-    if(Number.isFinite(published) && Math.abs(published-chartDate.getTime())>maxWindowMs) continue;
-
-    const classified=classifyNewsEvent(article);
-    for(const item of forecast){
-      const houseScore=classified.houseScores.get(item.house)||0;
-      if(houseScore<=0) continue;
-
-      const signals=forecastSignalPlanets(item);
-      const planetHits=classified.planetScores
-        .filter(x=>signals.has(x.name))
-        .sort((a,b)=>b.score-a.score);
-
-      const evidenceScore=Math.min(3,Math.abs(item.score)/2);
-      const planetScore=planetHits.reduce((sum,x)=>sum+Math.min(1.2,x.score*.35),0);
-      const matchScore=houseScore+planetScore+evidenceScore*.25;
-      if(matchScore<2.1) continue;
-
-      const topic=classified.houseReasons.get(item.house)?.[0]||`H${item.house} topic`;
-      const planetText=planetHits.length?` + ${planetHits.slice(0,2).map(x=>x.name).join('/')}`:'';
-      byHouse.get(item.house).push({
-        article,
-        score:matchScore,
-        matchWhy:`${topic}${planetText}`
-      });
-    }
-  }
-
-  for(const list of byHouse.values()){
-    list.sort((a,b)=>b.score-a.score);
-  }
-  return {byHouse};
-}
-
 function classifyNewsEvent(article){
   const text=`${article.title||''} ${article.description||''}`.toLowerCase();
   const houseRules={
@@ -1658,6 +1646,32 @@ function classifyNewsEvent(article){
       ['airline',1.2],['airport',1.1],['long-distance',1.5],['travel',.9],
       ['religion',1.2],['church',.8],['temple',.8],['law',.9],
       ['education',1.0],['research',1.0],['professor',1.0],['tourism',1.0]
+    ]
+  };
+  const breakingCategories={
+    'Accidents / Conflict':[
+      ['crash',2],['shooting',2],['attack',2],['explosion',2],['fire',1.5],['injury',1.2],['war',1.5],['military',1.2]
+    ],
+    'Weather / Disaster':[
+      ['earthquake',2],['hurricane',2],['flood',1.8],['wildfire',1.8],['tornado',2],['storm',1.3],['volcano',2],['evacuation',1.5]
+    ],
+    'Government / Legal':[
+      ['government',1.2],['mayor',1.2],['governor',1.2],['court',1.4],['lawsuit',1.5],['hearing',1.2],['law',1.0],['police',1.0]
+    ],
+    'Infrastructure / Transport':[
+      ['road',1.3],['traffic',1.3],['transit',1.4],['train',1.4],['airport',1.3],['airline',1.2],['bridge',1.3],['outage',1.5],['infrastructure',1.5]
+    ],
+    'Business / Markets':[
+      ['business',1.0],['market',1.2],['finance',1.2],['bank',1.2],['company',.9],['jobs',1.0],['layoff',1.3],['strike',1.2]
+    ],
+    'Public Safety / Health':[
+      ['emergency',1.4],['hospital',1.2],['health',1.1],['public safety',1.5],['warning',1.2],['shelter',1.0],['missing',1.2]
+    ],
+    'Education / Institutions':[
+      ['university',1.3],['college',1.2],['school',1.0],['research',1.1],['professor',1.0],['institution',1.0]
+    ],
+    'Technology / Communications':[
+      ['internet',1.4],['cyber',1.5],['technology',1.2],['data',1.0],['phone',1.0],['communications',1.2],['ai ',1.0]
     ]
   };
   const planetRules={
@@ -1698,7 +1712,27 @@ function classifyNewsEvent(article){
     if(score>0) planetScores.push({name,score});
   }
 
-  return {houseScores,houseReasons,planetScores};
+  const categories=[];
+  let breakingScore=0;
+  for(const [category,rules] of Object.entries(breakingCategories)){
+    let score=0;
+    for(const [term,weight] of rules){
+      if(text.includes(term)) score+=weight;
+    }
+    if(score>0){
+      categories.push({name:category,score});
+      breakingScore=Math.max(breakingScore,score);
+    }
+  }
+  categories.sort((a,b)=>b.score-a.score);
+
+  return {
+    houseScores,
+    houseReasons,
+    planetScores,
+    categories:categories.map(x=>x.name),
+    breakingScore
+  };
 }
 
 function forecastSignalPlanets(item){
