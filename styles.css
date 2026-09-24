@@ -676,3 +676,47 @@ button:hover,select:hover{border-color:rgba(103,232,249,.5)}
   color:#9fc7da;
   font-size:8px;
 }
+
+.forecast-card-head .forecast-balance{
+  margin-left:auto;
+  flex:0 0 auto;
+  padding:4px 6px;
+  border-radius:999px;
+  font-size:8px;
+  font-weight:800;
+  white-space:nowrap;
+  border:1px solid rgba(255,255,255,.08);
+}
+.forecast-balance.strong-support,
+.forecast-balance.support{
+  color:#9ee6ba;
+  background:rgba(72,199,116,.08);
+  border-color:rgba(72,199,116,.16);
+}
+.forecast-balance.pressure,
+.forecast-balance.high-pressure{
+  color:#ffaaa7;
+  background:rgba(255,90,95,.08);
+  border-color:rgba(255,90,95,.16);
+}
+.forecast-balance.mixed{
+  color:#f5d78d;
+  background:rgba(245,215,141,.07);
+  border-color:rgba(245,215,141,.14);
+}
+.forecast-reasons span.positive{
+  color:#9edbb7;
+  background:rgba(72,199,116,.065);
+}
+.forecast-reasons span.negative{
+  color:#f0aaa8;
+  background:rgba(255,90,95,.06);
+}
+.forecast-reasons span.caution{
+  color:#e8c77f;
+  background:rgba(232,199,127,.06);
+}
+.forecast-reasons span.neutral{
+  color:#9fc7da;
+  background:rgba(111,180,211,.07);
+}
