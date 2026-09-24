@@ -111,6 +111,14 @@ function bindControls(){
 
   ['showDayNight','showZodiac','showNakshatras','showPlanets','showGrid']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
+
+  const collapseBtn=document.getElementById('collapsePanelBtn');
+  const panel=document.querySelector('.control-panel');
+  collapseBtn.addEventListener('click',()=>{
+    const collapsed=panel.classList.toggle('collapsed');
+    collapseBtn.textContent=collapsed?'Expand':'Collapse';
+    collapseBtn.setAttribute('aria-expanded',String(!collapsed));
+  });
 }
 
 function freezePlayback(){
@@ -195,11 +203,10 @@ function draw(){
   ctx.clearRect(0,0,w,h);
   drawBackground(w,h);
 
-  const phase = state.astro ? normalize360(state.astro.gmst) : 0;
-  // Split the daily apparent motion between the two frames so the combined
-  // Earth-vs-sky relative motion remains one real sidereal rotation.
-  const earthShiftDeg = phase * 0.5;
-  const skyShiftDeg = -phase * 0.5;
+  const frameDate = currentDate();
+  const phase = normalize360(greenwichSiderealDegrees(frameDate));
+  // Full eastward Earth rotation: one complete wrap per sidereal day.
+  const earthShiftDeg = phase;
 
   if(document.getElementById('showGrid').checked) drawGrid(w,h,earthShiftDeg);
   if(state.mapReady) drawLand(w,h,earthShiftDeg);
@@ -209,10 +216,10 @@ function draw(){
       drawDayNight(w,h,earthShiftDeg);
     }
 
-    drawRisingField(w,h,earthShiftDeg);
+    drawRisingField(w,h,earthShiftDeg,frameDate);
 
     if(document.getElementById('showPlanets').checked){
-      drawProjectedPlanets(w,h,earthShiftDeg);
+      drawProjectedPlanets(w,h,earthShiftDeg,frameDate);
     }
   }
 
@@ -347,7 +354,7 @@ function drawDayNight(w,h,earthShiftDeg){
   ctx.restore();
 }
 
-function drawRisingField(w,h,earthShiftDeg){
+function drawRisingField(w,h,earthShiftDeg,frameDate){
   const showZodiac=document.getElementById('showZodiac').checked;
   const showNak=document.getElementById('showNakshatras').checked;
   if(!showZodiac && !showNak) return;
@@ -356,8 +363,8 @@ function drawRisingField(w,h,earthShiftDeg){
   const rh=risingCanvas.height;
   const img=risingCtx.createImageData(rw,rh);
   const data=img.data;
-  const date=state.astro.date;
-  const aya=state.astro.aya;
+  const date=frameDate;
+  const aya=lahiriAyanamsa(date);
 
   for(let py=0;py<rh;py++){
     const lat=yToLat(py+.5,rh);
@@ -456,9 +463,9 @@ function drawFieldLabel(text,color,x,y,size){
   ctx.restore();
 }
 
-function drawProjectedPlanets(w,h,earthShiftDeg){
-  const date=state.astro.date;
-  const aya=state.astro.aya;
+function drawProjectedPlanets(w,h,earthShiftDeg,frameDate){
+  const date=frameDate;
+  const aya=lahiriAyanamsa(date);
   const occupied=new Map();
 
   state.astro.placements.forEach(p=>{
