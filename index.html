@@ -3,15 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#06111f" />
-  <title>Earth Hazard Tracker · Live Global Hazards, Weather & Sidereal Patterns</title>
-  <meta name="description" content="Track earthquakes, cyclones, volcanoes, floods, wildfires, atmospheric rivers, live weather, global rising signs and experimental hazard patterns on an interactive world map." />
-  <meta property="og:title" content="Earth Hazard Tracker" />
-  <meta property="og:description" content="Live global hazards, weather intelligence, sidereal rising zones and experimental pattern analysis in one interactive world map." />
-  <meta property="og:type" content="website" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <link rel="preconnect" href="https://unpkg.com">
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.0/dist/maplibre-gl.css" />
+  <meta name="theme-color" content="#020812" />
+  <title>Sidereal Ecliptic Earth</title>
+  <meta name="description" content="Experimental 3D sidereal Earth and ecliptic visualization." />
   <link rel="stylesheet" href="/styles.css" />
   <script type="importmap">
   {
@@ -23,391 +17,73 @@
   </script>
 </head>
 <body>
-<script>
-if(window.top===window.self && location.pathname!=='/dashboard.html'){
-  const page=location.pathname==='/'?'/':location.pathname;
-  location.replace('/dashboard.html?page='+encodeURIComponent(page));
-}
-</script>
-  <div id="app">
-    <header class="topbar">
-      <div class="brand">
-        <div class="planet-mark">◎</div>
-        <div>
-          <h1>Earth Hazard Tracker</h1>
-          <p>Live hazards · weather intelligence · sidereal patterns</p>
-        </div>
-      </div>
+  <main class="app-shell">
+    <div id="scene" class="scene" aria-label="Interactive 3D Earth and ecliptic"></div>
 
-      <div class="header-actions">
-        <form id="searchForm" class="search">
-          <input id="searchInput" type="search" placeholder="Search city, country, volcano…" autocomplete="off" />
-          <button type="submit">Search</button>
-        </form>
-        <a href="/news.html" class="secondary top-news-link">📰 World News</a>
-        <a href="/patterns.html" class="secondary top-news-link">◫ Pattern Lab</a>
-        <button id="zodiacMasterBtn" class="secondary zodiac-master-btn">Zodiac Compass: OFF</button>
-        <button id="refreshBtn" class="secondary">Refresh now</button>
+    <header class="topbar glass">
+      <div>
+        <h1>Sidereal Ecliptic Earth</h1>
+        <p>3D prototype · Lahiri sidereal zodiac</p>
       </div>
+      <nav>
+        <a href="/news.html">World News</a>
+        <a href="/patterns.html">Pattern Lab</a>
+      </nav>
     </header>
 
-    <main>
-      <div id="globe3d" aria-label="Interactive 3D Earth and ecliptic"></div>
-      <div id="map"></div>
-
-      <section class="panel layers-panel">
-        <div class="panel-title collapsible-head">
-          <span>LAYERS</span>
-          <div class="head-actions"><span id="liveDot" class="live-pill">● LIVE</span><button class="collapse-btn" data-collapse="layers-panel" aria-label="Collapse">−</button></div>
+    <section class="control-panel glass">
+      <div class="panel-head">
+        <div>
+          <strong>ECLIPTIC CONTROLS</strong>
+          <span id="statusText">Loading astronomy…</span>
         </div>
-        <div class="collapsible-body">
+        <button id="resetViewBtn">Reset view</button>
+      </div>
 
-        <label class="layer-row">
-          <span><i class="legend earthquake"></i>Earthquakes</span>
-          <input class="layer-toggle" type="checkbox" data-layer="earthquakes" checked />
-        </label>
-        <label class="layer-row">
-          <span><i class="legend cyclone"></i>Cyclones / Hurricanes</span>
-          <input class="layer-toggle" type="checkbox" data-layer="TC" checked />
-        </label>
-        <label class="layer-row">
-          <span><i class="legend volcano"></i>Volcanoes</span>
-          <input class="layer-toggle" type="checkbox" data-layer="VO" checked />
-        </label>
-        <label class="layer-row">
-          <span><i class="legend flood"></i>Floods</span>
-          <input class="layer-toggle" type="checkbox" data-layer="FL" checked />
-        </label>
-        <label class="layer-row">
-          <span><i class="legend wildfire"></i>Wildfires</span>
-          <input class="layer-toggle" type="checkbox" data-layer="WF" checked />
-        </label>
-        <label class="layer-row">
-          <span><i class="legend drought"></i>Droughts</span>
-          <input class="layer-toggle" type="checkbox" data-layer="DR" />
-        </label>
+      <div class="readouts">
+        <div><small>ASC</small><strong id="ascText">—</strong></div>
+        <div><small>DSC</small><strong id="dscText">—</strong></div>
+        <div><small>MC</small><strong id="mcText">—</strong></div>
+        <div><small>IC</small><strong id="icText">—</strong></div>
+      </div>
 
-        <label class="layer-row">
-          <span><i class="legend atmospheric-river"></i>Atmospheric Rivers</span>
-          <input id="arLayerToggle" type="checkbox" checked />
-        </label>
+      <div class="time-controls">
+        <button data-minutes="-1440">−1D</button>
+        <button data-minutes="-60">−1H</button>
+        <button id="nowBtn">NOW</button>
+        <button data-minutes="60">+1H</button>
+        <button data-minutes="1440">+1D</button>
+      </div>
 
-        <label class="layer-row">
-          <span><i class="legend zodiac"></i>Zodiacal Compass</span>
-          <input id="zodiacLayerToggle" type="checkbox" checked />
-        </label>
+      <div class="row">
+        <button id="playBtn">▶ Play</button>
+        <select id="speedSelect">
+          <option value="1">1×</option>
+          <option value="60">60×</option>
+          <option value="360">360×</option>
+          <option value="1440">1440×</option>
+        </select>
+        <label><input id="rotateEarth" type="checkbox" checked /> Rotate Earth</label>
+      </div>
 
-        <label class="z-row map-brightness-row">
-          <span>Map brightness</span>
-          <input id="mapBrightness" type="range" min="25" max="100" value="58" />
-        </label>
-        <div class="divider"></div>
+      <div class="row">
+        <label><input id="showPlanets" type="checkbox" checked /> Planets</label>
+        <label><input id="showSigns" type="checkbox" checked /> Zodiac</label>
+        <label><input id="showAngles" type="checkbox" checked /> Angles</label>
+      </div>
 
-        <button id="projectionBtn" class="wide secondary">Switch to flat map</button>
-        <button id="rotateBtn" class="wide secondary">Pause globe rotation</button>
-        </div>
-      </section>
+      <div id="timeText" class="time-text">—</div>
+      <div id="planetList" class="planet-list"></div>
 
-      <aside class="panel events-panel">
-        <div class="panel-title collapsible-head">
-          <span>LIVE EVENTS</span>
-          <div class="head-actions"><span id="updatedAt">Loading…</span><button class="collapse-btn" data-collapse="events-panel" aria-label="Collapse">−</button></div>
-        </div>
-        <div class="collapsible-body events-body">
+      <p class="note">
+        Earth rotates west → east. The ecliptic band is a separate celestial reference plane.
+        Planet positions follow calculated sidereal longitudes; apparent daily east → west motion
+        comes from Earth rotating beneath the sky.
+      </p>
+    </section>
 
-        <div class="live-status-grid">
-          <div class="source-status">
-            <span class="status-dot" id="usgsStatusDot"></span>
-            <div><strong>USGS</strong><small id="usgsUpdated">Waiting…</small></div>
-          </div>
-          <div class="source-status">
-            <span class="status-dot" id="gdacsStatusDot"></span>
-            <div><strong>GDACS</strong><small id="gdacsUpdated">Waiting…</small></div>
-          </div>
-        </div>
-
-        <div id="newEventBanner" class="new-event-banner hidden">
-          <strong id="newEventCount">0 new events</strong>
-          <button id="showNewEventsBtn">Show</button>
-        </div>
-
-        <div class="stat-grid">
-          <button class="stat-card" data-filter="earthquakes">
-            <strong id="eqCount">—</strong><span>Earthquakes</span>
-          </button>
-          <button class="stat-card" data-filter="TC">
-            <strong id="tcCount">—</strong><span>Cyclones</span>
-          </button>
-          <button class="stat-card" data-filter="VO">
-            <strong id="voCount">—</strong><span>Volcanoes</span>
-          </button>
-          <button class="stat-card" data-filter="FL">
-            <strong id="flCount">—</strong><span>Floods</span>
-          </button>
-        </div>
-
-        <div class="events-heading">
-          <strong id="eventListTitle">Recent events</strong>
-          <button id="clearFilterBtn" class="text-btn">Show all</button>
-        </div>
-        <div id="eventsList" class="events-list">
-          <div class="loading-card">Loading global events…</div>
-        </div>
-        </div>
-      </aside>
-
-      <section id="detailPanel" class="panel detail-panel hidden">
-        <div class="detail-head collapsible-head">
-          <span>DETAILS</span>
-          <div class="head-actions"><button class="collapse-btn" data-collapse="detail-panel" aria-label="Collapse">−</button><button id="closeDetail" class="close-btn" aria-label="Close">×</button></div>
-        </div>
-        <div class="collapsible-body"><div id="detailContent"></div></div>
-      </section>
-
-      <section id="zodiacPanel" class="panel zodiac-panel">
-        <div class="zodiac-head collapsible-head">
-          <div>
-            <strong>ECLIPTIC COMPASS</strong>
-            <span id="zodiacStatus">Sidereal · Lahiri</span>
-          </div>
-          <div class="head-actions"><button id="zodiacCloseBtn" class="text-btn">Hide</button><button class="collapse-btn" data-collapse="zodiac-panel" aria-label="Collapse">−</button></div>
-        </div>
-        <div class="collapsible-body">
-
-        <div class="zodiac-readout zodiac-angle-readout">
-          <div><small>ASC · EAST</small><strong id="zAsc">—</strong></div>
-          <div><small>DSC · WEST</small><strong id="zDsc">—</strong></div>
-          <div><small>MC · TOP</small><strong id="zMc">—</strong></div>
-          <div><small>IC · BOTTOM</small><strong id="zIc">—</strong></div>
-          <div class="z-aya-cell"><small>Lahiri ayanamsa</small><strong id="zAya">—</strong></div>
-        </div>
-
-        <label class="z-row z-orientation-row">
-          <span>Compass view</span>
-          <select id="zOrientation">
-            <option value="ecliptic3d" selected>3D Ecliptic Band</option>
-            <option value="geographic">Geographic projection</option>
-          </select>
-        </label>
-        <div id="zOrientationNote" class="z-orientation-note">Ecliptic view: the sidereal zodiac is the compass. MC is top, ASC is east/right, and true N/E/S/W remain on the outer geographic ring.</div>
-
-        <div class="zodiac-time">
-          <button data-ztime="-1440">−1D</button>
-          <button data-ztime="-60">−1H</button>
-          <button id="zNowBtn">NOW</button>
-          <button data-ztime="60">+1H</button>
-          <button data-ztime="1440">+1D</button>
-        </div>
-
-        <div class="z-sim-controls">
-          <button id="zSimPlayBtn" class="secondary">▶ Play</button>
-          <select id="zSimSpeed" aria-label="Simulation speed">
-            <option value="1">1× real time</option>
-            <option value="60">60×</option>
-            <option value="360">360×</option>
-            <option value="1440">1440×</option>
-            <option value="10080">1 week / min</option>
-          </select>
-          <label><input id="zDayNight" type="checkbox" checked /> Day/night</label>
-        </div>
-
-        <div id="zTimeLabel" class="z-time-label">—</div>
-        <div id="zEphemerisStatus" class="z-ephemeris-status">Loading current sidereal transits…</div>
-
-        <div class="zodiac-actions">
-          <button id="zUseCenterBtn" class="secondary">Use map center</button>
-          <button id="zUseHereBtn" class="secondary">Set by Shift+Click</button>
-        </div>
-        <div id="zOriginLabel" class="z-origin-label">Origin: —</div>
-
-        <label class="z-row">
-          <span>Zodiac rising beams</span>
-          <input id="zGlobalZones" type="checkbox" checked />
-        </label>
-
-        <label class="z-row">
-          <span>Global nakshatra boundaries</span>
-          <input id="zGlobalNak" type="checkbox" checked />
-        </label>
-
-        <label class="z-row">
-          <span>Focus rising beam</span>
-          <select id="zGlobalSignSelect">
-            <option value="">All signs</option>
-            <option value="0">Aries</option>
-            <option value="1">Taurus</option>
-            <option value="2">Gemini</option>
-            <option value="3">Cancer</option>
-            <option value="4">Leo</option>
-            <option value="5">Virgo</option>
-            <option value="6">Libra</option>
-            <option value="7">Scorpio</option>
-            <option value="8">Sagittarius</option>
-            <option value="9">Capricorn</option>
-            <option value="10">Aquarius</option>
-            <option value="11">Pisces</option>
-          </select>
-        </label>
-
-        <div class="z-display-grid">
-          <label><span>Houses</span><input id="zShowHouses" type="checkbox" checked /></label>
-          <label><span>Nakshatras</span><input id="zShowNak" type="checkbox" checked /></label>
-          <label><span>Aspects</span><input id="zShowAspects" type="checkbox" /></label>
-          <label><span>Planet degrees</span><input id="zPlanetLabels" type="checkbox" checked /></label>
-        </div>
-
-        <label class="z-row">
-          <span>Compass opacity</span>
-          <input id="zOpacity" type="range" min="15" max="100" value="72" />
-        </label>
-
-        <label class="z-row">
-          <span>Highlight planet</span>
-          <select id="zPlanetSelect">
-            <option value="">None</option>
-            <option value="Sun">Sun</option>
-            <option value="Moon">Moon</option>
-            <option value="Mercury">Mercury</option>
-            <option value="Venus">Venus</option>
-            <option value="Mars">Mars</option>
-            <option value="Jupiter">Jupiter</option>
-            <option value="Saturn">Saturn</option>
-            <option value="Uranus">Uranus</option>
-            <option value="Neptune">Neptune</option>
-            <option value="Pluto">Pluto</option>
-            <option value="Rahu">Rahu</option>
-            <option value="Ketu">Ketu</option>
-          </select>
-        </label>
-
-        <div class="z-ring-guide">
-          <div><b>OUTER</b><span>Geographic N · NE · E · SE · S · SW · W · NW</span></div>
-          <div><b>MIDDLE</b><span>MC · IC · ASC · DSC · 12 Porphyry house cusps</span></div>
-          <div><b>INNER</b><span>Ecliptic · 12 sidereal signs · 27 nakshatras · planet glyphs</span></div>
-        </div>
-
-        <div class="zodiac-key">
-          <span><i class="zkey sign"></i>Signs</span>
-          <span><i class="zkey nak"></i>Nakshatras</span>
-          <span><i class="zkey house"></i>Houses / angles</span>
-          <span><i class="zkey direction"></i>True directions</span>
-        </div>
-
-        <div id="zPlanetList" class="z-planet-list"></div>
-        <div class="z-disclaimer">Ecliptic view is a chart projection of the real sidereal ecliptic. ASC/DSC are still the true eastern/western horizon intersections and MC/IC the local meridian intersections. Colored Earth bands show where each sign is currently rising; they are calculated horizon zones, not fixed geographic zodiac regions. Houses use the Porphyry quadrant system.</div>
-        </div>
-      </section>
-
-      <section id="usRisingPanel" class="panel us-rising-panel collapsed">
-        <div class="us-rising-head collapsible-head">
-          <div><strong>U.S. RISING SIGNS</strong><span id="usRisingTime">Sidereal · Lahiri</span></div>
-          <div class="head-actions"><button class="collapse-btn" data-collapse="us-rising-panel" aria-label="Collapse">+</button></div>
-        </div>
-        <div class="collapsible-body">
-          <div class="us-rising-note">Representative locations · exact local eastern horizon</div>
-          <div class="us-rising-grid">
-            <div class="us-rising-row"><div><strong>Eastern Time</strong><small>New York City</small></div><div><small>ASC</small><b id="usAscEast">—</b></div><div><small>Moon</small><b id="usMoonEast">—</b></div></div>
-            <div class="us-rising-row"><div><strong>Central Time</strong><small>Chicago</small></div><div><small>ASC</small><b id="usAscMid">—</b></div><div><small>Moon</small><b id="usMoonMid">—</b></div></div>
-            <div class="us-rising-row"><div><strong>Mountain Time</strong><small>Denver</small></div><div><small>ASC</small><b id="usAscMountain">—</b></div><div><small>Moon</small><b id="usMoonMountain">—</b></div></div>
-            <div class="us-rising-row"><div><strong>Pacific Time</strong><small>Los Angeles</small></div><div><small>ASC</small><b id="usAscWest">—</b></div><div><small>Moon</small><b id="usMoonWest">—</b></div></div>
-          </div>
-          <div class="us-rising-foot">Moon sign/degree is geocentric and therefore the same in all three rows; the Ascendant changes by location.</div>
-        </div>
-      </section>
-
-      <section id="arControlPanel" class="panel ar-control-panel collapsed">
-        <div class="ar-control-head collapsible-head">
-          <div>
-            <strong>ATMOSPHERIC RIVERS</strong>
-            <span id="arStatus">Loading model scan…</span>
-          </div>
-          <div class="head-actions"><button id="arRefreshBtn" class="text-btn">Refresh</button><button class="collapse-btn" data-collapse="ar-control-panel" aria-label="Collapse">+</button></div>
-        </div>
-        <div class="collapsible-body">
-        <div class="ar-time-buttons">
-          <button data-ar-hour="0" class="active">NOW</button>
-          <button data-ar-hour="6">+6H</button>
-          <button data-ar-hour="12">+12H</button>
-          <button data-ar-hour="24">+24H</button>
-          <button data-ar-hour="48">+48H</button>
-          <button data-ar-hour="72">+72H</button>
-        </div>
-        <div class="ar-legend">
-          <span><i class="ar-dot ar1"></i>AR1</span>
-          <span><i class="ar-dot ar2"></i>AR2</span>
-          <span><i class="ar-dot ar3"></i>AR3</span>
-          <span><i class="ar-dot ar4"></i>AR4</span>
-          <span><i class="ar-dot ar5"></i>AR5</span>
-          <span class="ar-note">Approximate IVT scan</span>
-        </div>
-        </div>
-      </section>
-
-      <section id="schumannPanel" class="panel schumann-panel collapsed">
-        <div class="schumann-head collapsible-head">
-          <div>
-            <strong>SCHUMANN RESONANCE</strong>
-            <span id="schumannStatus">Loading…</span>
-          </div>
-          <div class="head-actions">
-            <button id="schumannRefreshBtn" class="text-btn">Refresh</button>
-            <button class="collapse-btn" data-collapse="schumann-panel" aria-label="Collapse">+</button>
-          </div>
-        </div>
-        <div class="collapsible-body">
-          <div class="schumann-readout">
-            <div><small>Fundamental</small><strong id="schumannFreq">7.83 Hz</strong></div>
-            <div><small>Activity</small><strong id="schumannScore">—</strong></div>
-          </div>
-          <div id="schumannStations" class="schumann-stations">Observatories: —</div>
-          <div id="schumannUpdated" class="schumann-updated">Source time: —</div>
-          <div class="schumann-actions">
-            <a href="https://schumannresonancelive.com/en/live-spectrogram/" target="_blank" rel="noopener noreferrer">Live spectrogram ↗</a>
-          </div>
-          <div class="schumann-note">Activity is signal-strength status, not a change in the 7.83 Hz fundamental frequency.</div>
-        </div>
-      </section>
-
-      <section class="panel auto-refresh-panel">
-        <div class="auto-refresh-row collapsible-head">
-          <div>
-            <strong>AUTO REFRESH</strong>
-            <span id="autoRefreshText">Earthquakes 1 min · Hazards 5 min</span>
-          </div>
-          <div class="head-actions"><button class="collapse-btn" data-collapse="auto-refresh-panel" aria-label="Collapse">−</button>
-          <label class="switch">
-            <input id="autoRefreshToggle" type="checkbox" checked />
-            <span class="slider"></span>
-          </label></div>
-        </div>
-        <div class="collapsible-body auto-body"></div>
-      </section>
-
-      <section class="panel timeline-panel">
-        <div class="timeline-top collapsible-head">
-          <div>
-            <strong>PAST EVENT WINDOW</strong>
-            <span id="timelineLabel">7 days</span>
-          </div>
-          <div class="head-actions"><button class="collapse-btn" data-collapse="timeline-panel" aria-label="Collapse">−</button><div class="timeline-presets">
-            <button data-days="1">24H</button>
-            <button data-days="7" class="active">7D</button>
-            <button data-days="30">30D</button>
-          </div></div>
-        </div>
-        <div class="collapsible-body">
-          <input id="timelineRange" type="range" min="1" max="30" value="7" />
-          <div class="timeline-axis"><span>1 day</span><span>NOW</span></div>
-        </div>
-      </section>
-
-      <div id="statusToast" class="toast hidden"></div>
-    </main>
-
-    <footer>
-      Live data: USGS · GDACS · Open-Meteo. For situational awareness only; follow official local authorities for warnings.
-    </footer>
-  </div>
+    <div class="prototype-badge">WEATHER / HAZARDS TEMPORARILY REMOVED</div>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
   <script type="module" src="/app.js"></script>
