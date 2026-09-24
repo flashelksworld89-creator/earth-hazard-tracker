@@ -88,18 +88,27 @@
       </div>
 
       <div class="row">
-        <label><input id="showPlanets" type="checkbox" checked /> Planets</label>
-        <label><input id="showSigns" type="checkbox" checked /> Zodiac</label>
+        <label><input id="showPlanets" type="checkbox" checked /> Celestial planets</label>
+        <label><input id="showSigns" type="checkbox" checked /> Zodiac band</label>
         <label><input id="showAngles" type="checkbox" checked /> Angles</label>
       </div>
 
+      <div class="row">
+        <label><input id="showNakSkin" type="checkbox" checked /> Rising nakshatra skin</label>
+        <label><input id="showNakLabels" type="checkbox" checked /> Nakshatra labels</label>
+        <label><input id="showProjectedPlanets" type="checkbox" checked /> Projected planet glyphs</label>
+        <label><input id="showStars" type="checkbox" checked /> Fixed stars</label>
+      </div>
+
       <div id="timeText" class="time-text">—</div>
+      <div id="nakshatraKey" class="nakshatra-key"></div>
       <div id="planetList" class="planet-list"></div>
 
       <p class="note">
-        Earth rotates west → east. The ecliptic band is a separate celestial reference plane.
-        Planet positions follow calculated sidereal longitudes; apparent daily east → west motion
-        comes from Earth rotating beneath the sky.
+        Earth rotates west → east beneath a fixed celestial reference. The transparent surface skin
+        shows which nakshatra is rising at each geographic region. Its colored zones and projected
+        planet glyphs migrate westward across Earth as the planet turns eastward; the celestial
+        planet glyphs themselves move only by their calculated sidereal motion.
       </p>
     </section>
 
