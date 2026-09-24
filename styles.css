@@ -1143,3 +1143,37 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{
   .z-orientation-row select{width:100%}
   .z-display-grid{grid-template-columns:1fr 1fr}
 }
+
+/* ecliptic compass visual pass */
+.zodiac-panel{
+  width:356px;
+  border-color:rgba(103,232,249,.22);
+  box-shadow:0 18px 60px rgba(0,0,0,.48),0 0 30px rgba(56,189,248,.06);
+}
+.zodiac-head strong{color:#dff9ff}
+#zodiacStatus{color:#67e8f9}
+.zodiac-angle-readout>div{
+  background:linear-gradient(180deg,rgba(7,24,36,.72),rgba(4,15,25,.58));
+}
+.z-orientation-row{
+  border-color:rgba(103,232,249,.16);
+  background:rgba(5,27,36,.34);
+}
+.z-orientation-row select{border-color:rgba(103,232,249,.16)}
+.z-ring-guide>div:nth-child(1){border-left-color:rgba(148,163,184,.35)}
+.z-ring-guide>div:nth-child(2){border-left-color:rgba(253,230,138,.38)}
+.z-ring-guide>div:nth-child(3){border-left-color:rgba(103,232,249,.38)}
+.z-ring-guide b{color:#bff7ff}
+.zodiac-key{padding-top:3px}
+.z-planet-item{
+  background:linear-gradient(90deg,rgba(5,18,29,.80),rgba(5,18,29,.52));
+}
+.z-disclaimer{
+  padding:8px 9px;
+  border:1px solid rgba(103,232,249,.09);
+  border-radius:8px;
+  background:rgba(3,15,24,.42);
+}
+@media(max-width:700px){
+  .zodiac-panel{width:auto}
+}
