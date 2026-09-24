@@ -96,6 +96,7 @@ export function initZodiacCompass(map, maplibregl) {
     signs:'zodiac-sign-lines',
     nak:'zodiac-nak-lines',
     houses:'zodiac-house-lines',
+    angles:'zodiac-angle-lines',
     dirs:'zodiac-direction-lines',
     rings:'zodiac-rings',
     aspects:'zodiac-aspects',
@@ -230,11 +231,11 @@ export function initZodiacCompass(map, maplibregl) {
 
     document.getElementById('zShowHouses')?.addEventListener('change',(e)=>{
       state.showHouses=e.target.checked;
-      setVisibility();
+      refresh();
     });
     document.getElementById('zShowNak')?.addEventListener('change',(e)=>{
       state.showNak=e.target.checked;
-      setVisibility();
+      refresh();
     });
     document.getElementById('zShowAspects')?.addEventListener('change',(e)=>{
       state.showAspects=e.target.checked;
@@ -317,7 +318,8 @@ export function initZodiacCompass(map, maplibregl) {
         'line-opacity':['case',['==',['get','above'],true],.94,.22]
       }
     });
-    addLine(ids.houses,'#fde68a',1.8,.76,[5,3]);
+    addLine(ids.houses,'#fde68a',1.45,.62,[5,3]);
+    addLine(ids.angles,'#fff3b0',2.7,.94);
     addLine(ids.dirs,'#cbd5e1',1.3,.56,[1,4]);
 
     if (!map.getLayer(ids.rings)) map.addLayer({
@@ -579,7 +581,8 @@ export function initZodiacCompass(map, maplibregl) {
     const pairs=[
       [ids.signs,'line-opacity',.78],
       [ids.nak,'line-opacity',.42],
-      [ids.houses,'line-opacity',.65],
+      [ids.houses,'line-opacity',.62],
+      [ids.angles,'line-opacity',.94],
       [ids.dirs,'line-opacity',.48],
       [ids.rings,'line-opacity',.46],
       [ids.aspects,'line-opacity',.58],
@@ -601,7 +604,7 @@ export function initZodiacCompass(map, maplibregl) {
 
   function drawGeometry(angles,date,aya) {
     const {asc,dsc,mc,ic,houseCusps}=angles;
-    const signs=[],nak=[],houses=[],dirs=[],labels=[],rings=[];
+    const signs=[],nak=[],houses=[],anglesLayer=[],dirs=[],labels=[],rings=[];
 
     const bearingForLon=(lon)=>{
       if(state.orientation==='traditional') return traditionalChartBearing(lon,asc,mc);
@@ -644,20 +647,24 @@ export function initZodiacCompass(map, maplibregl) {
       nak.push(lineFeature(rayCoordinates(bearingForLon(lon),7000),{
         kind:'nak',nakIndex:i,above:edge.alt>=0,alt:edge.alt
       }));
-      labels.push(pointFeature(destination(state.origin,bearingForLon(midLon),6150),{
-        kind:'nak',
-        label:state.orientation==='traditional'
-          ? NAKSHATRAS[i]
-          : `${NAKSHATRAS[i]} ${mid.alt>=0?'↑':'↓'}`
-      }));
+      if(state.showNak){
+        labels.push(pointFeature(destination(state.origin,bearingForLon(midLon),6150),{
+          kind:'nak',
+          label:state.orientation==='traditional'
+            ? NAKSHATRAS[i]
+            : `${NAKSHATRAS[i]} ${mid.alt>=0?'↑':'↓'}`
+        }));
+      }
     }
 
     houseCusps.forEach((lon,i)=>{
       const b=bearingForLon(lon);
       houses.push(lineFeature(rayCoordinates(b,11100),{kind:'house',house:i+1}));
-      labels.push(pointFeature(destination(state.origin,b,9650),{
-        kind:'house',label:`H${i+1}`
-      }));
+      if(state.showHouses){
+        labels.push(pointFeature(destination(state.origin,b,9650),{
+          kind:'house',label:`H${i+1}`
+        }));
+      }
     });
 
     // True geographic compass remains fixed even when the astrology wheel is rotated.
@@ -673,7 +680,7 @@ export function initZodiacCompass(map, maplibregl) {
       ['DSC',dsc,state.orientation==='traditional'?270:bearingForLon(dsc)]
     ];
     angleData.forEach(([name,lon,b])=>{
-      houses.push(lineFeature(rayCoordinates(b,11600),{kind:'angle',angle:name}));
+      anglesLayer.push(lineFeature(rayCoordinates(b,11600),{kind:'angle',angle:name}));
       labels.push(pointFeature(destination(state.origin,b,10600),{
         kind:'angle',label:`${name} ${zodiacDegree(lon)}`
       }));
@@ -682,6 +689,7 @@ export function initZodiacCompass(map, maplibregl) {
     setData(ids.signs,signs);
     setData(ids.nak,nak);
     setData(ids.houses,houses);
+    setData(ids.angles,anglesLayer);
     setData(ids.dirs,dirs);
     setData(ids.rings,rings);
     setData(ids.labels,labels);
