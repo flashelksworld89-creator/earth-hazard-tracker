@@ -393,11 +393,27 @@ function drawRisingField(w,h,earthShiftDeg,frameDate){
   const showNak=document.getElementById('showNakshatras').checked;
   if(!showZodiac && !showNak) return;
 
+  buildRisingCache(frameDate,earthShiftDeg,showZodiac,showNak);
+
+  ctx.save();
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(risingCanvas,0,0,w,h);
+  ctx.restore();
+
+  drawRisingLabels(w,h,showZodiac,showNak);
+}
+
+function buildRisingCache(date,earthShiftDeg,showZodiac,showNak){
   const rw=risingCanvas.width;
   const rh=risingCanvas.height;
+  const dayKey=date.toISOString().slice(0,10);
+  const cacheKey=`${dayKey}|${showZodiac?1:0}|${showNak?1:0}`;
+  if(state.risingCacheKey===cacheKey && state.risingSignGrid && state.risingNakGrid) return;
+
   const img=risingCtx.createImageData(rw,rh);
   const data=img.data;
-  const date=frameDate;
+  const signGrid=new Uint8Array(rw*rh);
+  const nakGrid=new Uint8Array(rw*rh);
   const aya=lahiriAyanamsa(date);
 
   for(let py=0;py<rh;py++){
@@ -409,77 +425,101 @@ function drawRisingField(w,h,earthShiftDeg,frameDate){
       const asc=normalize360(tropicalAscendant(date,lat,earthLng)-aya);
       const signIndex=Math.floor(asc/30);
       const nakIndex=Math.min(26,Math.floor(asc/NAK_SIZE));
+      const cell=py*rw+px;
+
+      signGrid[cell]=signIndex;
+      nakGrid[cell]=nakIndex;
 
       const signColor=hexToRgb(SIGNS[signIndex][2]);
       const nakColor=hslToRgb(nakIndex/27,.72,.58);
 
-      let r=signColor[0],g=signColor[1],b=signColor[2],a=0;
-      if(showZodiac){
-        a=.18;
-      }
+      let r=signColor[0],g=signColor[1],b=signColor[2],alpha=0;
+      if(showZodiac) alpha=.14;
+
       if(showNak){
         if(showZodiac){
-          r=Math.round(r*.68+nakColor[0]*.32);
-          g=Math.round(g*.68+nakColor[1]*.32);
-          b=Math.round(b*.68+nakColor[2]*.32);
-          a=.22;
+          r=Math.round(r*.72+nakColor[0]*.28);
+          g=Math.round(g*.72+nakColor[1]*.28);
+          b=Math.round(b*.72+nakColor[2]*.28);
+          alpha=.18;
         }else{
-          r=nakColor[0];g=nakColor[1];b=nakColor[2];a=.16;
+          r=nakColor[0];g=nakColor[1];b=nakColor[2];alpha=.13;
         }
       }
 
-      const i=(py*rw+px)*4;
-      data[i]=r;data[i+1]=g;data[i+2]=b;data[i+3]=Math.round(a*255);
+      const p=cell*4;
+      data[p]=r;data[p+1]=g;data[p+2]=b;data[p+3]=Math.round(alpha*255);
     }
   }
 
   risingCtx.putImageData(img,0,0);
-  ctx.save();
-  ctx.imageSmoothingEnabled=true;
-  ctx.drawImage(risingCanvas,0,0,w,h);
-  ctx.restore();
 
-  drawRisingLabels(w,h,earthShiftDeg,showZodiac,showNak,frameDate);
-}
+  // Boundary lines are drawn on the cached layer so they stay crisp but inexpensive.
+  risingCtx.save();
+  for(let py=1;py<rh-1;py++){
+    for(let px=1;px<rw-1;px++){
+      const i=py*rw+px;
+      const right=i+1;
+      const down=i+rw;
 
-function drawRisingLabels(w,h,earthShiftDeg,showZodiac,showNak,frameDate){
-  const date=frameDate;
-  const aya=lahiriAyanamsa(date);
-
-  if(showZodiac){
-    const seen=new Set();
-    const samples=180;
-
-    for(let i=0;i<samples;i++){
-      const x=(i+.5)/samples*w;
-      const mapLng=xToLon(x,w);
-      const earthLng=normalize180(mapLng-earthShiftDeg);
-      const asc=normalize360(tropicalAscendant(date,0,earthLng)-aya);
-      const si=Math.floor(asc/30);
-
-      if(!seen.has(si)){
-        seen.add(si);
-        const label=`${SIGNS[si][1]} ${SIGNS[si][0]}`;
-        drawFieldLabel(label,SIGNS[si][2],x,h*.18,13);
-        drawFieldLabel(label,SIGNS[si][2],x,h*.52,13);
-        drawFieldLabel(label,SIGNS[si][2],x,h*.84,13);
+      if(showZodiac && (signGrid[i]!==signGrid[right] || signGrid[i]!==signGrid[down])){
+        risingCtx.fillStyle='rgba(255,255,255,.42)';
+        risingCtx.fillRect(px,py,1,1);
+      }else if(showNak && (nakGrid[i]!==nakGrid[right] || nakGrid[i]!==nakGrid[down])){
+        risingCtx.fillStyle='rgba(210,235,248,.20)';
+        risingCtx.fillRect(px,py,1,1);
       }
     }
   }
+  risingCtx.restore();
+
+  state.risingSignGrid=signGrid;
+  state.risingNakGrid=nakGrid;
+  state.risingCacheKey=cacheKey;
+}
+
+function drawRisingLabels(w,h,showZodiac,showNak){
+  const rw=risingCanvas.width;
+  const rh=risingCanvas.height;
+  if(!state.risingSignGrid || !state.risingNakGrid) return;
+
+  if(showZodiac){
+    [0.18,0.52,0.84].forEach(yFrac=>{
+      const row=Math.max(0,Math.min(rh-1,Math.floor(yFrac*rh)));
+      drawCenteredRuns(
+        state.risingSignGrid,row,12,w,h*yFrac,
+        index=>`${SIGNS[index][1]} ${SIGNS[index][0]}`,
+        index=>SIGNS[index][2],
+        13,30
+      );
+    });
+  }
 
   if(showNak && w>720){
-    const seenNak=new Set();
-    const samples=270;
-    for(let i=0;i<samples;i++){
-      const x=(i+.5)/samples*w;
-      const mapLng=xToLon(x,w);
-      const earthLng=normalize180(mapLng-earthShiftDeg);
-      const asc=normalize360(tropicalAscendant(date,12,earthLng)-aya);
-      const ni=Math.min(26,Math.floor(asc/NAK_SIZE));
+    const yFrac=.69;
+    const row=Math.max(0,Math.min(rh-1,Math.floor(yFrac*rh)));
+    drawCenteredRuns(
+      state.risingNakGrid,row,27,w,h*yFrac,
+      index=>NAKSHATRAS[index],
+      index=>nakColorCss(index),
+      9,18
+    );
+  }
 
-      if(!seenNak.has(ni)){
-        seenNak.add(ni);
-        drawFieldLabel(NAKSHATRAS[ni],nakColorCss(ni),x,h*.69,9);
+  function drawCenteredRuns(grid,row,count,screenW,y,labelFor,colorFor,size,minScreenWidth){
+    let start=0;
+    let current=grid[row*rw];
+
+    for(let x=1;x<=rw;x++){
+      const next=x<rw?grid[row*rw+x]:255;
+      if(next!==current){
+        const runWidth=(x-start)/rw*screenW;
+        if(current<count && runWidth>=minScreenWidth){
+          const center=(start+x)/2/rw*screenW;
+          drawFieldLabel(labelFor(current),colorFor(current),center,y,size);
+        }
+        start=x;
+        current=next;
       }
     }
   }
