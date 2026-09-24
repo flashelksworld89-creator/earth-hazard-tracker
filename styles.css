@@ -169,3 +169,40 @@ button:hover,select:hover{border-color:rgba(103,232,249,.5)}
   .planet-list{grid-template-columns:1fr}
   .prototype-badge{display:none}
 }
+
+.observer-box{
+  margin:10px 0;
+  padding:9px;
+  border:1px solid rgba(103,232,249,.12);
+  border-radius:10px;
+  background:rgba(1,9,17,.38);
+}
+.observer-head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  margin-bottom:8px;
+}
+.observer-head strong{font-size:10px;letter-spacing:.07em}
+.observer-head span{font-size:9px;color:#8fb8cf;font-variant-numeric:tabular-nums}
+.observer-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+.observer-grid label{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  font-size:9px;
+  color:#9fb8ca;
+}
+.observer-grid input{
+  width:100%;
+  border:1px solid var(--border);
+  background:rgba(8,24,38,.9);
+  color:var(--text);
+  border-radius:8px;
+  padding:7px 8px;
+}
