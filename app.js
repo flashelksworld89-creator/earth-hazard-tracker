@@ -402,6 +402,7 @@ function drawRisingField(w,h,earthShiftDeg,frameDate){
   ctx.drawImage(risingCanvas,0,0,w,h);
   ctx.restore();
 
+  drawZoneBoundaries(w,h,showZodiac,showNak);
   drawRisingLabels(w,h,showZodiac,showNak);
 }
 
@@ -456,28 +457,94 @@ function buildRisingCache(date,earthShiftDeg,showZodiac,showNak){
 
   risingCtx.putImageData(img,0,0);
 
-  // Boundary lines are drawn on the cached layer so they stay crisp but inexpensive.
-  risingCtx.save();
-  for(let py=1;py<rh-1;py++){
-    for(let px=1;px<rw-1;px++){
-      const i=py*rw+px;
-      const right=i+1;
-      const down=i+rw;
-
-      if(showZodiac && (signGrid[i]!==signGrid[right] || signGrid[i]!==signGrid[down])){
-        risingCtx.fillStyle='rgba(255,255,255,.42)';
-        risingCtx.fillRect(px,py,1,1);
-      }else if(showNak && (nakGrid[i]!==nakGrid[right] || nakGrid[i]!==nakGrid[down])){
-        risingCtx.fillStyle='rgba(210,235,248,.20)';
-        risingCtx.fillRect(px,py,1,1);
-      }
-    }
-  }
-  risingCtx.restore();
-
   state.risingSignGrid=signGrid;
   state.risingNakGrid=nakGrid;
   state.risingCacheKey=cacheKey;
+}
+
+function drawZoneBoundaries(w,h,showZodiac,showNak){
+  const rw=risingCanvas.width;
+  const rh=risingCanvas.height;
+  if(!state.risingSignGrid || !state.risingNakGrid) return;
+
+  if(showZodiac){
+    const signPaths=collectBoundaryPaths(state.risingSignGrid,rw,rh);
+    for(const path of signPaths){
+      const a=path.a,b=path.b;
+      const colorA=hexToRgb(SIGNS[a][2]);
+      const colorB=hexToRgb(SIGNS[b][2]);
+      const mix=[
+        Math.round((colorA[0]+colorB[0])/2),
+        Math.round((colorA[1]+colorB[1])/2),
+        Math.round((colorA[2]+colorB[2])/2)
+      ];
+      strokeBoundaryPath(path.points,w,h,`rgba(${mix[0]},${mix[1]},${mix[2]},.62)`,1.35);
+    }
+  }
+
+  if(showNak){
+    const nakPaths=collectBoundaryPaths(state.risingNakGrid,rw,rh);
+    for(const path of nakPaths){
+      const colorA=hslToRgb(path.a/27,.72,.58);
+      const colorB=hslToRgb(path.b/27,.72,.58);
+      const mix=[
+        Math.round((colorA[0]+colorB[0])/2),
+        Math.round((colorA[1]+colorB[1])/2),
+        Math.round((colorA[2]+colorB[2])/2)
+      ];
+      strokeBoundaryPath(path.points,w,h,`rgba(${mix[0]},${mix[1]},${mix[2]},.30)`,.8);
+    }
+  }
+
+  function collectBoundaryPaths(grid,width,height){
+    const groups=new Map();
+
+    for(let y=1;y<height-1;y++){
+      for(let x=1;x<width;x++){
+        const left=grid[y*width+x-1];
+        const right=grid[y*width+x];
+        if(left===right) continue;
+
+        const a=Math.min(left,right);
+        const b=Math.max(left,right);
+        const key=`${a}-${b}`;
+        if(!groups.has(key)) groups.set(key,{a,b,points:[]});
+        groups.get(key).points.push({x,y});
+      }
+    }
+
+    return [...groups.values()];
+  }
+
+  function strokeBoundaryPath(pointsInfo,screenW,screenH,stroke,width){
+    if(pointsInfo.length<2) return;
+
+    const pts=pointsInfo
+      .map(p=>({x:p.x/rw*screenW,y:p.y/rh*screenH}))
+      .sort((a,b)=>a.y-b.y || a.x-b.x);
+
+    ctx.save();
+    ctx.strokeStyle=stroke;
+    ctx.lineWidth=width;
+    ctx.lineJoin='round';
+    ctx.lineCap='round';
+    ctx.beginPath();
+
+    let prev=null;
+    for(const p of pts){
+      if(!prev || Math.abs(p.x-prev.x)>screenW*.18 || Math.abs(p.y-prev.y)>screenH*.08){
+        ctx.moveTo(p.x,p.y);
+      }else{
+        const mx=(prev.x+p.x)/2;
+        const my=(prev.y+p.y)/2;
+        ctx.quadraticCurveTo(prev.x,prev.y,mx,my);
+      }
+      prev=p;
+    }
+
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawRisingLabels(w,h,showZodiac,showNak){
