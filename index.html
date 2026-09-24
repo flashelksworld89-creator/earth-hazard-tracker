@@ -66,6 +66,26 @@
         <span>RISING FIELD <b>← west</b></span>
       </div>
 
+      <div class="location-box">
+        <div class="location-head">
+          <strong>MY LOCATION</strong>
+          <span id="locationStatus">Not set</span>
+        </div>
+        <div class="location-grid">
+          <label><span>Latitude</span><input id="latitudeInput" type="number" min="-89.9" max="89.9" step="0.0001" placeholder="Latitude" /></label>
+          <label><span>Longitude</span><input id="longitudeInput" type="number" min="-180" max="180" step="0.0001" placeholder="Longitude" /></label>
+        </div>
+        <div class="row">
+          <button id="useLocationBtn">Use my location</button>
+          <button id="applyLocationBtn">Apply coordinates</button>
+        </div>
+        <div class="rising-readout">
+          <div><small>RISING SIGN</small><strong id="localSignText">—</strong></div>
+          <div><small>RISING NAKSHATRA</small><strong id="localNakText">—</strong></div>
+          <div><small>ASCENDANT</small><strong id="localAscText">—</strong></div>
+        </div>
+      </div>
+
       <div id="timeText" class="time-text">—</div>
       <div id="planetList" class="planet-list"></div>
       <div id="nakshatraKey" class="nakshatra-key"></div>
