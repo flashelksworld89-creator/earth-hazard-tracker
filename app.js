@@ -35,6 +35,10 @@ const risingCanvas = document.createElement('canvas');
 risingCanvas.width = 360;
 risingCanvas.height = 180;
 const risingCtx = risingCanvas.getContext('2d');
+const focusCanvas = document.createElement('canvas');
+focusCanvas.width = 360;
+focusCanvas.height = 180;
+const focusCtx = focusCanvas.getContext('2d');
 
 const state = {
   land: [],
@@ -49,13 +53,16 @@ const state = {
   observer: null,
   risingCacheKey: '',
   risingSignGrid: null,
-  risingNakGrid: null
+  risingNakGrid: null,
+  focusSign: null,
+  focusNak: null
 };
 
 init();
 
 async function init(){
   buildNakshatraKey();
+  populateFocusControls();
   bindControls();
   resize();
   window.addEventListener('resize', resize);
@@ -115,6 +122,35 @@ function bindControls(){
 
   ['showDayNight','showZodiac','showNakshatras','showPlanets','showGrid']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
+
+  document.getElementById('focusSignSelect').addEventListener('change',e=>{
+    state.focusSign=e.target.value===''?null:Number(e.target.value);
+    if(state.focusSign!==null){
+      state.focusNak=null;
+      document.getElementById('focusNakSelect').value='';
+    }
+    updateFocusSummary();
+    draw();
+  });
+
+  document.getElementById('focusNakSelect').addEventListener('change',e=>{
+    state.focusNak=e.target.value===''?null:Number(e.target.value);
+    if(state.focusNak!==null){
+      state.focusSign=null;
+      document.getElementById('focusSignSelect').value='';
+    }
+    updateFocusSummary();
+    draw();
+  });
+
+  document.getElementById('clearFocusBtn').addEventListener('click',()=>{
+    state.focusSign=null;
+    state.focusNak=null;
+    document.getElementById('focusSignSelect').value='';
+    document.getElementById('focusNakSelect').value='';
+    updateFocusSummary();
+    draw();
+  });
 
   document.getElementById('applyLocationBtn').addEventListener('click',()=>{
     applyObserver(
@@ -403,6 +439,7 @@ function drawRisingField(w,h,earthShiftDeg,frameDate){
   ctx.restore();
 
   drawZoneBoundaries(w,h,showZodiac,showNak);
+  drawFocusOverlay(w,h);
   drawRisingLabels(w,h,showZodiac,showNak);
 }
 
@@ -547,6 +584,111 @@ function drawZoneBoundaries(w,h,showZodiac,showNak){
   }
 }
 
+function drawFocusOverlay(w,h){
+  const hasSign=state.focusSign!==null;
+  const hasNak=state.focusNak!==null;
+  if(!hasSign && !hasNak) return;
+  if(!state.risingSignGrid || !state.risingNakGrid) return;
+
+  const rw=focusCanvas.width;
+  const rh=focusCanvas.height;
+  const source=hasSign?state.risingSignGrid:state.risingNakGrid;
+  const target=hasSign?state.focusSign:state.focusNak;
+  const img=focusCtx.createImageData(rw,rh);
+  const data=img.data;
+  const baseColor=hasSign
+    ? hexToRgb(SIGNS[target][2])
+    : hslToRgb(target/27,.72,.58);
+
+  for(let i=0;i<source.length;i++){
+    if(source[i]!==target) continue;
+    const p=i*4;
+    data[p]=baseColor[0];
+    data[p+1]=baseColor[1];
+    data[p+2]=baseColor[2];
+    data[p+3]=150;
+  }
+  focusCtx.putImageData(img,0,0);
+
+  ctx.save();
+  ctx.fillStyle='rgba(2,8,18,.50)';
+  ctx.fillRect(0,0,w,h);
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(focusCanvas,0,0,w,h);
+  ctx.restore();
+
+  drawFocusContour(source,target,w,h,baseColor);
+}
+
+function drawFocusContour(grid,target,w,h,color){
+  const rw=risingCanvas.width;
+  const rh=risingCanvas.height;
+  const left=[];
+  const right=[];
+
+  for(let y=0;y<rh;y++){
+    let first=-1,last=-1;
+    for(let x=0;x<rw;x++){
+      if(grid[y*rw+x]===target){
+        if(first<0) first=x;
+        last=x;
+      }
+    }
+    if(first>=0){
+      left.push({x:first/rw*w,y:y/rh*h});
+      right.push({x:(last+1)/rw*w,y:y/rh*h});
+    }
+  }
+
+  const stroke=`rgba(${color[0]},${color[1]},${color[2]},.95)`;
+  [left,right].forEach(points=>{
+    if(points.length<2) return;
+    ctx.save();
+    ctx.strokeStyle=stroke;
+    ctx.lineWidth=2.2;
+    ctx.lineJoin='round';
+    ctx.lineCap='round';
+    ctx.beginPath();
+
+    let prev=null;
+    for(const p of points){
+      if(!prev || Math.abs(p.x-prev.x)>w*.3){
+        ctx.moveTo(p.x,p.y);
+      }else{
+        const mx=(prev.x+p.x)/2;
+        const my=(prev.y+p.y)/2;
+        ctx.quadraticCurveTo(prev.x,prev.y,mx,my);
+      }
+      prev=p;
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function updateFocusSummary(){
+  const el=document.getElementById('focusSummary');
+  if(state.focusSign!==null){
+    const planets=state.astro?.placements?.filter(p=>Math.floor(normalize360(p.lon)/30)===state.focusSign)||[];
+    el.textContent=`${SIGNS[state.focusSign][1]} ${SIGNS[state.focusSign][0]} highlighted · ${planets.length} planet${planets.length===1?'':'s'} in sign`;
+  }else if(state.focusNak!==null){
+    const planets=state.astro?.placements?.filter(p=>Math.floor(normalize360(p.lon)/NAK_SIZE)===state.focusNak)||[];
+    el.textContent=`${NAKSHATRAS[state.focusNak]} highlighted · ${planets.length} planet${planets.length===1?'':'s'} in nakshatra`;
+  }else{
+    el.textContent='No zone highlighted';
+  }
+}
+
+function populateFocusControls(){
+  const select=document.getElementById('focusNakSelect');
+  NAKSHATRAS.forEach((name,i)=>{
+    const option=document.createElement('option');
+    option.value=String(i);
+    option.textContent=name;
+    select.appendChild(option);
+  });
+}
+
 function drawRisingLabels(w,h,showZodiac,showNak){
   const rw=risingCanvas.width;
   const rh=risingCanvas.height;
@@ -635,13 +777,22 @@ function drawProjectedPlanets(w,h){
     occupied.set(bucket,slot+1);
     const y=h*.40+slot*19;
 
+    const signIndex=Math.floor(normalize360(p.lon)/30);
+    const matchesFocus=
+      state.focusSign===null && state.focusNak===null
+        ? true
+        : state.focusSign!==null
+          ? signIndex===state.focusSign
+          : targetNak===state.focusNak;
+
     ctx.save();
-    ctx.font='800 15px system-ui,Segoe UI Symbol,sans-serif';
+    ctx.globalAlpha=matchesFocus?1:.16;
+    ctx.font=`${matchesFocus?'900':'700'} ${matchesFocus?17:14}px system-ui,Segoe UI Symbol,sans-serif`;
     ctx.textAlign='center';
     ctx.textBaseline='middle';
     ctx.fillStyle=p.color;
     ctx.shadowColor='rgba(0,0,0,.98)';
-    ctx.shadowBlur=6;
+    ctx.shadowBlur=matchesFocus?8:3;
     ctx.fillText(`${p.glyph} ${degreeInSign(p.lon)}`,x,y);
     ctx.restore();
   });
@@ -724,6 +875,7 @@ function drawEdgeFade(w,h){
 function updateText(){
   const {date,placements}=state.astro;
   document.getElementById('timeText').textContent=date.toLocaleString();
+  updateFocusSummary();
   document.getElementById('planetList').innerHTML=placements.map(p=>{
     const ni=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
     return `<div><span style="color:${p.color}">${p.glyph}</span><b>${p.name}</b><span>${fullZodiac(p.lon)} · ${NAKSHATRAS[ni]}</span></div>`;
