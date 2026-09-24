@@ -371,3 +371,32 @@ button:hover,select:hover{border-color:rgba(103,232,249,.5)}
 @media(max-width:520px){
   .focus-grid{grid-template-columns:1fr}
 }
+
+.control-panel[hidden]{display:none !important}
+
+.panel-reopen-btn{
+  position:absolute;
+  z-index:12;
+  left:14px;
+  bottom:14px;
+  width:42px;
+  height:42px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:rgba(6,18,31,.92);
+  color:var(--text);
+  font-size:20px;
+  font-weight:700;
+  line-height:1;
+  box-shadow:0 10px 30px rgba(0,0,0,.28);
+}
+.panel-reopen-btn[hidden]{display:none !important}
+
+#worldCanvas{
+  cursor:grab;
+  touch-action:none;
+}
+#worldCanvas:active{cursor:grabbing}
