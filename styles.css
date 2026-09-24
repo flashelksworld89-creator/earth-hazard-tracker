@@ -1177,3 +1177,19 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{
 @media(max-width:700px){
   .zodiac-panel{width:auto}
 }
+
+/* 3D celestial ecliptic band */
+#eclipticBandCanvas{
+  position:absolute;
+  inset:0;
+  z-index:4;
+  pointer-events:none;
+  display:block;
+  width:100%;
+  height:100%;
+  filter:drop-shadow(0 0 12px rgba(56,189,248,.10));
+}
+#map{z-index:1}
+.layers-panel,.events-panel,.detail-panel,.zodiac-panel,
+.us-rising-panel,.ar-control-panel,.schumann-panel,
+.auto-refresh-panel,.timeline-panel{z-index:10}
