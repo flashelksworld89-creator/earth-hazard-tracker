@@ -83,17 +83,22 @@ export function initHazardGlobe3D(container, callbacks={}) {
   celestialGroup.add(planetGroup);
   celestialGroup.add(angleGroup);
 
-  buildEclipticBand();
-
   const state = {
     visible:true,
     rotating:true,
     speed:1,
     last:performance.now(),
     astro:null,
+    ayanamsa:0,
     events:[],
-    risingZones:[]
+    risingZones:[],
+    rotationEpochY:0,
+    rotationEpochRealMs:performance.now(),
+    rotationEpochAstroMs:Date.now()
   };
+
+  syncEarthRotation(Date.now(),1);
+  buildEclipticBand();
 
   function buildEclipticBand() {
     bandGroup.clear();
@@ -123,7 +128,8 @@ export function initHazardGlobe3D(container, callbacks={}) {
   }
 
   function eclipticPoint(lonDeg, radius) {
-    const a=THREE.MathUtils.degToRad(lonDeg);
+    const physicalLon=lonDeg + (state.ayanamsa||0);
+    const a=THREE.MathUtils.degToRad(physicalLon);
     const x=radius*Math.cos(a);
     const z=radius*Math.sin(a);
     const y=z*Math.sin(OBLIQUITY);
@@ -150,7 +156,11 @@ export function initHazardGlobe3D(container, callbacks={}) {
   }
 
   function updateAstro(data) {
+    const oldAya=state.ayanamsa;
     state.astro=data;
+    state.ayanamsa=Number(data?.ayanamsa)||0;
+    if(Math.abs(state.ayanamsa-oldAya)>.0001) buildEclipticBand();
+    if(Number.isFinite(Number(data?.timestamp))) syncEarthRotation(Number(data.timestamp),state.speed);
     planetGroup.clear();
     angleGroup.clear();
     if(!data) return;
@@ -220,7 +230,36 @@ export function initHazardGlobe3D(container, callbacks={}) {
   }
 
   function setRotating(on) { state.rotating=!!on; }
-  function setSpeed(speed) { state.speed=Math.max(0,Number(speed)||1); }
+  function setSpeed(speed) {
+    const currentAstro=state.rotationEpochAstroMs +
+      (performance.now()-state.rotationEpochRealMs)*state.speed;
+    state.speed=Math.max(0,Number(speed)||1);
+    syncEarthRotation(currentAstro,state.speed);
+  }
+
+  function syncEarthRotation(timestamp,speed=state.speed) {
+    const gmst=greenwichSiderealDegrees(new Date(timestamp));
+    // ThreeGlobe's lon=0 points toward +Z. At GMST=0 the Greenwich meridian
+    // faces the sidereal zero direction (+X), requiring a +90° alignment.
+    state.rotationEpochY=THREE.MathUtils.degToRad(90-gmst);
+    state.rotationEpochRealMs=performance.now();
+    state.rotationEpochAstroMs=Number(timestamp);
+    state.speed=Math.max(0,Number(speed)||1);
+    earthGroup.rotation.y=state.rotationEpochY;
+  }
+
+  function greenwichSiderealDegrees(date) {
+    const jd=date.getTime()/86400000+2440587.5;
+    const T=(jd-2451545.0)/36525;
+    return normalize360(
+      280.46061837+
+      360.98564736629*(jd-2451545.0)+
+      .000387933*T*T-
+      (T*T*T)/38710000
+    );
+  }
+
+  function normalize360(x){return ((x%360)+360)%360;}
 
   function focus(lat,lng,altitude=2.25) {
     const local=globe.getCoords(lat,lng,0);
@@ -247,8 +286,11 @@ export function initHazardGlobe3D(container, callbacks={}) {
     state.last=now;
 
     if(state.visible && state.rotating) {
-      // Eastward Earth rotation. Celestial/ecliptic group is intentionally not rotated.
-      earthGroup.rotation.y -= dt*state.speed*(Math.PI*2/SIDEREAL_DAY_MS);
+      // Earth rotation is anchored to sidereal time, not an arbitrary animation phase.
+      const elapsedReal=now-state.rotationEpochRealMs;
+      earthGroup.rotation.y=
+        state.rotationEpochY-
+        elapsedReal*state.speed*(Math.PI*2/SIDEREAL_DAY_MS);
     }
 
     controls.update();
@@ -276,7 +318,10 @@ export function initHazardGlobe3D(container, callbacks={}) {
   window.addEventListener('zodiac-astro-state',e=>updateAstro(e.detail));
   window.addEventListener('zodiac-rising-zones',e=>setRisingZones(e.detail?.features||[]));
   window.addEventListener('zodiac-sim-time',e=>{
-    setSpeed(e.detail?.running ? e.detail?.speed : 1);
+    const speed=e.detail?.running ? e.detail?.speed : 1;
+    const ts=Number(e.detail?.timestamp);
+    if(Number.isFinite(ts)) syncEarthRotation(ts,speed);
+    else setSpeed(speed);
   });
 
   resize();
