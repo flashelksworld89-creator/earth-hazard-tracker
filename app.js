@@ -52,15 +52,13 @@ async function init(){
   window.addEventListener('resize', resize);
 
   try{
-    const r = await fetch(
-      'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@ca96624a/geojson/ne_110m_land.geojson',
-      { cache:'force-cache' }
-    );
+    const r = await fetch('/world-land.geojson', { cache:'force-cache' });
     if(!r.ok) throw new Error('World map HTTP '+r.status);
     const geo = await r.json();
     state.land = extractPolygons(geo);
     state.mapReady = true;
     document.getElementById('statusText').textContent='World geometry loaded · Lahiri sidereal';
+    draw();
   }catch(err){
     console.error(err);
     document.getElementById('statusText').textContent='World geometry failed to load';
