@@ -325,7 +325,7 @@ function draw(){
     drawRisingField(w,h,earthShiftDeg,frameDate);
 
     if(document.getElementById('showPlanets').checked){
-      drawProjectedPlanets(w,h);
+      drawProjectedPlanets(w,h,earthShiftDeg);
     }
 
     drawObserverMarker(w,h,earthShiftDeg,frameDate);
@@ -467,23 +467,20 @@ function drawRisingField(w,h,earthShiftDeg,frameDate){
   const showNak=document.getElementById('showNakshatras').checked;
   if(!showZodiac && !showNak) return;
 
-  buildRisingCache(frameDate,earthShiftDeg,showZodiac,showNak);
+  buildRisingCache(frameDate,showZodiac,showNak);
 
-  ctx.save();
-  ctx.imageSmoothingEnabled=true;
-  ctx.drawImage(risingCanvas,0,0,w,h);
-  ctx.restore();
+  drawWrappedCanvas(risingCanvas,w,h,earthShiftDeg);
 
-  drawZoneBoundaries(w,h,showZodiac,showNak);
-  drawFocusOverlay(w,h);
-  drawRisingLabels(w,h,showZodiac,showNak);
+  drawZoneBoundaries(w,h,showZodiac,showNak,earthShiftDeg);
+  drawFocusOverlay(w,h,earthShiftDeg);
+  drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg);
 }
 
-function buildRisingCache(date,earthShiftDeg,showZodiac,showNak){
+function buildRisingCache(date,showZodiac,showNak){
   const rw=risingCanvas.width;
   const rh=risingCanvas.height;
-  const dayKey=date.toISOString().slice(0,10);
-  const cacheKey=`${dayKey}|${showZodiac?1:0}|${showNak?1:0}`;
+  const minuteKey=date.toISOString().slice(0,16);
+  const cacheKey=`${minuteKey}|${showZodiac?1:0}|${showNak?1:0}`;
   if(state.risingCacheKey===cacheKey && state.risingSignGrid && state.risingNakGrid) return;
 
   const img=risingCtx.createImageData(rw,rh);
@@ -496,8 +493,7 @@ function buildRisingCache(date,earthShiftDeg,showZodiac,showNak){
     const lat=yToLat(py+.5,rh);
 
     for(let px=0;px<rw;px++){
-      const mapLng=xToLon(px+.5,rw);
-      const earthLng=normalize180(mapLng-earthShiftDeg);
+      const earthLng=xToLon(px+.5,rw);
       const asc=normalize360(tropicalAscendant(date,lat,earthLng)-aya);
       const signIndex=Math.floor(asc/30);
       const nakIndex=Math.min(26,Math.floor(asc/NAK_SIZE));
@@ -535,7 +531,7 @@ function buildRisingCache(date,earthShiftDeg,showZodiac,showNak){
   state.risingCacheKey=cacheKey;
 }
 
-function drawZoneBoundaries(w,h,showZodiac,showNak){
+function drawZoneBoundaries(w,h,showZodiac,showNak,earthShiftDeg){
   const rw=risingCanvas.width;
   const rh=risingCanvas.height;
   if(!state.risingSignGrid || !state.risingNakGrid) return;
@@ -551,7 +547,7 @@ function drawZoneBoundaries(w,h,showZodiac,showNak){
         Math.round((colorA[1]+colorB[1])/2),
         Math.round((colorA[2]+colorB[2])/2)
       ];
-      strokeBoundaryPath(path.points,w,h,`rgba(${mix[0]},${mix[1]},${mix[2]},.62)`,1.35);
+      strokeBoundaryPath(path.points,w,h,earthShiftDeg,`rgba(${mix[0]},${mix[1]},${mix[2]},.62)`,1.35);
     }
   }
 
@@ -565,7 +561,7 @@ function drawZoneBoundaries(w,h,showZodiac,showNak){
         Math.round((colorA[1]+colorB[1])/2),
         Math.round((colorA[2]+colorB[2])/2)
       ];
-      strokeBoundaryPath(path.points,w,h,`rgba(${mix[0]},${mix[1]},${mix[2]},.30)`,.8);
+      strokeBoundaryPath(path.points,w,h,earthShiftDeg,`rgba(${mix[0]},${mix[1]},${mix[2]},.30)`,.8);
     }
   }
 
@@ -589,38 +585,43 @@ function drawZoneBoundaries(w,h,showZodiac,showNak){
     return [...groups.values()];
   }
 
-  function strokeBoundaryPath(pointsInfo,screenW,screenH,stroke,width){
+  function strokeBoundaryPath(pointsInfo,screenW,screenH,shiftDeg,stroke,width){
     if(pointsInfo.length<2) return;
 
-    const pts=pointsInfo
-      .map(p=>({x:p.x/rw*screenW,y:p.y/rh*screenH}))
+    const shiftPx=shiftDeg/360*screenW;
+    const basePts=pointsInfo
+      .map(p=>({x:p.x/rw*screenW+shiftPx,y:p.y/rh*screenH}))
       .sort((a,b)=>a.y-b.y || a.x-b.x);
 
-    ctx.save();
-    ctx.strokeStyle=stroke;
-    ctx.lineWidth=width;
-    ctx.lineJoin='round';
-    ctx.lineCap='round';
-    ctx.beginPath();
+    for(const copy of [-1,0,1]){
+      const dx=copy*screenW;
+      ctx.save();
+      ctx.strokeStyle=stroke;
+      ctx.lineWidth=width;
+      ctx.lineJoin='round';
+      ctx.lineCap='round';
+      ctx.beginPath();
 
-    let prev=null;
-    for(const p of pts){
-      if(!prev || Math.abs(p.x-prev.x)>screenW*.18 || Math.abs(p.y-prev.y)>screenH*.08){
-        ctx.moveTo(p.x,p.y);
-      }else{
-        const mx=(prev.x+p.x)/2;
-        const my=(prev.y+p.y)/2;
-        ctx.quadraticCurveTo(prev.x,prev.y,mx,my);
+      let prev=null;
+      for(const raw of basePts){
+        const p={x:raw.x+dx,y:raw.y};
+        if(!prev || Math.abs(p.x-prev.x)>screenW*.18 || Math.abs(p.y-prev.y)>screenH*.08){
+          ctx.moveTo(p.x,p.y);
+        }else{
+          const mx=(prev.x+p.x)/2;
+          const my=(prev.y+p.y)/2;
+          ctx.quadraticCurveTo(prev.x,prev.y,mx,my);
+        }
+        prev=p;
       }
-      prev=p;
-    }
 
-    ctx.stroke();
-    ctx.restore();
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 }
 
-function drawFocusOverlay(w,h){
+function drawFocusOverlay(w,h,earthShiftDeg){
   const hasSign=state.focusSign!==null;
   const hasNak=state.focusNak!==null;
   if(!hasSign && !hasNak) return;
@@ -649,14 +650,13 @@ function drawFocusOverlay(w,h){
   ctx.save();
   ctx.fillStyle='rgba(2,8,18,.50)';
   ctx.fillRect(0,0,w,h);
-  ctx.imageSmoothingEnabled=true;
-  ctx.drawImage(focusCanvas,0,0,w,h);
   ctx.restore();
 
-  drawFocusContour(source,target,w,h,baseColor);
+  drawWrappedCanvas(focusCanvas,w,h,earthShiftDeg);
+  drawFocusContour(source,target,w,h,baseColor,earthShiftDeg);
 }
 
-function drawFocusContour(grid,target,w,h,color){
+function drawFocusContour(grid,target,w,h,color,earthShiftDeg){
   const rw=risingCanvas.width;
   const rh=risingCanvas.height;
   const left=[];
@@ -671,34 +671,39 @@ function drawFocusContour(grid,target,w,h,color){
       }
     }
     if(first>=0){
-      left.push({x:first/rw*w,y:y/rh*h});
-      right.push({x:(last+1)/rw*w,y:y/rh*h});
+      const shiftPx=earthShiftDeg/360*w;
+      left.push({x:first/rw*w+shiftPx,y:y/rh*h});
+      right.push({x:(last+1)/rw*w+shiftPx,y:y/rh*h});
     }
   }
 
   const stroke=`rgba(${color[0]},${color[1]},${color[2]},.95)`;
   [left,right].forEach(points=>{
     if(points.length<2) return;
-    ctx.save();
-    ctx.strokeStyle=stroke;
-    ctx.lineWidth=2.2;
-    ctx.lineJoin='round';
-    ctx.lineCap='round';
-    ctx.beginPath();
+    for(const copy of [-1,0,1]){
+      const dx=copy*w;
+      ctx.save();
+      ctx.strokeStyle=stroke;
+      ctx.lineWidth=2.2;
+      ctx.lineJoin='round';
+      ctx.lineCap='round';
+      ctx.beginPath();
 
-    let prev=null;
-    for(const p of points){
-      if(!prev || Math.abs(p.x-prev.x)>w*.3){
-        ctx.moveTo(p.x,p.y);
-      }else{
-        const mx=(prev.x+p.x)/2;
-        const my=(prev.y+p.y)/2;
-        ctx.quadraticCurveTo(prev.x,prev.y,mx,my);
+      let prev=null;
+      for(const raw of points){
+        const p={x:raw.x+dx,y:raw.y};
+        if(!prev || Math.abs(p.x-prev.x)>w*.3){
+          ctx.moveTo(p.x,p.y);
+        }else{
+          const mx=(prev.x+p.x)/2;
+          const my=(prev.y+p.y)/2;
+          ctx.quadraticCurveTo(prev.x,prev.y,mx,my);
+        }
+        prev=p;
       }
-      prev=p;
+      ctx.stroke();
+      ctx.restore();
     }
-    ctx.stroke();
-    ctx.restore();
   });
 }
 
@@ -725,7 +730,7 @@ function populateFocusControls(){
   });
 }
 
-function drawRisingLabels(w,h,showZodiac,showNak){
+function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
   const rw=risingCanvas.width;
   const rh=risingCanvas.height;
   if(!state.risingSignGrid || !state.risingNakGrid) return;
@@ -762,8 +767,12 @@ function drawRisingLabels(w,h,showZodiac,showNak){
       if(next!==current){
         const runWidth=(x-start)/rw*screenW;
         if(current<count && runWidth>=minScreenWidth){
-          const center=(start+x)/2/rw*screenW;
-          drawFieldLabel(labelFor(current),colorFor(current),center,y,size);
+          const center=(start+x)/2/rw*screenW + earthShiftDeg/360*screenW;
+          for(const cx of [center-screenW,center,center+screenW]){
+            if(cx>-80 && cx<screenW+80){
+              drawFieldLabel(labelFor(current),colorFor(current),cx,y,size);
+            }
+          }
         }
         start=x;
         current=next;
@@ -784,7 +793,7 @@ function drawFieldLabel(text,color,x,y,size){
   ctx.restore();
 }
 
-function drawProjectedPlanets(w,h){
+function drawProjectedPlanets(w,h,earthShiftDeg){
   if(!state.risingNakGrid) return;
 
   const rw=risingCanvas.width;
@@ -807,7 +816,9 @@ function drawProjectedPlanets(w,h){
     }
 
     if(start<0) return;
-    const x=((start+end+1)/2)/rw*w;
+    const xBase=((start+end+1)/2)/rw*w + earthShiftDeg/360*w;
+    const visibleXs=[xBase-w,xBase,xBase+w].filter(x=>x>-70&&x<w+70);
+    const x=visibleXs.length?visibleXs[0]:xBase;
     const bucket=Math.round(x/58);
     const slot=occupied.get(bucket)||0;
     occupied.set(bucket,slot+1);
@@ -829,7 +840,9 @@ function drawProjectedPlanets(w,h){
     ctx.fillStyle=p.color;
     ctx.shadowColor='rgba(0,0,0,.98)';
     ctx.shadowBlur=matchesFocus?8:3;
-    ctx.fillText(`${p.glyph} ${degreeInSign(p.lon)}`,x,y);
+    for(const px of visibleXs){
+      ctx.fillText(`${p.glyph} ${degreeInSign(p.lon)}`,px,y);
+    }
     ctx.restore();
   });
 }
@@ -892,6 +905,16 @@ function drawObserverMarker(w,h,earthShiftDeg,date){
     ctx.shadowColor='rgba(0,0,0,.95)';
     ctx.shadowBlur=5;
     ctx.fillText(`${SIGNS[signIndex][1]} ${NAKSHATRAS[nakIndex]}`,x,y-11);
+  }
+  ctx.restore();
+}
+
+function drawWrappedCanvas(source,w,h,shiftDeg){
+  const shiftPx=shiftDeg/360*w;
+  ctx.save();
+  ctx.imageSmoothingEnabled=true;
+  for(const copy of [-1,0,1]){
+    ctx.drawImage(source,shiftPx+copy*w,0,w,h);
   }
   ctx.restore();
 }
