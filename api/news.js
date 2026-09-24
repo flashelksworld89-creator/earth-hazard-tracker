@@ -16,7 +16,7 @@ export default async function handler(req,res){
       ? [{
           category:'local',
           source:'Google News · '+area,
-          url:'https://news.google.com/rss/search?q='+encodeURIComponent(area+' news')+'&hl=en-US&gl=US&ceid=US:en'
+          url:'https://news.google.com/rss/search?q='+encodeURIComponent(area+' breaking news when:1d')+'&hl=en-US&gl=US&ceid=US:en'
         }]
       : FEEDS;
     const settled=await Promise.allSettled(feeds.map(fetchFeed));
