@@ -26,6 +26,10 @@ const PLANETS = [
 const NAK_SIZE = 360/27;
 const canvas = document.getElementById('worldCanvas');
 const ctx = canvas.getContext('2d');
+const lightCanvas = document.createElement('canvas');
+lightCanvas.width = 240;
+lightCanvas.height = 120;
+const lightCtx = lightCanvas.getContext('2d');
 
 const state = {
   land: [],
@@ -271,17 +275,17 @@ function drawPolygon(rings,w,h,shiftDeg){
 
 function drawDayNight(w,h,earthShiftDeg){
   const {subsolarLat,subsolarLon}=state.astro.sun;
+  const lw=lightCanvas.width;
+  const lh=lightCanvas.height;
+  lightCtx.clearRect(0,0,lw,lh);
 
-  const image=ctx.getImageData(0,0,w,h);
-  const data=image.data;
-
-  for(let py=0;py<h;py+=3){
-    const lat=yToLat(py,h);
+  for(let py=0;py<lh;py++){
+    const lat=yToLat(py,lh);
     const latR=rad(lat);
     const sunLatR=rad(subsolarLat);
 
-    for(let px=0;px<w;px+=3){
-      const mapLng=xToLon(px,w);
+    for(let px=0;px<lw;px++){
+      const mapLng=xToLon(px,lw);
       const earthLng=normalize180(mapLng-earthShiftDeg);
       const H=rad(normalize180(earthLng-subsolarLon));
       const cosZ=
@@ -289,28 +293,31 @@ function drawDayNight(w,h,earthShiftDeg){
         Math.cos(latR)*Math.cos(sunLatR)*Math.cos(H);
 
       if(cosZ<0){
-        const darkness=Math.min(.68,.22+(-cosZ)*.5);
-        ctx.fillStyle=`rgba(0,4,12,${darkness})`;
-        ctx.fillRect(px,py,3,3);
+        const darkness=Math.min(.72,.20+(-cosZ)*.52);
+        lightCtx.fillStyle=`rgba(0,4,12,${darkness})`;
+        lightCtx.fillRect(px,py,1,1);
       }
     }
   }
 
-  // Terminator line.
   ctx.save();
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(lightCanvas,0,0,w,h);
+
+  // Approximate day/night boundary.
   ctx.strokeStyle='rgba(148,210,236,.48)';
-  ctx.lineWidth=1.2;
+  ctx.lineWidth=1.15;
   ctx.beginPath();
   let pen=false;
-  for(let x=0;x<=w;x+=2){
+  for(let x=0;x<=w;x+=3){
     const mapLng=xToLon(x,w);
     const earthLng=normalize180(mapLng-earthShiftDeg);
     const H=rad(normalize180(earthLng-subsolarLon));
     const sunLatR=rad(subsolarLat);
-    const denom=Math.tan(sunLatR);
-    if(Math.abs(denom)<1e-5) continue;
-    const lat=Math.atan(-Math.cos(H)/denom)*180/Math.PI;
-    if(!Number.isFinite(lat) || Math.abs(lat)>90){pen=false;continue;}
+    const tanSun=Math.tan(sunLatR);
+    if(Math.abs(tanSun)<1e-5){pen=false;continue;}
+    const lat=Math.atan(-Math.cos(H)/tanSun)*180/Math.PI;
+    if(!Number.isFinite(lat)||Math.abs(lat)>90){pen=false;continue;}
     const y=latToY(lat,h);
     if(!pen){ctx.moveTo(x,y);pen=true;}else ctx.lineTo(x,y);
   }
