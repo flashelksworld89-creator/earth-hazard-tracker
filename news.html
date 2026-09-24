@@ -1,153 +1,509 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#06111f"><title>World News & Live Video · Earth Hazard Tracker</title>
-<meta name="description" content="Follow current U.S., world, politics, weather and Earth-event headlines alongside live video and internal YouTube search.">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#06111f">
+<title>Leader Transit Agents · Sidereal Transit Map</title>
+<meta name="description" content="Configurable leader profiles comparing same-day public news with symbolic sidereal transit channels.">
 <style>
-:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.15);--text:#eaf4ff;--muted:#91a8bf;--accent:#38bdf8}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
-header{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;background:rgba(2,7,13,.96);border-bottom:1px solid var(--border)}
-.brand{color:inherit;text-decoration:none;font-weight:800;letter-spacing:.05em}.brand small{display:block;color:var(--muted);font-size:10px;font-weight:500;margin-top:2px}
-nav{display:flex;gap:8px;flex-wrap:wrap}nav a{color:#cbe7fa;text-decoration:none;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:11px;font-weight:700}nav a.active{border-color:var(--accent);color:#7dd3fc}
-main{width:min(1180px,calc(100% - 28px));margin:auto;padding:28px 0 48px}.hero{display:flex;justify-content:space-between;align-items:end;gap:18px}.eyebrow{color:#67e8f9;font-size:10px;font-weight:800;letter-spacing:.13em}
-h1{font-size:clamp(28px,4vw,46px);margin:6px 0 8px}.hero p{max-width:760px;color:var(--muted);font-size:12px;line-height:1.5}
-.hero button,.tabs button{background:#0b1b2b;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;font-weight:700}
-.toolbar{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(7,20,32,.82)}
-.tabs{display:flex;flex-wrap:wrap;gap:6px}.tabs button.active{border-color:var(--accent);color:#7dd3fc}.toolbar input{width:min(310px,40vw);padding:9px 11px;background:#06111f;color:var(--text);border:1px solid var(--border);border-radius:8px}
-.meta{display:flex;justify-content:space-between;gap:12px;padding:11px 2px;color:#71869a;font-size:10px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.card{display:flex;flex-direction:column;min-height:220px;padding:15px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,#071420,#030a11)}
-.top,.foot{display:flex;justify-content:space-between;gap:10px;align-items:center}.cat{font-size:8px;font-weight:850;letter-spacing:.1em}.weather{color:#67e8f9}.us{color:#86efac}.politics{color:#fde68a}.world{color:#c4b5fd}
-.time,.source{color:#71869a;font-size:9px}.card h2{font-size:16px;line-height:1.3;margin:10px 0 8px}.card p{color:#9fb2c5;font-size:11px;line-height:1.5;margin:0 0 14px}
-.foot{margin-top:auto;padding-top:11px;border-top:1px solid rgba(124,185,255,.1)}.source{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.foot a{color:#7dd3fc;text-decoration:none;font-size:10px;white-space:nowrap}
-.loading{grid-column:1/-1;text-align:center;padding:36px;color:var(--muted);border:1px dashed var(--border);border-radius:12px}
-.live-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
-.live-grid.hidden{display:none}
-.live-card{overflow:hidden;border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,#071420,#030a11)}
-.live-head{display:flex;justify-content:space-between;gap:8px;padding:9px 11px;color:#9fb2c5;font-size:8px;font-weight:800;letter-spacing:.08em}
-.live-badge{color:#fb7185}
-.video-wrap{position:relative;aspect-ratio:16/9;background:#000}
-.video-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
-.live-info{display:grid;gap:4px;padding:11px}
-.live-info strong{font-size:13px}.live-info span{color:var(--muted);font-size:10px;line-height:1.4}.live-info a{margin-top:3px;color:#7dd3fc;text-decoration:none;font-size:10px}
-.youtube-search-body{display:grid;gap:10px;padding:18px}
-.youtube-search-body strong{font-size:16px}
-.youtube-search-body>span{color:var(--muted);font-size:11px;line-height:1.45}
-.youtube-search-form{display:flex;gap:8px}
-.youtube-search-form input{flex:1;min-width:0;padding:10px 12px;background:#06111f;color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px}
-.youtube-search-form button,.youtube-quick button{background:#0b1b2b;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;font-weight:700}
-.youtube-quick{display:flex;flex-wrap:wrap;gap:6px}
-.youtube-quick button{font-size:10px}
-.youtube-note{color:#71869a;font-size:9px;line-height:1.45}.player-send-btn{background:#0b1b2b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:7px 9px;cursor:pointer;font-size:10px;font-weight:700}
-.youtube-results{display:grid;gap:8px;margin-top:4px}.youtube-result{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:8px;border:1px solid var(--border);border-radius:9px;background:#06111f}.youtube-result img{width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:6px}.youtube-result strong{display:block;font-size:11px;line-height:1.3}.youtube-result span{display:block;margin:4px 0 7px;color:var(--muted);font-size:9px}.youtube-result button{background:#0b1b2b;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:7px 9px;cursor:pointer;font-size:10px;font-weight:700}@media(max-width:650px){.youtube-result{grid-template-columns:1fr}.youtube-result img{width:100%}}
-@media(max-width:900px){.grid,.live-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){header,.hero,.toolbar,.meta{align-items:stretch;flex-direction:column}.toolbar input{width:100%;font-size:16px}.grid{grid-template-columns:1fr}}
-
-/* public polish */
-body{background:radial-gradient(circle at 50% 0,#0b1b2c 0,#02070d 36%);letter-spacing:.005em}
-header{padding:12px 18px;box-shadow:0 8px 30px rgba(0,0,0,.22)}
-nav a{border-radius:999px;background:rgba(8,20,32,.7)}
-main{width:min(1240px,calc(100% - 32px));padding-top:34px}
-.hero{padding:8px 2px 4px}
-.hero p{font-size:13px}
-.toolbar{position:sticky;top:70px;z-index:4;backdrop-filter:blur(14px);background:rgba(7,20,32,.92)}
-.tabs button{border-radius:999px;font-size:10px}
-.card,.live-card{border-radius:14px;box-shadow:0 14px 36px rgba(0,0,0,.22)}
-.card{min-height:205px}
-.card h2{font-size:15px}
-.card:hover{border-color:rgba(125,211,252,.28)}
-.youtube-result{transition:border-color .16s ease,background .16s ease}
-.youtube-result:hover{border-color:rgba(125,211,252,.28);background:#081725}
-@media(max-width:650px){main{width:min(100% - 20px,1240px);padding-top:20px}.toolbar{top:58px}}
+:root{--bg:#02070d;--panel:#071420;--panel2:#0a1825;--border:rgba(124,185,255,.15);--text:#eaf4ff;--muted:#91a8bf;--accent:#38bdf8;--gold:#ffd166;--good:#9ee6ba;--warn:#ffd49a}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#02070d;color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{background:radial-gradient(circle at 50% 0,#0b1b2c 0,#02070d 38%);letter-spacing:.005em}
+header{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 18px;background:rgba(2,7,13,.96);border-bottom:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,.22)}
+.brand{color:inherit;text-decoration:none;font-weight:850;letter-spacing:.05em}.brand small{display:block;color:var(--muted);font-size:10px;font-weight:500;margin-top:2px}
+nav{display:flex;gap:8px;flex-wrap:wrap}nav a{color:#cbe7fa;text-decoration:none;padding:8px 11px;border:1px solid var(--border);border-radius:999px;font-size:11px;font-weight:700;background:rgba(8,20,32,.7)}nav a.active{border-color:var(--accent);color:#7dd3fc}
+main{width:min(1440px,calc(100% - 24px));margin:auto;padding:20px 0 46px}
+.hero{display:flex;justify-content:space-between;align-items:end;gap:18px;margin-bottom:14px}.eyebrow{color:#67e8f9;font-size:10px;font-weight:850;letter-spacing:.13em}.hero h1{font-size:clamp(26px,4vw,44px);margin:5px 0 7px}.hero p{max-width:840px;color:var(--muted);font-size:12px;line-height:1.55;margin:0}.hero-actions{display:flex;gap:8px;flex-wrap:wrap}
+button,input,select,textarea{font:inherit}button{cursor:pointer}.btn{padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:#0b1b2b;color:var(--text);font-size:10px;font-weight:800}.btn.primary{border-color:rgba(56,189,248,.35);color:#9be1ff}.btn.danger{border-color:rgba(255,90,95,.25);color:#ffaaa7}
+.layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px}
+.sidebar,.workspace,.card{border:1px solid var(--border);background:rgba(7,20,32,.86);box-shadow:0 14px 36px rgba(0,0,0,.20);border-radius:14px}
+.sidebar{padding:12px;height:max-content;position:sticky;top:76px}.side-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.side-head strong{font-size:10px;letter-spacing:.08em}.profile-list{display:grid;gap:7px}.profile-btn{width:100%;text-align:left;padding:10px;border:1px solid rgba(124,185,255,.10);border-radius:9px;background:#06111f;color:var(--text)}.profile-btn.active{border-color:rgba(56,189,248,.42);background:#0a1d2d}.profile-btn b,.profile-btn span{display:block}.profile-btn b{font-size:11px}.profile-btn span{margin-top:3px;color:var(--muted);font-size:8.5px;line-height:1.35}
+.side-note{margin-top:10px;padding-top:9px;border-top:1px solid rgba(124,185,255,.08);color:#71869a;font-size:8px;line-height:1.5}
+.workspace{padding:14px;min-width:0}.profile-head{display:flex;justify-content:space-between;align-items:start;gap:14px;padding-bottom:12px;border-bottom:1px solid rgba(124,185,255,.10)}.profile-title h2{margin:0 0 4px;font-size:20px}.profile-title p{margin:0;color:var(--muted);font-size:10px}.profile-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.pill{padding:4px 7px;border:1px solid rgba(124,185,255,.12);border-radius:999px;color:#a9c7d8;font-size:8px;background:rgba(6,17,31,.65)}
+.statusbar{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 0;color:#7895a7;font-size:9px}
+.transit-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}.transit-card{padding:9px;border:1px solid rgba(124,185,255,.10);border-radius:10px;background:#06111f;min-width:0}.transit-card .glyph{font-size:18px}.transit-card b{display:block;font-size:10px;margin-top:4px}.transit-card span{display:block;color:#8cabbd;font-size:8px;line-height:1.35;margin-top:2px}
+.report-intro{padding:10px;border:1px solid rgba(255,209,102,.12);border-radius:10px;background:rgba(255,209,102,.035);margin-bottom:10px}.report-intro b{display:block;color:#ffe19a;font-size:9px;margin-bottom:4px}.report-intro p{margin:0;color:#c9dbe5;font-size:9px;line-height:1.55}
+.channel-grid{display:grid;gap:8px}.channel-card{padding:10px;border:1px solid rgba(124,185,255,.10);border-radius:10px;background:linear-gradient(180deg,#071622,#050e16)}.channel-head{display:flex;align-items:flex-start;gap:9px}.channel-icon{flex:0 0 34px;height:34px;display:grid;place-items:center;border-radius:9px;background:rgba(56,189,248,.06);font-size:18px}.channel-head>div{min-width:0}.channel-head b{font-size:11px}.channel-head small{display:block;color:#819fb0;font-size:8px;margin-top:2px;line-height:1.35}.channel-card>p{margin:8px 0;color:#c4d7e1;font-size:9px;line-height:1.55}
+.evidence{display:flex;gap:5px;flex-wrap:wrap}.evidence span{padding:3px 6px;border-radius:999px;background:rgba(125,211,252,.05);color:#8fb4c6;font-size:7.5px;border:1px solid rgba(125,211,252,.08)}
+.story-block{display:grid;gap:5px;margin-top:9px;padding-top:8px;border-top:1px solid rgba(124,185,255,.07)}.story-block>b{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:#b7d3e1}.story{display:grid;gap:2px;padding:7px;border:1px solid rgba(124,185,255,.08);border-radius:8px;background:rgba(4,13,21,.75);text-decoration:none}.story:hover{border-color:rgba(125,211,252,.24)}.story strong{font-size:9px;color:#d8edf7;line-height:1.35}.story span{font-size:7.5px;color:#7392a4;line-height:1.35}
+.memory{margin-top:7px;padding:7px;border:1px solid rgba(155,93,229,.12);border-radius:8px;background:rgba(155,93,229,.04);color:#a999bc;font-size:8px;line-height:1.4}.memory b{color:#d5c4eb}
+.breaking-summary{margin:10px 0;padding:9px;border:1px solid rgba(255,176,72,.12);border-radius:10px;background:rgba(255,176,72,.04)}.breaking-summary b{font-size:8px;color:#ffd49a;text-transform:uppercase;letter-spacing:.05em}.breaking-summary p{margin:4px 0 0;color:#bca781;font-size:8px;line-height:1.45}
+.empty{color:#728b9a;font-size:8px;line-height:1.45}
+dialog{width:min(620px,calc(100% - 24px));border:1px solid rgba(124,185,255,.18);border-radius:14px;background:#071420;color:var(--text);padding:0;box-shadow:0 30px 90px rgba(0,0,0,.7)}dialog::backdrop{background:rgba(0,0,0,.72)}.modal{padding:16px}.modal-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px}.modal-head h3{margin:0;font-size:16px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.field{display:grid;gap:4px}.field.full{grid-column:1/-1}.field span{color:#8eacbc;font-size:8px}.field input,.field select,.field textarea{width:100%;padding:9px;border:1px solid rgba(124,185,255,.14);border-radius:8px;background:#03101a;color:var(--text);font-size:11px}.field textarea{min-height:70px;resize:vertical}.modal-actions{display:flex;justify-content:space-between;gap:8px;margin-top:13px}.modal-actions>div{display:flex;gap:7px}
+.disclaimer{margin-top:12px;padding:9px;border-top:1px solid rgba(124,185,255,.08);color:#6f8796;font-size:8px;line-height:1.5}
+@media(max-width:1000px){.layout{grid-template-columns:1fr}.sidebar{position:static}.transit-grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:650px){header,.hero,.profile-head{align-items:stretch;flex-direction:column}.transit-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}main{width:calc(100% - 16px)}}
 </style>
 </head>
 <body>
 <script>
 if(window.top===window.self && location.pathname!=='/dashboard.html'){
-  const page=location.pathname==='/'?'/':location.pathname;
-  location.replace('/dashboard.html?page='+encodeURIComponent(page));
+  location.replace('/dashboard.html?page='+encodeURIComponent('/news.html'));
 }
 </script>
 <header>
-<a class="brand" href="/">◎ EARTH HAZARD TRACKER<small>World media & weather intelligence</small></a>
-<nav><a href="/">🌎 Earth Tracker</a><a class="active" href="/news.html">📰 World News</a><a href="/patterns.html">◫ Pattern Lab</a></nav>
+  <a class="brand" href="/">◎ SIDEREAL TRANSIT MAP<small>Leader transit agents & same-day public news</small></a>
+  <nav>
+    <a href="/">🌎 Earth Tracker</a>
+    <a class="active" href="/news.html">◉ Leader Agents</a>
+    <a href="/patterns.html">◫ Pattern Lab</a>
+  </nav>
 </header>
 <main>
-<section class="hero"><div><span class="eyebrow">LIVE WORLD MEDIA</span><h1>Weather, U.S., politics and world news</h1><p>Headlines are shown with their original publisher and publication time. Political coverage is presented by source without editorial ranking.</p></div><button id="refresh">Refresh stories</button></section>
-<section class="toolbar"><div class="tabs"><button class="active" data-cat="all">All</button><button data-cat="weather">Weather & Earth</button><button data-cat="us">U.S. News</button><button data-cat="politics">Politics</button><button data-cat="world">World</button><button data-cat="live">Live Video</button></div><input id="search" type="search" placeholder="Search headlines or sources…"></section>
-<div class="meta"><span id="status">Loading current stories…</span><span id="updated"></span></div>
-<section id="liveGrid" class="live-grid hidden" aria-label="Live video feeds">
-  <article class="live-card">
-    <div class="live-head"><span class="live-badge">● LIVE</span><span>WORLD NEWS</span></div>
-    <div class="video-wrap">
-      <iframe src="https://www.youtube.com/embed/gCNeDWCI0vo?autoplay=0&rel=0" title="Al Jazeera English live" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+  <section class="hero">
+    <div>
+      <span class="eyebrow">CONFIGURABLE LEADER TRANSIT AGENTS</span>
+      <h1>Leader profiles + same-day event tracking</h1>
+      <p>Create profiles for public leaders, define the natal framework you want to use, and compare today's public actions and statements with selected sidereal transit channels. Astrology is presented as a symbolic correlation layer, not evidence of private mental states or causation.</p>
     </div>
-    <div class="live-info">
-      <strong>Al Jazeera English</strong>
-      <span>Continuous international news coverage</span>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px"><button type="button" class="player-send-btn" data-play-youtube="https://www.youtube.com/watch?v=gCNeDWCI0vo">Play in persistent player</button><a href="https://www.youtube.com/watch?v=gCNeDWCI0vo" target="_blank" rel="noopener noreferrer">Open on YouTube ↗</a></div>
+    <div class="hero-actions">
+      <button id="refreshBtn" class="btn">Refresh today</button>
+      <button id="addProfileBtn" class="btn primary">+ Add profile</button>
     </div>
-  </article>
+  </section>
 
-  <article class="live-card youtube-search-card">
-    <div class="live-head"><span class="live-badge">▶ VIDEO SEARCH</span><span>YOUTUBE</span></div>
-    <div class="youtube-search-body">
-      <strong>Search YouTube videos</strong>
-      <span>Search weather, U.S. news, earthquakes, volcanoes, hurricanes, or any topic.</span>
-      <form id="youtubeSearchForm" class="youtube-search-form">
-        <input id="youtubeSearchInput" type="search" placeholder="Search YouTube…" autocomplete="off">
-        <button type="submit">Search</button>
-      </form>
-      <div class="youtube-quick">
-        <button type="button" data-youtube-q="NBC News live">NBC News</button>
-        <button type="button" data-youtube-q="The Weather Channel live">Weather Channel</button>
-        <button type="button" data-youtube-q="US breaking news live">U.S. Breaking News</button>
-        <button type="button" data-youtube-q="hurricane live coverage">Hurricanes</button>
-        <button type="button" data-youtube-q="earthquake news live">Earthquakes</button>
-        <button type="button" data-youtube-q="volcano live camera">Volcanoes</button>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="side-head"><strong>LEADER PROFILES</strong><span id="profileCount" class="pill">0</span></div>
+      <div id="profileList" class="profile-list"></div>
+      <div class="side-note">Profiles are stored in this browser. Add as many leaders as you want. Natal settings are user-defined research inputs and are not treated as verified biographical facts.</div>
+    </aside>
+
+    <section class="workspace">
+      <div class="profile-head">
+        <div class="profile-title">
+          <h2 id="leaderName">—</h2>
+          <p id="leaderRole">—</p>
+          <div id="profileMeta" class="profile-meta"></div>
+        </div>
+        <button id="editProfileBtn" class="btn">Edit profile</button>
       </div>
-      <div id="youtubeResults" class="youtube-results"><div class="youtube-note">Search results will appear here and play in the persistent player.</div></div>
-      <div class="youtube-note">Only videos YouTube marks as embeddable are returned.</div>
-    </div>
-  </article>
-</section>
 
-<section id="grid" class="grid" aria-live="polite"><div class="loading">Loading world news…</div></section>
+      <div class="statusbar"><span id="astroStatus">Calculating sidereal transits…</span><span id="newsStatus">Loading today's breaking news…</span></div>
+
+      <div id="transitGrid" class="transit-grid"></div>
+
+      <div class="report-intro">
+        <b>REPORT LOGIC</b>
+        <p><strong>Mars</strong> = observable actions · <strong>Sun</strong> = stated/public purpose · <strong>Moon</strong> = reaction and timing climate · <strong>Rahu</strong> = surprise, amplification and irregularity · <strong>Ketu</strong> = withdrawal, reversal, severance and simplifying pressure. The report compares these symbolic channels with same-day public reporting; it does not claim access to a person's private thoughts or hidden motives.</p>
+      </div>
+
+      <div id="breakingSummary" class="breaking-summary"><b>Today's breaking-news categories</b><p>Loading…</p></div>
+      <div id="channelGrid" class="channel-grid"></div>
+
+      <div class="disclaimer">This page is a research and pattern-comparison tool. News links remain attributable to their publishers. The transit interpretations are symbolic astrological interpretations, and recurring correlations should not be treated as proof that a transit caused an event or that it reveals a person's private mental state.</div>
+    </section>
+  </div>
 </main>
+
+<dialog id="profileDialog">
+  <form id="profileForm" class="modal" method="dialog">
+    <div class="modal-head"><h3 id="dialogTitle">Leader profile</h3><button class="btn" value="cancel" type="button" id="closeDialogBtn">×</button></div>
+    <input id="profileId" type="hidden">
+    <div class="form-grid">
+      <label class="field"><span>Name</span><input id="profileName" required></label>
+      <label class="field"><span>Role / title</span><input id="profileRole" required></label>
+      <label class="field"><span>Country / institution</span><input id="profileInstitution" required></label>
+      <label class="field"><span>Same-day news query</span><input id="profileNewsQuery" required></label>
+      <label class="field"><span>Sidereal rising sign</span><select id="profileAsc"></select></label>
+      <label class="field"><span>Natal Mars sign</span><select id="profileMarsSign"></select></label>
+      <label class="field"><span>Natal Mars house</span><select id="profileMarsHouse"></select></label>
+      <label class="field"><span>Profile color label</span><input id="profileTag" placeholder="e.g. U.S. executive"></label>
+      <label class="field full"><span>Research notes</span><textarea id="profileNotes"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button id="deleteProfileBtn" class="btn danger" type="button">Delete</button>
+      <div><button id="cancelProfileBtn" class="btn" type="button">Cancel</button><button class="btn primary" type="submit">Save profile</button></div>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
 <script>
-const state={articles:[],cat:'all',q:''},grid=document.getElementById('grid'),status=document.getElementById('status'),updated=document.getElementById('updated');
-document.querySelectorAll('[data-cat]').forEach(b=>b.addEventListener('click',()=>{state.cat=b.dataset.cat;document.querySelectorAll('[data-cat]').forEach(x=>x.classList.toggle('active',x===b));render()}));
-document.getElementById('search').addEventListener('input',e=>{state.q=e.target.value.trim().toLowerCase();render()});
-document.getElementById('refresh').addEventListener('click',()=>load(true));
-document.getElementById('youtubeSearchForm')?.addEventListener('submit',e=>{e.preventDefault();searchYoutube(document.getElementById('youtubeSearchInput').value)});
-document.querySelectorAll('[data-youtube-q]').forEach(b=>b.addEventListener('click',()=>{document.getElementById('youtubeSearchInput').value=b.dataset.youtubeQ;searchYoutube(b.dataset.youtubeQ)}));
-document.querySelectorAll('[data-play-youtube]').forEach(b=>b.addEventListener('click',()=>{if(window.parent!==window)window.parent.postMessage({type:'play-youtube',value:b.dataset.playYoutube},location.origin);else window.open(b.dataset.playYoutube,'_blank')}));
-load(false);
-async function load(manual){status.textContent=manual?'Refreshing stories…':'Loading current stories…';try{const r=await fetch('/api/news?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('News HTTP '+r.status);const d=await r.json();state.articles=Array.isArray(d.articles)?d.articles:[];const f=Array.isArray(d.failures)?d.failures.length:0;status.textContent=f?state.articles.length+' stories · '+f+' source unavailable':state.articles.length+' current stories';updated.textContent=d.updatedAt?'Updated '+new Date(d.updatedAt).toLocaleString():'';render()}catch(e){console.error(e);status.textContent='News feed unavailable';grid.innerHTML='<div class="loading">Stories could not be loaded. Try Refresh stories.</div>'}}
-function render(){
-  const live=document.getElementById('liveGrid');
-  const showingLive=state.cat==='live';
-  live.classList.toggle('hidden',!showingLive);
-  grid.style.display=showingLive?'none':'grid';
-  document.getElementById('search').disabled=showingLive;
-  if(showingLive){status.textContent='Live video + YouTube search';updated.textContent='';return}
-  const q=state.q,a=state.articles.filter(x=>(state.cat==='all'||x.category===state.cat)&&(!q||[x.title,x.description,x.source].some(v=>String(v||'').toLowerCase().includes(q))));
-  if(!a.length){grid.innerHTML='<div class="loading">No matching stories in this view.</div>';return}
-  grid.innerHTML=a.map(x=>'<article class="card"><div class="top"><span class="cat '+esc(x.category)+'">'+label(x.category)+'</span><span class="time">'+esc(ago(x.publishedAt))+'</span></div><h2>'+esc(x.title)+'</h2>'+(x.description?'<p>'+esc(x.description)+'</p>':'')+'<div class="foot"><span class="source">'+esc(x.source||'Source')+'</span><a href="'+attr(x.url)+'" target="_blank" rel="noopener noreferrer">Open story ↗</a></div></article>').join('')
+const A=window.Astronomy;
+const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const SIGN_GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
+const CHANNELS=[
+  {key:'Mars',glyph:'♂',title:'Actions',subtitle:'Observable actions, interventions, confrontations, implementation and physical initiative'},
+  {key:'Sun',glyph:'☉',title:'Stated / Public Purpose',subtitle:'Publicly stated aims, leadership framing, authority, visibility and declared priorities'},
+  {key:'Moon',glyph:'☽',title:'Reaction / Timing Climate',subtitle:'Short-term response patterns, timing shifts, messaging changes and public-emotional climate'},
+  {key:'Rahu',glyph:'☊',title:'Surprise / Amplification',subtitle:'Unusual moves, controversy, escalation, foreign or technological themes and attention spikes'},
+  {key:'Ketu',glyph:'☋',title:'Withdrawal / Reversal Driver',subtitle:'Severance, cancellation, reversal, detachment, technical narrowing and stripping away'}
+];
+const HOUSE_TOPICS={
+  1:'identity, presence and immediate initiative',2:'money, resources and speech',3:'communications, local movement and neighbors',
+  4:'home base, property and private security',5:'creativity, recreation and messaging performance',6:'workload, service, disputes and health routines',
+  7:'meetings, agreements, opponents and one-to-one dealings',8:'crisis, secrecy, shared resources and disruption',
+  9:'foreign affairs, law, belief, universities and long-distance travel',10:'public office, executive action, reputation and government',
+  11:'alliances, networks, gains and large groups',12:'withdrawal, expense, isolation and foreign/behind-the-scenes settings'
+};
+const DEFAULT_PROFILE={
+  id:'donald-trump',
+  name:'Donald Trump',
+  role:'President of the United States',
+  institution:'White House · United States',
+  newsQuery:'Donald Trump White House',
+  asc:4,
+  marsSign:4,
+  marsHouse:1,
+  tag:'U.S. executive',
+  notes:'User-defined research profile: Leo rising with Mars in the Ascendant.'
+};
+const LS_PROFILES='leader-agent-profiles-v1';
+const LS_ACTIVE='leader-agent-active-v1';
+const LS_MEMORY='leader-agent-pattern-memory-v1';
+let profiles=loadProfiles();
+let activeId=localStorage.getItem(LS_ACTIVE)||profiles[0].id;
+let currentTransits=null;
+let currentArticles=[];
+let currentCategories=[];
+let refreshSeq=0;
+
+init();
+
+function init(){
+  fillSelects();
+  bind();
+  renderProfileList();
+  activateProfile(activeId);
 }
-async function searchYoutube(q){
- const term=String(q||'').trim(),box=document.getElementById('youtubeResults');if(!term||!box)return;
- box.innerHTML='<div class="youtube-note">Searching YouTube…</div>';
- try{
-  const r=await fetch('/api/youtube-search?q='+encodeURIComponent(term),{cache:'no-store'}),d=await r.json();
-  if(d.setupRequired){box.innerHTML='<div class="youtube-note">Internal YouTube search needs a YOUTUBE_API_KEY environment variable in Vercel.</div>';return}
-  if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
-  if(!d.items?.length){box.innerHTML='<div class="youtube-note">No embeddable videos found.</div>';return}
-  box.innerHTML=d.items.map(x=>'<div class="youtube-result">'+(x.thumbnail?'<img src="'+attr(x.thumbnail)+'" alt="">':'')+'<div><strong>'+esc(x.title)+'</strong><span>'+esc(x.channel)+(x.publishedAt?' · '+esc(new Date(x.publishedAt).toLocaleDateString()):'')+'</span><button type="button" data-result-id="'+attr(x.id)+'">Play in site</button></div></div>').join('');
-  box.querySelectorAll('[data-result-id]').forEach(b=>b.addEventListener('click',()=>{if(window.parent!==window)window.parent.postMessage({type:'play-youtube',value:b.dataset.resultId},location.origin)}));
- }catch(e){console.error(e);box.innerHTML='<div class="youtube-note">YouTube search is unavailable right now.</div>'}
+
+function fillSelects(){
+  const signOptions=SIGNS.map((s,i)=>'<option value="'+i+'">'+SIGN_GLYPHS[i]+' '+s+'</option>').join('');
+  document.getElementById('profileAsc').innerHTML=signOptions;
+  document.getElementById('profileMarsSign').innerHTML=signOptions;
+  document.getElementById('profileMarsHouse').innerHTML=Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'">House '+(i+1)+'</option>').join('');
 }
-function label(c){return {weather:'WEATHER & EARTH',us:'U.S. NEWS',politics:'POLITICS',world:'WORLD'}[c]||String(c||'').toUpperCase()}
-function ago(v){const t=new Date(v).getTime();if(!Number.isFinite(t))return'Time unavailable';const s=Math.max(0,Math.floor((Date.now()-t)/1000));if(s<60)return'Just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago'}
-function esc(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}function attr(v){return esc(v).replaceAll('`','&#096;')}
+
+function bind(){
+  document.getElementById('addProfileBtn').onclick=()=>openProfileDialog(null);
+  document.getElementById('editProfileBtn').onclick=()=>openProfileDialog(getActiveProfile());
+  document.getElementById('refreshBtn').onclick=()=>refreshActive(true);
+  document.getElementById('closeDialogBtn').onclick=closeDialog;
+  document.getElementById('cancelProfileBtn').onclick=closeDialog;
+  document.getElementById('deleteProfileBtn').onclick=deleteProfile;
+  document.getElementById('profileForm').addEventListener('submit',saveProfile);
+}
+
+function loadProfiles(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(LS_PROFILES)||'null');
+    if(Array.isArray(raw)&&raw.length) return raw;
+  }catch{}
+  localStorage.setItem(LS_PROFILES,JSON.stringify([DEFAULT_PROFILE]));
+  return [DEFAULT_PROFILE];
+}
+
+function saveProfiles(){
+  localStorage.setItem(LS_PROFILES,JSON.stringify(profiles));
+  document.getElementById('profileCount').textContent=profiles.length;
+}
+
+function getActiveProfile(){
+  return profiles.find(p=>p.id===activeId)||profiles[0];
+}
+
+function renderProfileList(){
+  document.getElementById('profileCount').textContent=profiles.length;
+  document.getElementById('profileList').innerHTML=profiles.map(p=>
+    '<button class="profile-btn '+(p.id===activeId?'active':'')+'" data-id="'+escAttr(p.id)+'">'+
+      '<b>'+esc(p.name)+'</b><span>'+esc(p.role)+' · '+esc(p.institution)+'</span></button>'
+  ).join('');
+  document.querySelectorAll('.profile-btn').forEach(b=>b.onclick=()=>activateProfile(b.dataset.id));
+}
+
+function activateProfile(id){
+  const p=profiles.find(x=>x.id===id)||profiles[0];
+  activeId=p.id;
+  localStorage.setItem(LS_ACTIVE,activeId);
+  document.getElementById('leaderName').textContent=p.name;
+  document.getElementById('leaderRole').textContent=p.role+' · '+p.institution;
+  document.getElementById('profileMeta').innerHTML=
+    '<span class="pill">'+SIGN_GLYPHS[p.asc]+' '+SIGNS[p.asc]+' rising</span>'+
+    '<span class="pill">Natal Mars · '+SIGN_GLYPHS[p.marsSign]+' '+SIGNS[p.marsSign]+' · H'+p.marsHouse+'</span>'+
+    (p.tag?'<span class="pill">'+esc(p.tag)+'</span>':'');
+  renderProfileList();
+  refreshActive(false);
+}
+
+async function refreshActive(manual){
+  const seq=++refreshSeq;
+  const p=getActiveProfile();
+  document.getElementById('astroStatus').textContent='Calculating Lahiri sidereal transits…';
+  document.getElementById('newsStatus').textContent=(manual?'Refreshing':'Loading')+" today's breaking news…";
+  try{
+    currentTransits=calculateTrackedTransits(new Date(),p);
+    if(seq!==refreshSeq)return;
+    renderTransits(p,currentTransits);
+    document.getElementById('astroStatus').textContent='Lahiri sidereal · '+new Date().toLocaleString();
+  }catch(e){
+    console.error(e);
+    document.getElementById('astroStatus').textContent='Transit calculation unavailable';
+    currentTransits=null;
+  }
+
+  try{
+    const r=await fetch('/api/news?q='+encodeURIComponent(p.newsQuery),{cache:'no-store'});
+    if(!r.ok) throw new Error('News HTTP '+r.status);
+    const data=await r.json();
+    if(seq!==refreshSeq)return;
+    currentArticles=(Array.isArray(data.articles)?data.articles:[]).filter(a=>isToday(a.publishedAt));
+    const classified=currentArticles.map(article=>({article,...classifyStory(article)}));
+    currentCategories=summarizeCategories(classified);
+    renderBreakingSummary(currentCategories,currentArticles.length);
+    renderChannels(p,currentTransits,classified);
+    document.getElementById('newsStatus').textContent=currentArticles.length+" same-day breaking headline"+(currentArticles.length===1?'':'s')+' · '+p.newsQuery;
+  }catch(e){
+    console.error(e);
+    currentArticles=[];currentCategories=[];
+    renderBreakingSummary([],0);
+    renderChannels(p,currentTransits,[]);
+    document.getElementById('newsStatus').textContent="Today's news feed unavailable";
+  }
+}
+
+function calculateTrackedTransits(date,profile){
+  if(!A) throw new Error('Astronomy Engine missing');
+  const aya=lahiriAyanamsa(date);
+  const out={};
+  for(const name of ['Sun','Moon','Mars']){
+    const body=A.Body[name];
+    const vec=A.GeoVector(body,date,true);
+    const ecl=A.Ecliptic(vec);
+    const lon=normalize360(Number(ecl.elon)-aya);
+    out[name]=transitRecord(name,lon,profile);
+  }
+  const rahu=normalize360(meanNodeTropicalLongitude(date)-aya);
+  out.Rahu=transitRecord('Rahu',rahu,profile);
+  out.Ketu=transitRecord('Ketu',normalize360(rahu+180),profile);
+  return out;
+}
+
+function transitRecord(name,lon,profile){
+  const sign=Math.floor(lon/30);
+  const degree=lon%30;
+  const house=((sign-profile.asc+12)%12)+1;
+  const aspectsNatalMars=aspectsHouse(name,house,profile.marsHouse);
+  const conjunctNatalMars=house===profile.marsHouse;
+  return {name,lon,sign,degree,house,aspectsNatalMars,conjunctNatalMars};
+}
+
+function renderTransits(profile,transits){
+  document.getElementById('transitGrid').innerHTML=CHANNELS.map(ch=>{
+    const t=transits[ch.key];
+    return '<div class="transit-card"><span class="glyph">'+ch.glyph+'</span><b>'+ch.key+' · H'+t.house+'</b>'+
+      '<span>'+SIGN_GLYPHS[t.sign]+' '+SIGNS[t.sign]+' '+t.degree.toFixed(1)+'°</span>'+
+      '<span>'+(t.conjunctNatalMars?'Activates natal Mars house':t.aspectsNatalMars?'Full aspect to natal Mars house':'No full aspect to natal Mars house')+'</span></div>';
+  }).join('');
+}
+
+function renderChannels(profile,transits,classified){
+  if(!transits){
+    document.getElementById('channelGrid').innerHTML='<div class="empty">Transit data unavailable.</div>';return;
+  }
+  document.getElementById('channelGrid').innerHTML=CHANNELS.map(ch=>{
+    const t=transits[ch.key];
+    const narrative=channelNarrative(ch,t,profile,transits);
+    const matches=classified
+      .map(x=>({x,score:(x.channelScores[ch.key]||0)+transitCategoryBoost(ch.key,t,x.categories)}))
+      .filter(r=>r.score>=1.2)
+      .sort((a,b)=>b.score-a.score)
+      .slice(0,4);
+    rememberMatches(profile,ch,t,matches);
+    const memory=memoryText(profile,ch,t);
+    return '<article class="channel-card">'+
+      '<div class="channel-head"><span class="channel-icon">'+ch.glyph+'</span><div><b>'+ch.key+' · '+ch.title+'</b><small>'+ch.subtitle+'</small></div></div>'+
+      '<p>'+esc(narrative)+'</p>'+
+      '<div class="evidence"><span>'+SIGN_GLYPHS[t.sign]+' '+SIGNS[t.sign]+' '+t.degree.toFixed(1)+'°</span><span>Transit H'+t.house+'</span>'+
+      (t.conjunctNatalMars?'<span>Same house as natal Mars</span>':'')+(t.aspectsNatalMars?'<span>Full aspect to natal Mars house</span>':'')+'</div>'+
+      (memory?'<div class="memory"><b>Pattern memory:</b> '+esc(memory)+'</div>':'')+
+      '<div class="story-block"><b>Today · corresponding public stories</b>'+
+      (matches.length?matches.map(m=>storyHtml(m.x.article,m.x.categories[0]||'Breaking news')).join(''):'<span class="empty">No strong same-day story match for this channel yet.</span>')+
+      '</div></article>';
+  }).join('');
+}
+
+function channelNarrative(ch,t,p,all){
+  const house=HOUSE_TOPICS[t.house];
+  const marsLink=t.conjunctNatalMars?' It occupies the configured natal Mars house, so this channel directly overlaps the profile’s action marker.':t.aspectsNatalMars?' It casts a configured full sign-based aspect to the natal Mars house, linking this channel to the profile’s action marker.':'';
+  if(ch.key==='Mars') return 'Mars is the action channel. In H'+t.house+', today’s symbolic emphasis is on '+house+'. Same-day reporting is checked for concrete actions, interventions, confrontations, implementation, travel, military/police activity, executive moves, or other visible acts.'+marsLink;
+  if(ch.key==='Sun') return 'The Sun is used for public or stated purpose—not hidden motive. In H'+t.house+', compare official explanations, leadership framing, stated priorities and authority themes with '+house+'.'+marsLink;
+  if(ch.key==='Moon') return 'The Moon is used as a fast timing and reaction channel—not a claim about private thoughts. In H'+t.house+', watch same-day shifts in response, messaging, scheduling, public mood and immediate decision climate around '+house+'.'+marsLink;
+  if(ch.key==='Rahu') return 'Rahu is the disruption and amplification channel. In H'+t.house+', flag unusual, controversial, foreign, technological, escalatory or attention-dominating events connected with '+house+'.'+marsLink;
+  return 'Ketu is the withdrawal and reversal channel. In H'+t.house+', look for severance, cancellation, removal, retreat, reversal, narrowing, technical focus or stripping-away themes connected with '+house+'.'+marsLink;
+}
+
+function classifyStory(article){
+  const text=((article.title||'')+' '+(article.description||'')).toLowerCase();
+  const categoryRules={
+    'Executive / Government':['president','white house','executive','order','administration','government','cabinet','agency'],
+    'Foreign Affairs / Diplomacy':['foreign','summit','meeting','president of','prime minister','diplomatic','treaty','china','russia','iran','israel','nato','united nations'],
+    'Military / Conflict':['military','strike','attack','war','troops','weapons','missile','pentagon','defense','cartel'],
+    'Legal / Courts':['court','judge','lawsuit','legal','supreme court','justice department','attorney','indictment','ruling'],
+    'Economy / Trade':['tariff','trade','economy','market','jobs','tax','bank','business','investment','inflation','dollar'],
+    'Immigration / Border':['border','immigration','migrant','deport','visa','asylum','ice '],
+    'Media / Communications':['speech','remarks','interview','post','media','press','statement','announcement','truth social'],
+    'Personnel / Appointments':['appoint','nominate','fire','fired','resign','resignation','staff','secretary','director'],
+    'Technology / Cyber':['technology','cyber','ai ','artificial intelligence','data','internet'],
+    'Travel / Ceremony':['travel','visit','arrival','depart','ceremony','trip','golf']
+  };
+  const channelRules={
+    Mars:[['orders',1.4],['order',1],['strike',1.5],['attack',1.5],['military',1.3],['fire',1.2],['fired',1.3],['action',1],['deploy',1.4],['signs',.8],['launch',1]],
+    Sun:[['says',.8],['said',.8],['purpose',1],['goal',1],['priority',1],['remarks',1],['speech',1],['statement',1],['policy',.8],['agenda',1],['leadership',1]],
+    Moon:[['react',1.2],['response',1.1],['respond',1.1],['changes',.8],['shift',1],['today',.5],['meeting',.7],['press',.6],['mood',1],['concern',.8]],
+    Rahu:[['shocking',1.5],['surprise',1.4],['unprecedented',1.5],['controvers',1.2],['escalat',1.2],['foreign',.8],['cyber',1.2],['ai ',1],['record',.7],['dramatic',1]],
+    Ketu:[['cancel',1.4],['withdraw',1.4],['remove',1.2],['fire',1],['fired',1.3],['resign',1.2],['cut',1],['end ',1],['terminate',1.4],['reverse',1.4],['ban',1]]
+  };
+  const categories=[];
+  for(const [name,terms] of Object.entries(categoryRules)){
+    const hits=terms.filter(term=>text.includes(term)).length;
+    if(hits) categories.push({name,score:hits});
+  }
+  categories.sort((a,b)=>b.score-a.score);
+  const channelScores={};
+  for(const [name,rules] of Object.entries(channelRules)){
+    let score=0;
+    for(const [term,weight] of rules) if(text.includes(term)) score+=weight;
+    channelScores[name]=score;
+  }
+  return {categories:categories.map(x=>x.name),channelScores};
+}
+
+function transitCategoryBoost(channel,t,categories){
+  let boost=0;
+  const set=new Set(categories);
+  if(channel==='Mars'&&(set.has('Military / Conflict')||set.has('Executive / Government')||set.has('Personnel / Appointments')))boost+=.8;
+  if(channel==='Sun'&&(set.has('Executive / Government')||set.has('Media / Communications')))boost+=.7;
+  if(channel==='Moon'&&(set.has('Media / Communications')||set.has('Travel / Ceremony')))boost+=.5;
+  if(channel==='Rahu'&&(set.has('Foreign Affairs / Diplomacy')||set.has('Technology / Cyber')||set.has('Media / Communications')))boost+=.7;
+  if(channel==='Ketu'&&(set.has('Personnel / Appointments')||set.has('Legal / Courts')||set.has('Immigration / Border')))boost+=.7;
+  if(t.conjunctNatalMars||t.aspectsNatalMars)boost+=.35;
+  return boost;
+}
+
+function summarizeCategories(classified){
+  const counts=new Map();
+  classified.forEach(x=>x.categories.forEach(c=>counts.set(c,(counts.get(c)||0)+1)));
+  return [...counts.entries()].sort((a,b)=>b[1]-a[1]).map(([name,count])=>({name,count}));
+}
+
+function renderBreakingSummary(categories,count){
+  document.getElementById('breakingSummary').innerHTML='<b>Today\'s breaking-news categories</b><p>'+
+    (categories.length?categories.slice(0,7).map(c=>esc(c.name)+' ('+c.count+')').join(' · '):'No same-day categorized stories found')+
+    ' · '+count+' total same-day headline'+(count===1?'':'s')+'</p>';
+}
+
+function storyHtml(a,category){
+  return '<a class="story" href="'+escAttr(a.url)+'" target="_blank" rel="noopener noreferrer"><strong>'+esc(a.title)+'</strong><span>'+esc(category)+' · '+esc(a.source||'Source')+' · '+storyTime(a.publishedAt)+'</span></a>';
+}
+
+function rememberMatches(profile,ch,t,matches){
+  if(!matches.length)return;
+  try{
+    const memory=JSON.parse(localStorage.getItem(LS_MEMORY)||'{}');
+    const sig=signature(profile,ch,t);
+    const row=memory[sig]||{count:0,categories:{}};
+    row.count+=matches.length;
+    matches.forEach(m=>(m.x.categories||[]).slice(0,3).forEach(c=>row.categories[c]=(row.categories[c]||0)+1));
+    memory[sig]=row;
+    const trimmed=Object.fromEntries(Object.entries(memory).sort((a,b)=>(b[1].count||0)-(a[1].count||0)).slice(0,300));
+    localStorage.setItem(LS_MEMORY,JSON.stringify(trimmed));
+  }catch{}
+}
+
+function memoryText(profile,ch,t){
+  try{
+    const row=JSON.parse(localStorage.getItem(LS_MEMORY)||'{}')[signature(profile,ch,t)];
+    if(!row||row.count<2)return'';
+    const top=Object.entries(row.categories||{}).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    return 'Across '+row.count+' saved same-day matches for this transit signature, recurring categories are '+top.map(([k,v])=>k+' ('+v+')').join(', ')+'. This is correlation memory, not proof of causation.';
+  }catch{return''}
+}
+
+function signature(profile,ch,t){
+  return [profile.id,ch.key,'H'+t.house,'S'+t.sign,t.conjunctNatalMars?'conjMars':'',t.aspectsNatalMars?'aspMars':''].filter(Boolean).join('|');
+}
+
+function aspectsHouse(name,fromHouse,targetHouse){
+  const offsets=name==='Mars'?[3,6,7]:['Sun','Moon','Rahu','Ketu'].includes(name)?[6]:[];
+  const offset=(targetHouse-fromHouse+12)%12;
+  return offsets.includes(offset);
+}
+
+function isToday(value){
+  const d=new Date(value),n=new Date();
+  return Number.isFinite(d.getTime())&&d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate();
+}
+
+function openProfileDialog(profile){
+  const editing=!!profile;
+  const p=profile||{id:'',name:'',role:'',institution:'',newsQuery:'',asc:0,marsSign:0,marsHouse:1,tag:'',notes:''};
+  document.getElementById('dialogTitle').textContent=editing?'Edit leader profile':'Add leader profile';
+  document.getElementById('profileId').value=p.id||'';
+  document.getElementById('profileName').value=p.name||'';
+  document.getElementById('profileRole').value=p.role||'';
+  document.getElementById('profileInstitution').value=p.institution||'';
+  document.getElementById('profileNewsQuery').value=p.newsQuery||'';
+  document.getElementById('profileAsc').value=String(p.asc??0);
+  document.getElementById('profileMarsSign').value=String(p.marsSign??0);
+  document.getElementById('profileMarsHouse').value=String(p.marsHouse??1);
+  document.getElementById('profileTag').value=p.tag||'';
+  document.getElementById('profileNotes').value=p.notes||'';
+  document.getElementById('deleteProfileBtn').style.visibility=editing?'visible':'hidden';
+  document.getElementById('profileDialog').showModal();
+}
+
+function closeDialog(){document.getElementById('profileDialog').close()}
+
+function saveProfile(e){
+  e.preventDefault();
+  const existingId=document.getElementById('profileId').value;
+  const name=document.getElementById('profileName').value.trim();
+  const profile={
+    id:existingId||slug(name)+'-'+Date.now().toString(36),
+    name,
+    role:document.getElementById('profileRole').value.trim(),
+    institution:document.getElementById('profileInstitution').value.trim(),
+    newsQuery:document.getElementById('profileNewsQuery').value.trim(),
+    asc:Number(document.getElementById('profileAsc').value),
+    marsSign:Number(document.getElementById('profileMarsSign').value),
+    marsHouse:Number(document.getElementById('profileMarsHouse').value),
+    tag:document.getElementById('profileTag').value.trim(),
+    notes:document.getElementById('profileNotes').value.trim()
+  };
+  if(existingId){
+    profiles=profiles.map(p=>p.id===existingId?profile:p);
+  }else{
+    profiles.push(profile);
+  }
+  activeId=profile.id;
+  saveProfiles();closeDialog();activateProfile(profile.id);
+}
+
+function deleteProfile(){
+  const id=document.getElementById('profileId').value;
+  if(!id)return;
+  if(profiles.length<=1){alert('Keep at least one profile.');return}
+  profiles=profiles.filter(p=>p.id!==id);
+  activeId=profiles[0].id;
+  saveProfiles();closeDialog();activateProfile(activeId);
+}
+
+function lahiriAyanamsa(date){
+  const jd=date.getTime()/86400000+2440587.5;
+  const T=(jd-2451545.0)/36525;
+  return (85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600;
+}
+function meanNodeTropicalLongitude(date){
+  const jd=date.getTime()/86400000+2440587.5;
+  const T=(jd-2451545.0)/36525;
+  return normalize360(125.04452-1934.136261*T+.0020708*T*T+(T*T*T)/450000);
+}
+function normalize360(x){return((x%360)+360)%360}
+function storyTime(value){const d=new Date(value);return Number.isFinite(d.getTime())?d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'today'}
+function slug(v){return String(v||'profile').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'profile'}
+function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function escAttr(v){return esc(v).replace(/\x60/g,'&#96;')}
 </script>
-</body></html>
+</body>
+</html>
