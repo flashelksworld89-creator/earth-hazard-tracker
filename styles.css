@@ -223,16 +223,17 @@ button:hover,select:hover{border-color:rgba(103,232,249,.5)}
   overflow:visible;
   padding:9px 10px;
 }
-.control-panel.collapsed #transitPanelBody{display:none}
-.control-panel.collapsed .panel-head{
-  gap:8px;
-}
-.control-panel.collapsed .panel-head>div{
-  display:none;
-}
-.control-panel.collapsed #resetBtn{
-  display:none;
-}
-.control-panel.collapsed #collapsePanelBtn{
-  white-space:nowrap;
+.control-panel.collapsed .panel-head{gap:0}
+.control-panel.collapsed .panel-head>div{display:none}
+.control-panel.collapsed #resetBtn{display:none}
+#transitPanelBody[hidden]{display:none !important}
+.icon-btn{
+  width:34px;
+  height:34px;
+  padding:0;
+  display:inline-grid;
+  place-items:center;
+  font-size:20px;
+  line-height:1;
+  font-weight:700;
 }
