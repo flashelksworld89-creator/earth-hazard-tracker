@@ -93,7 +93,6 @@ export function initZodiacCompass(map, maplibregl) {
   };
 
   const ids = {
-    signs:'zodiac-sign-lines',
     ecliptic:'zodiac-ecliptic-ring',
     nak:'zodiac-nak-lines',
     houses:'zodiac-house-lines',
@@ -321,14 +320,6 @@ export function initZodiacCompass(map, maplibregl) {
         'line-dasharray':[2,3]
       }
     });
-    if (!map.getLayer(ids.signs)) map.addLayer({
-      id:ids.signs,type:'line',source:ids.signs,
-      paint:{
-        'line-color':signColorExpression(),
-        'line-width':3.2,
-        'line-opacity':['case',['==',['get','above'],true],.94,.22]
-      }
-    });
     addLine(ids.houses,'#fde68a',1.45,.62,[5,3]);
     addLine(ids.angles,'#fff3b0',2.7,.94);
     addLine(ids.dirs,'#cbd5e1',1.3,.56,[1,4]);
@@ -431,10 +422,10 @@ export function initZodiacCompass(map, maplibregl) {
     if (!map.getLayer(ids.globalBounds)) map.addLayer({
       id:ids.globalBounds,type:'line',source:ids.globalBounds,
       paint:{
-        'line-color':signColorExpression(),
-        'line-width':['case',['==',['get','active'],true],3.4,2.0],
-        'line-opacity':['case',['==',['get','active'],true],.92,.58],
-        'line-blur':['case',['==',['get','active'],true],2.2,.8]
+        'line-color':['case',['==',['get','active'],true],'#d8f6ff','#6f8496'],
+        'line-width':['case',['==',['get','active'],true],1.8,.8],
+        'line-opacity':['case',['==',['get','active'],true],.58,.24],
+        'line-blur':0
       }
     });
 
@@ -593,7 +584,6 @@ export function initZodiacCompass(map, maplibregl) {
   function updateOpacity() {
     const pairs=[
       [ids.ecliptic,'line-opacity',.86],
-      [ids.signs,'line-opacity',.58],
       [ids.nak,'line-opacity',.42],
       [ids.houses,'line-opacity',.62],
       [ids.angles,'line-opacity',.94],
@@ -618,7 +608,7 @@ export function initZodiacCompass(map, maplibregl) {
 
   function drawGeometry(angles,date,aya) {
     const {asc,dsc,mc,ic,houseCusps}=angles;
-    const signs=[],ecliptic=[],nak=[],houses=[],anglesLayer=[],dirs=[],labels=[],rings=[];
+    const ecliptic=[],nak=[],houses=[],anglesLayer=[],dirs=[],labels=[],rings=[];
 
     const bearingForLon=(lon)=>{
       if(state.orientation==='ecliptic') return traditionalChartBearing(lon,asc,mc);
@@ -641,11 +631,6 @@ export function initZodiacCompass(map, maplibregl) {
       }));
 
       const edgeLon=i*30;
-      const edge=localEclipticDirection(date,edgeLon,aya);
-      signs.push(lineFeature(rayCoordinates(bearingForLon(edgeLon),8150),{
-        kind:'sign',signIndex:i,above:edge.alt>=0,alt:edge.alt
-      }));
-
       const midLon=normalize360(edgeLon+15);
       const mid=localEclipticDirection(date,midLon,aya);
       labels.push(pointFeature(destination(state.origin,bearingForLon(midLon),7900),{
@@ -702,7 +687,6 @@ export function initZodiacCompass(map, maplibregl) {
       }));
     });
 
-    setData(ids.signs,signs);
     setData(ids.ecliptic,ecliptic);
     setData(ids.nak,nak);
     setData(ids.houses,houses);
