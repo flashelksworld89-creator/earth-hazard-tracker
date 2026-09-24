@@ -4,26 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#020812" />
-  <title>Sidereal Ecliptic Earth</title>
-  <meta name="description" content="Experimental 3D sidereal Earth and ecliptic visualization." />
+  <title>Sidereal Transit Map</title>
+  <meta name="description" content="Flat-world sidereal zodiac and nakshatra transit visualization." />
   <link rel="stylesheet" href="/styles.css" />
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://esm.sh/three@0.183.2",
-      "three/": "https://esm.sh/three@0.183.2/"
-    }
-  }
-  </script>
 </head>
 <body>
   <main class="app-shell">
-    <div id="scene" class="scene" aria-label="Interactive 3D Earth and ecliptic"></div>
+    <canvas id="worldCanvas" aria-label="Animated world map with zodiac and nakshatra transit band"></canvas>
 
     <header class="topbar glass">
       <div>
-        <h1>Sidereal Ecliptic Earth</h1>
-        <p>3D prototype · Lahiri sidereal zodiac</p>
+        <h1>Sidereal Transit Map</h1>
+        <p>Single-world projection · Lahiri sidereal zodiac · day/night</p>
       </div>
       <nav>
         <a href="/news.html">World News</a>
@@ -34,44 +26,15 @@
     <section class="control-panel glass">
       <div class="panel-head">
         <div>
-          <strong>ECLIPTIC CONTROLS</strong>
-          <span id="statusText">Loading astronomy…</span>
+          <strong>TRANSIT CONTROLS</strong>
+          <span id="statusText">Loading world geometry…</span>
         </div>
-        <button id="resetViewBtn">Reset view</button>
-      </div>
-
-      <div class="readouts">
-        <div><small>ASC</small><strong id="ascText">—</strong></div>
-        <div><small>DSC</small><strong id="dscText">—</strong></div>
-        <div><small>MC</small><strong id="mcText">—</strong></div>
-        <div><small>IC</small><strong id="icText">—</strong></div>
-      </div>
-
-      <div class="observer-box">
-        <div class="observer-head">
-          <strong>OBSERVER LOCATION</strong>
-          <span id="observerStatus">0.0000°, 0.0000°</span>
-        </div>
-        <div class="observer-grid">
-          <label>
-            <span>Latitude</span>
-            <input id="latitudeInput" type="number" min="-89.9" max="89.9" step="0.0001" value="0" />
-          </label>
-          <label>
-            <span>Longitude</span>
-            <input id="longitudeInput" type="number" min="-180" max="180" step="0.0001" value="0" />
-          </label>
-        </div>
-        <div class="row">
-          <button id="applyLocationBtn">Apply location</button>
-          <button id="useLocationBtn">Use my location</button>
-        </div>
+        <button id="resetBtn">NOW</button>
       </div>
 
       <div class="time-controls">
         <button data-minutes="-1440">−1D</button>
         <button data-minutes="-60">−1H</button>
-        <button id="nowBtn">NOW</button>
         <button data-minutes="60">+1H</button>
         <button data-minutes="1440">+1D</button>
       </div>
@@ -79,40 +42,38 @@
       <div class="row">
         <button id="playBtn">▶ Play</button>
         <select id="speedSelect">
-          <option value="1">1×</option>
+          <option value="1">1× realtime</option>
           <option value="60">60×</option>
           <option value="360">360×</option>
           <option value="1440">1440×</option>
         </select>
-        <label><input id="rotateEarth" type="checkbox" checked /> Rotate Earth</label>
       </div>
 
       <div class="row">
-        <label><input id="showPlanets" type="checkbox" checked /> Celestial planets</label>
-        <label><input id="showSigns" type="checkbox" checked /> Zodiac band</label>
-        <label><input id="showAngles" type="checkbox" checked /> Angles</label>
+        <label><input id="showDayNight" type="checkbox" checked /> Day / night</label>
+        <label><input id="showZodiac" type="checkbox" checked /> Zodiac</label>
+        <label><input id="showNakshatras" type="checkbox" checked /> Nakshatras</label>
+        <label><input id="showPlanets" type="checkbox" checked /> Planets</label>
+        <label><input id="showGrid" type="checkbox" checked /> Grid</label>
       </div>
 
-      <div class="row">
-        <label><input id="showNakSkin" type="checkbox" checked /> Rising nakshatra skin</label>
-        <label><input id="showNakLabels" type="checkbox" checked /> Nakshatra labels</label>
-        <label><input id="showProjectedPlanets" type="checkbox" checked /> Projected planet glyphs</label>
-        <label><input id="showStars" type="checkbox" checked /> Fixed stars</label>
+      <div class="motion-key">
+        <span>EARTH <b>→ east</b></span>
+        <span>CELESTIAL BAND <b>← west</b></span>
       </div>
 
       <div id="timeText" class="time-text">—</div>
-      <div id="nakshatraKey" class="nakshatra-key"></div>
       <div id="planetList" class="planet-list"></div>
+      <div id="nakshatraKey" class="nakshatra-key"></div>
 
       <p class="note">
-        Earth rotates west → east beneath a fixed celestial reference. The transparent surface skin
-        shows which nakshatra is rising at each geographic region. Its colored zones and projected
-        planet glyphs migrate westward across Earth as the planet turns eastward; the celestial
-        planet glyphs themselves move only by their calculated sidereal motion.
+        The continents move right and wrap at the map edge to visualize eastward Earth rotation.
+        The zodiac/nakshatra ribbon moves left relative to the map and wraps continuously. Its curved
+        centerline follows the ecliptic's changing declination instead of a flat horizontal stripe.
       </p>
     </section>
 
-    <div class="prototype-badge">BASE 3D PROTOTYPE</div>
+    <div class="prototype-badge">FLAT MAP PROTOTYPE</div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
