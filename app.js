@@ -77,6 +77,10 @@ const focusCanvas = document.createElement('canvas');
 focusCanvas.width = 360;
 focusCanvas.height = 180;
 const focusCtx = focusCanvas.getContext('2d');
+const gandantaCanvas = document.createElement('canvas');
+gandantaCanvas.width = 360;
+gandantaCanvas.height = 180;
+const gandantaCtx = gandantaCanvas.getContext('2d');
 
 const state = {
   land: [],
@@ -94,6 +98,7 @@ const state = {
   risingCacheKey: '',
   risingSignGrid: null,
   risingNakGrid: null,
+  risingGandantaGrid: null,
   focusSign: null,
   focusNak: null,
   panDeg: 0,
@@ -174,7 +179,7 @@ function bindControls(){
     }
   });
 
-  ['showDayNight','showZodiac','showNakshatras','showPlanets','showGrid','showPlaceLabels']
+  ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showGrid','showPlaceLabels']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
 
   document.getElementById('focusSignSelect').addEventListener('change',e=>{
@@ -667,15 +672,21 @@ function drawDayNight(w,h,earthShiftDeg){
 function drawRisingField(w,h,earthShiftDeg,frameDate){
   const showZodiac=document.getElementById('showZodiac').checked;
   const showNak=document.getElementById('showNakshatras').checked;
-  if(!showZodiac && !showNak) return;
+  const showGandanta=document.getElementById('showGandanta').checked;
+  if(!showZodiac && !showNak && !showGandanta) return;
 
   buildRisingCache(frameDate,showZodiac,showNak);
 
-  drawWrappedCanvas(risingCanvas,w,h,earthShiftDeg);
+  if(showZodiac || showNak){
+    drawWrappedCanvas(risingCanvas,w,h,earthShiftDeg);
+    drawZoneBoundaries(w,h,showZodiac,showNak,earthShiftDeg);
+    drawFocusOverlay(w,h,earthShiftDeg);
+    drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg);
+  }
 
-  drawZoneBoundaries(w,h,showZodiac,showNak,earthShiftDeg);
-  drawFocusOverlay(w,h,earthShiftDeg);
-  drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg);
+  if(showGandanta){
+    drawGandantaOverlay(w,h,earthShiftDeg);
+  }
 }
 
 function buildRisingCache(date,showZodiac,showNak){
@@ -689,6 +700,7 @@ function buildRisingCache(date,showZodiac,showNak){
   const data=img.data;
   const signGrid=new Uint8Array(rw*rh);
   const nakGrid=new Uint8Array(rw*rh);
+  const gandantaGrid=new Uint8Array(rw*rh);
   const aya=lahiriAyanamsa(date);
 
   for(let py=0;py<rh;py++){
@@ -703,6 +715,7 @@ function buildRisingCache(date,showZodiac,showNak){
 
       signGrid[cell]=signIndex;
       nakGrid[cell]=nakIndex;
+      gandantaGrid[cell]=isGandanta(asc)?1:0;
 
       const signColor=hexToRgb(SIGNS[signIndex][2]);
       const nakColor=hslToRgb(nakIndex/27,.72,.58);
@@ -730,6 +743,7 @@ function buildRisingCache(date,showZodiac,showNak){
 
   state.risingSignGrid=signGrid;
   state.risingNakGrid=nakGrid;
+  state.risingGandantaGrid=gandantaGrid;
   state.risingCacheKey=cacheKey;
 }
 
@@ -749,7 +763,7 @@ function drawZoneBoundaries(w,h,showZodiac,showNak,earthShiftDeg){
         Math.round((colorA[1]+colorB[1])/2),
         Math.round((colorA[2]+colorB[2])/2)
       ];
-      strokeBoundaryPath(path.points,w,h,earthShiftDeg,`rgba(${mix[0]},${mix[1]},${mix[2]},.62)`,1.35);
+      strokeBoundaryPath(path.points,w,h,earthShiftDeg,`rgba(${mix[0]},${mix[1]},${mix[2]},.90)`,2.0);
     }
   }
 
@@ -819,6 +833,63 @@ function drawZoneBoundaries(w,h,showZodiac,showNak,earthShiftDeg){
 
       ctx.stroke();
       ctx.restore();
+    }
+  }
+}
+
+function drawGandantaOverlay(w,h,earthShiftDeg){
+  if(!state.risingGandantaGrid) return;
+
+  const rw=gandantaCanvas.width;
+  const rh=gandantaCanvas.height;
+  const img=gandantaCtx.createImageData(rw,rh);
+  const data=img.data;
+
+  for(let i=0;i<state.risingGandantaGrid.length;i++){
+    if(!state.risingGandantaGrid[i]) continue;
+    const p=i*4;
+    data[p]=255;
+    data[p+1]=176;
+    data[p+2]=72;
+    data[p+3]=88;
+  }
+  gandantaCtx.putImageData(img,0,0);
+  drawWrappedCanvas(gandantaCanvas,w,h,earthShiftDeg);
+  drawGandantaLabels(w,h,earthShiftDeg);
+}
+
+function drawGandantaLabels(w,h,earthShiftDeg){
+  const grid=state.risingGandantaGrid;
+  if(!grid) return;
+  const rw=gandantaCanvas.width;
+  const rh=gandantaCanvas.height;
+  const row=Math.floor(rh*.34);
+  let start=-1;
+
+  for(let x=0;x<=rw;x++){
+    const on=x<rw && grid[row*rw+x]===1;
+    if(on && start<0) start=x;
+    if((!on || x===rw) && start>=0){
+      const end=x;
+      const width=(end-start)/rw*w;
+      if(width>=12){
+        const center=(start+end)/2/rw*w+earthShiftDeg/360*w;
+        for(const cx of [center-w,center,center+w]){
+          if(cx>-60&&cx<w+60){
+            ctx.save();
+            const scale=Math.max(1,Math.sqrt(state.zoom));
+            ctx.font=`800 ${9/scale}px system-ui,sans-serif`;
+            ctx.textAlign='center';
+            ctx.textBaseline='middle';
+            ctx.fillStyle='rgba(255,205,118,.95)';
+            ctx.shadowColor='rgba(0,0,0,.95)';
+            ctx.shadowBlur=5/scale;
+            ctx.fillText('GANDANTA',cx,h*.34);
+            ctx.restore();
+          }
+        }
+      }
+      start=-1;
     }
   }
 }
