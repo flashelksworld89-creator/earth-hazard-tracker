@@ -29,8 +29,12 @@
           <strong>TRANSIT CONTROLS</strong>
           <span id="statusText">Loading world geometry…</span>
         </div>
-        <button id="resetBtn">NOW</button>
+        <div class="panel-actions">
+          <button id="resetBtn">NOW</button>
+          <button id="collapsePanelBtn" aria-expanded="true" aria-controls="transitPanelBody">Collapse</button>
+        </div>
       </div>
+      <div id="transitPanelBody">
 
       <div class="time-controls">
         <button data-minutes="-1440">−1D</button>
@@ -72,6 +76,7 @@
         actually rising at each geographic location. Its boundaries curve naturally with latitude
         and migrate westward relative to the moving continents.
       </p>
+      </div>
     </section>
 
     <div class="prototype-badge">FLAT MAP PROTOTYPE</div>
