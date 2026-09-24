@@ -837,3 +837,24 @@ button:hover,select:hover{border-color:rgba(103,232,249,.5)}
   line-height:1.4;
   color:#aa9bbd;
 }
+
+.breaking-category-summary{
+  display:grid;
+  gap:3px;
+  margin-top:8px;
+  padding:7px;
+  border-radius:7px;
+  background:rgba(255,176,72,.05);
+  border:1px solid rgba(255,176,72,.12);
+}
+.breaking-category-summary b{
+  font-size:8px;
+  color:#ffd49a;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.breaking-category-summary span{
+  font-size:8px;
+  line-height:1.4;
+  color:#bfa77f;
+}
