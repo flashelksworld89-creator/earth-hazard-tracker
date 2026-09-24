@@ -966,6 +966,8 @@ function updateLocationReading(lat,lon,date){
   const signLord=SIGN_LORDS[signIndex];
   const nakLord=NAK_LORD_SEQUENCE[nakIndex%9];
   const influences=locationInfluences(asc,nakIndex);
+  const angles=localAngles(date,lat,lon,aya);
+  const houses=buildWholeSignHouses(asc);
 
   document.getElementById('inspectCoords').textContent=
     `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
@@ -977,14 +979,67 @@ function updateLocationReading(lat,lon,date){
   document.getElementById('inspectSignLord').textContent=signLord;
   document.getElementById('inspectNakLord').textContent=nakLord;
 
+  document.getElementById('inspectAngleAsc').textContent=fullZodiac(angles.asc);
+  document.getElementById('inspectAngleDsc').textContent=fullZodiac(angles.dsc);
+  document.getElementById('inspectAngleMc').textContent=fullZodiac(angles.mc);
+  document.getElementById('inspectAngleIc').textContent=fullZodiac(angles.ic);
+
+  document.getElementById('inspectHouses').innerHTML=houses.map(house=>{
+    const planetText=house.planets.length
+      ? house.planets.map(p=>`${p.glyph} ${p.name}`).join(', ')
+      : '—';
+    return `<div class="house-row ${house.angular?'angular-house':''}">
+      <span class="house-num">H${house.number}</span>
+      <span class="house-sign"><b>${SIGNS[house.sign][1]} ${SIGNS[house.sign][0]}</b><small>${house.lord}</small></span>
+      <span class="house-purpose">${house.purpose}</span>
+      <span class="house-planets">${planetText}</span>
+    </div>`;
+  }).join('');
+
   const influenceEl=document.getElementById('inspectInfluences');
   influenceEl.innerHTML=influences.length
     ? influences.map(item=>`<span><b>${item.glyph} ${item.name}</b> · ${item.reason}</span>`).join('')
     : '<span>No close angular contacts to the Ascendant.</span>';
 
+  const occupied=houses.filter(h=>h.planets.length).map(h=>`H${h.number}`).join(', ');
   document.getElementById('inspectSummary').textContent=
     `${SIGNS[signIndex][0]} rises here in ${NAKSHATRAS[nakIndex]} pada ${pada}. `+
-    `The sign lord is ${signLord}; the nakshatra lord is ${nakLord}.`;
+    `The sign lord is ${signLord}; the nakshatra lord is ${nakLord}. `+
+    `Current planets occupy ${occupied||'no listed houses'} in the local whole-sign chart.`;
+}
+
+function localAngles(date,lat,lon,aya){
+  const asc=normalize360(tropicalAscendant(date,lat,lon)-aya);
+  const dsc=normalize360(asc+180);
+  const lst=normalize360(greenwichSiderealDegrees(date)+lon);
+  const eps=rad(meanObliquityFromDate(date));
+  const theta=rad(lst);
+
+  const mcTropical=normalize360(
+    Math.atan2(Math.sin(theta)*Math.cos(eps),Math.cos(theta))*180/Math.PI
+  );
+  const mc=normalize360(mcTropical-aya);
+  const ic=normalize360(mc+180);
+
+  return {asc,dsc,mc,ic};
+}
+
+function buildWholeSignHouses(asc){
+  const ascSign=Math.floor(normalize360(asc)/30);
+  const purposes=['Dharma','Artha','Kama','Moksha','Dharma','Artha','Kama','Moksha','Dharma','Artha','Kama','Moksha'];
+
+  return Array.from({length:12},(_,i)=>{
+    const sign=(ascSign+i)%12;
+    const planets=(state.astro?.placements||[]).filter(p=>Math.floor(normalize360(p.lon)/30)===sign);
+    return {
+      number:i+1,
+      sign,
+      lord:SIGN_LORDS[sign],
+      purpose:purposes[i],
+      angular:[1,4,7,10].includes(i+1),
+      planets
+    };
+  });
 }
 
 function locationInfluences(asc,nakIndex){
