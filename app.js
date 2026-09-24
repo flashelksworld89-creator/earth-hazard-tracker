@@ -70,7 +70,10 @@ const state = {
   dragX: 0,
   dragStartX: 0,
   dragStartY: 0,
-  selectedPoint: null
+  selectedPoint: null,
+  countryLabels: [],
+  admin1Labels: [],
+  labelsReady: false
 };
 
 init();
@@ -79,6 +82,7 @@ async function init(){
   buildNakshatraKey();
   populateFocusControls();
   bindControls();
+  loadPoliticalLabels();
   resize();
   window.addEventListener('resize', resize);
 
@@ -135,7 +139,7 @@ function bindControls(){
     }
   });
 
-  ['showDayNight','showZodiac','showNakshatras','showPlanets','showGrid']
+  ['showDayNight','showZodiac','showNakshatras','showPlanets','showGrid','showPlaceLabels']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
 
   document.getElementById('focusSignSelect').addEventListener('change',e=>{
@@ -349,6 +353,10 @@ function draw(){
     }
 
     drawRisingField(w,h,earthShiftDeg,frameDate);
+
+    if(document.getElementById('showPlaceLabels').checked){
+      drawPoliticalLabels(w,h,earthShiftDeg);
+    }
 
     if(document.getElementById('showPlanets').checked){
       drawProjectedPlanets(w,h,earthShiftDeg);
@@ -892,6 +900,137 @@ function applyObserver(lat,lng){
     `${clampedLat.toFixed(4)}°, ${wrappedLng.toFixed(4)}°`;
   draw();
   return true;
+}
+
+async function loadPoliticalLabels(){
+  const status=document.getElementById('statusText');
+  try{
+    const [countriesRes,admin1Res]=await Promise.all([
+      fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_countries.geojson',{cache:'force-cache'}),
+      fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_admin_1_states_provinces.geojson',{cache:'force-cache'})
+    ]);
+
+    if(!countriesRes.ok) throw new Error('Country labels HTTP '+countriesRes.status);
+    const countries=await countriesRes.json();
+
+    state.countryLabels=(countries.features||[])
+      .map(f=>featureLabelPoint(f,'country'))
+      .filter(Boolean);
+
+    if(admin1Res.ok){
+      const admin1=await admin1Res.json();
+      state.admin1Labels=(admin1.features||[])
+        .filter(f=>{
+          const p=f.properties||{};
+          const code=String(
+            p.adm0_a3||p.ADM0_A3||p.sov_a3||p.SOV_A3||p.gu_a3||p.GU_A3||''
+          ).toUpperCase();
+          const admin=String(p.admin||p.ADMIN||p.geonunit||p.GEONUNIT||'').toLowerCase();
+          return code==='USA'||code==='CAN'||admin==='united states of america'||admin==='canada';
+        })
+        .map(f=>featureLabelPoint(f,'admin1'))
+        .filter(Boolean);
+    }
+
+    state.labelsReady=true;
+    status.textContent=
+      `World loaded · Lahiri sidereal · ${state.countryLabels.length} countries · ${state.admin1Labels.length} states/provinces`;
+    draw();
+  }catch(err){
+    console.error('Political labels failed:',err);
+    state.labelsReady=false;
+  }
+}
+
+function featureLabelPoint(feature,type){
+  const p=feature.properties||{};
+  const name=String(
+    p.NAME_EN||p.name_en||p.NAME||p.name||p.ADMIN||p.admin||''
+  ).trim();
+  if(!name) return null;
+
+  const labelLon=Number(
+    p.LABEL_X??p.label_x??p.longitude??p.LONGITUDE
+  );
+  const labelLat=Number(
+    p.LABEL_Y??p.label_y??p.latitude??p.LATITUDE
+  );
+
+  let lon=labelLon;
+  let lat=labelLat;
+
+  if(!Number.isFinite(lon)||!Number.isFinite(lat)){
+    const bbox=feature.bbox;
+    if(Array.isArray(bbox)&&bbox.length>=4){
+      lon=(Number(bbox[0])+Number(bbox[2]))/2;
+      lat=(Number(bbox[1])+Number(bbox[3]))/2;
+    }else{
+      const point=geometryCenter(feature.geometry);
+      if(!point) return null;
+      lon=point.lon;
+      lat=point.lat;
+    }
+  }
+
+  const rank=Number(p.LABELRANK??p.labelrank??p.scalerank??p.SCALERANK??5);
+  return {name,lon:normalize180(lon),lat,type,rank};
+}
+
+function geometryCenter(geometry){
+  if(!geometry) return null;
+  const coords=[];
+  const collect=value=>{
+    if(!Array.isArray(value)) return;
+    if(value.length>=2&&Number.isFinite(Number(value[0]))&&Number.isFinite(Number(value[1]))){
+      coords.push([Number(value[0]),Number(value[1])]);
+      return;
+    }
+    value.forEach(collect);
+  };
+  collect(geometry.coordinates);
+  if(!coords.length) return null;
+
+  let minLon=180,maxLon=-180,minLat=90,maxLat=-90;
+  for(const [lon,lat] of coords){
+    minLon=Math.min(minLon,lon);maxLon=Math.max(maxLon,lon);
+    minLat=Math.min(minLat,lat);maxLat=Math.max(maxLat,lat);
+  }
+  return {lon:(minLon+maxLon)/2,lat:(minLat+maxLat)/2};
+}
+
+function drawPoliticalLabels(w,h,earthShiftDeg){
+  if(!state.labelsReady) return;
+
+  const drawLabel=(item,isAdmin1)=>{
+    const xBase=lonToX(item.lon+earthShiftDeg,w);
+    const y=latToY(item.lat,h);
+    const fontSize=isAdmin1
+      ? Math.max(8,Math.min(10,w/150))
+      : Math.max(9,Math.min(13,w/105));
+
+    ctx.save();
+    ctx.font=`${isAdmin1?'600':'700'} ${fontSize}px system-ui,sans-serif`;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillStyle=isAdmin1?'rgba(220,236,246,.70)':'rgba(244,250,255,.88)';
+    ctx.shadowColor='rgba(0,0,0,.92)';
+    ctx.shadowBlur=4;
+
+    for(const x of wrappedXs(xBase,w)){
+      ctx.fillText(item.name,x,y);
+    }
+    ctx.restore();
+  };
+
+  // Larger countries first; tiny labels are suppressed at world scale.
+  state.countryLabels
+    .filter(item=>item.rank<=5)
+    .sort((a,b)=>a.rank-b.rank)
+    .forEach(item=>drawLabel(item,false));
+
+  if(w>=760){
+    state.admin1Labels.forEach(item=>drawLabel(item,true));
+  }
 }
 
 function drawObserverMarker(w,h,earthShiftDeg,date){
