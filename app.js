@@ -1268,6 +1268,7 @@ function updateLocationReading(lat,lon,date){
   const influences=locationInfluences(asc,nakIndex);
   const angles=localAngles(date,lat,lon,aya);
   const houses=buildWholeSignHouses(asc);
+  const coreForecast=buildCoreLocationForecast(houses,asc,nakIndex);
 
   document.getElementById('inspectCoords').textContent=
     `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
@@ -1295,6 +1296,19 @@ function updateLocationReading(lat,lon,date){
       <span class="house-planets">${planetText}</span>
     </div>`;
   }).join('');
+
+  document.getElementById('inspectCoreForecast').innerHTML=coreForecast.map(item=>`
+    <article class="forecast-card">
+      <div class="forecast-card-head">
+        <span class="forecast-house">H${item.house}</span>
+        <div>
+          <b>${item.title}</b>
+          <small>${item.signText} · lord ${item.lord}</small>
+        </div>
+      </div>
+      <p>${item.message}</p>
+      <div class="forecast-reasons">${item.reasons.map(r=>`<span>${r}</span>`).join('')}</div>
+    </article>`).join('');
 
   const influenceEl=document.getElementById('inspectInfluences');
   influenceEl.innerHTML=influences.length
@@ -1340,6 +1354,99 @@ function buildWholeSignHouses(asc){
       planets
     };
   });
+}
+
+function buildCoreLocationForecast(houses,asc,nakIndex){
+  const sectors=[
+    {house:1,title:'Self / Immediate Experience',theme:'identity, physical presence, initiative and how the place meets you'},
+    {house:3,title:'Local Travel / Communication',theme:'short trips, movement, messages, neighbors and immediate surroundings'},
+    {house:7,title:'Other People / Encounters',theme:'one-to-one interactions, agreements, strangers, partners and direct encounters'},
+    {house:9,title:'Long Distance / Guidance',theme:'long journeys, teachers, beliefs, higher learning and broader direction'}
+  ];
+
+  const beneficNames=new Set(['Jupiter','Venus','Mercury','Moon']);
+  const pressureNames=new Set(['Saturn','Mars','Rahu','Ketu','Pluto']);
+
+  return sectors.map(sector=>{
+    const house=houses[sector.house-1];
+    const lordPlanet=(state.astro?.placements||[]).find(p=>p.name===house.lord);
+    const lordHouse=lordPlanet?planetHouseNumber(lordPlanet.lon,houses):null;
+    const occupants=house.planets||[];
+    const reasons=[];
+    let support=0;
+    let pressure=0;
+
+    for(const p of occupants){
+      if(beneficNames.has(p.name)) support++;
+      if(pressureNames.has(p.name)) pressure++;
+      reasons.push(`${p.glyph} ${p.name} in H${sector.house}`);
+    }
+
+    if(lordPlanet){
+      reasons.push(`${house.lord}, the H${sector.house} lord, is in H${lordHouse}`);
+      if([1,4,5,7,9,10].includes(lordHouse)) support++;
+      if([6,8,12].includes(lordHouse)) pressure++;
+    }else{
+      reasons.push(`${house.lord} rules the house`);
+    }
+
+    const ascDiffs=(state.astro?.placements||[])
+      .map(p=>({p,diff:Math.abs(normalize180(normalize360(p.lon)-asc))}))
+      .filter(x=>x.diff<=6);
+    if(sector.house===1 && ascDiffs.length){
+      ascDiffs.forEach(x=>{
+        reasons.push(`${x.p.glyph} ${x.p.name} within ${x.diff.toFixed(1)}° of ASC`);
+        if(beneficNames.has(x.p.name)) support++;
+        if(pressureNames.has(x.p.name)) pressure++;
+      });
+    }
+
+    const tone=
+      support>pressure?'supportive':
+      pressure>support?'pressurized':'mixed';
+
+    const message=forecastMessageForSector(sector.house,tone,house,lordHouse,occupants,nakIndex);
+    return {
+      house:sector.house,
+      title:sector.title,
+      signText:`${SIGNS[house.sign][1]} ${SIGNS[house.sign][0]}`,
+      lord:house.lord,
+      message,
+      reasons:reasons.slice(0,5)
+    };
+  });
+}
+
+function forecastMessageForSector(houseNumber,tone,house,lordHouse,occupants,nakIndex){
+  const sign=SIGNS[house.sign][0];
+  const nak=NAKSHATRAS[nakIndex];
+  const occupied=occupants.length
+    ? `Current occupants: ${occupants.map(p=>p.name).join(', ')}. `
+    : '';
+  const lordText=lordHouse
+    ? `Its lord ${house.lord} is operating through house ${lordHouse}. `
+    : `${house.lord} rules this sector. `;
+
+  const toneText={
+    supportive:'The pattern is comparatively supportive, so movement through this topic may come more easily if you act deliberately.',
+    pressurized:'The pattern is comparatively pressurized, so expect more friction, delay, intensity, or the need for clearer boundaries.',
+    mixed:'The pattern is mixed, so results may depend strongly on timing, attention, and how you respond to changing conditions.'
+  }[tone];
+
+  const sectorText={
+    1:`At this location, ${sign} colors your immediate approach and presentation. ${occupied}${lordText}${toneText}`,
+    3:`For short trips, communication, neighbors, and local movement here, ${sign} sets the style. ${occupied}${lordText}${toneText}`,
+    7:`For meetings and one-to-one encounters at this location, ${sign} describes the immediate relational climate. ${occupied}${lordText}${toneText}`,
+    9:`For long-distance movement, guidance, study, and broader direction from this location, ${sign} sets the tone. ${occupied}${lordText}${toneText}`
+  }[houseNumber];
+
+  return `${sectorText} The local Ascendant is in ${nak}, which adds the current nakshatra context.`;
+}
+
+function planetHouseNumber(lon,houses){
+  const sign=Math.floor(normalize360(lon)/30);
+  const index=houses.findIndex(h=>h.sign===sign);
+  return index>=0?index+1:null;
 }
 
 function locationInfluences(asc,nakIndex){
