@@ -32,6 +32,35 @@ const NAK_LORD_SEQUENCE = [
   'Ketu','Venus','Sun','Moon','Mars','Rahu','Jupiter','Saturn','Mercury'
 ];
 
+const CLASSICAL_GRAHAS=new Set(['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu']);
+
+const OWN_SIGNS={
+  Sun:[4], Moon:[3], Mars:[0,7], Mercury:[2,5],
+  Jupiter:[8,11], Venus:[1,6], Saturn:[9,10]
+};
+
+const EXALTATION_SIGNS={
+  Sun:0, Moon:1, Mars:9, Mercury:5, Jupiter:3, Venus:11, Saturn:6
+};
+
+const DEBILITATION_SIGNS={
+  Sun:6, Moon:7, Mars:3, Mercury:11, Jupiter:9, Venus:5, Saturn:0
+};
+
+const NATURAL_RELATIONS={
+  Sun:{friends:['Moon','Mars','Jupiter'],enemies:['Venus','Saturn']},
+  Moon:{friends:['Sun','Mercury'],enemies:[]},
+  Mars:{friends:['Sun','Moon','Jupiter'],enemies:['Mercury']},
+  Mercury:{friends:['Sun','Venus'],enemies:['Moon']},
+  Jupiter:{friends:['Sun','Moon','Mars'],enemies:['Mercury','Venus']},
+  Venus:{friends:['Mercury','Saturn'],enemies:['Sun','Moon']},
+  Saturn:{friends:['Mercury','Venus'],enemies:['Sun','Moon','Mars']}
+};
+
+const COMBUSTION_ORBS={
+  Moon:12, Mars:17, Mercury:14, Jupiter:11, Venus:10, Saturn:15
+};
+
 const NAK_SIZE = 360/27;
 const canvas = document.getElementById('worldCanvas');
 const ctx = canvas.getContext('2d');
@@ -1268,7 +1297,7 @@ function updateLocationReading(lat,lon,date){
   const influences=locationInfluences(asc,nakIndex);
   const angles=localAngles(date,lat,lon,aya);
   const houses=buildWholeSignHouses(asc);
-  const coreForecast=buildCoreLocationForecast(houses,asc,nakIndex);
+  const coreForecast=buildCoreLocationForecast(houses,asc,nakIndex,date);
 
   document.getElementById('inspectCoords').textContent=
     `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
@@ -1305,9 +1334,10 @@ function updateLocationReading(lat,lon,date){
           <b>${item.title}</b>
           <small>${item.signText} · lord ${item.lord}</small>
         </div>
+        <span class="forecast-balance ${item.tone}">${item.balanceText}</span>
       </div>
       <p>${item.message}</p>
-      <div class="forecast-reasons">${item.reasons.map(r=>`<span>${r}</span>`).join('')}</div>
+      <div class="forecast-reasons">${item.reasons.map(r=>`<span class="${r.kind}">${r.text}</span>`).join('')}</div>
     </article>`).join('');
 
   const influenceEl=document.getElementById('inspectInfluences');
@@ -1356,91 +1386,351 @@ function buildWholeSignHouses(asc){
   });
 }
 
-function buildCoreLocationForecast(houses,asc,nakIndex){
+function buildCoreLocationForecast(houses,asc,nakIndex,date){
   const sectors=[
-    {house:1,title:'Self / Immediate Experience',theme:'identity, physical presence, initiative and how the place meets you'},
-    {house:3,title:'Local Travel / Communication',theme:'short trips, movement, messages, neighbors and immediate surroundings'},
-    {house:7,title:'Other People / Encounters',theme:'one-to-one interactions, agreements, strangers, partners and direct encounters'},
-    {house:9,title:'Long Distance / Guidance',theme:'long journeys, teachers, beliefs, higher learning and broader direction'}
+    {house:1,title:'Self / Immediate Experience'},
+    {house:3,title:'Local Travel / Communication'},
+    {house:7,title:'Other People / Encounters'},
+    {house:9,title:'Long Distance / Guidance'}
   ];
-
-  const beneficNames=new Set(['Jupiter','Venus','Mercury','Moon']);
-  const pressureNames=new Set(['Saturn','Mars','Rahu','Ketu','Pluto']);
+  const ascLord=houses[0].lord;
 
   return sectors.map(sector=>{
     const house=houses[sector.house-1];
-    const lordPlanet=(state.astro?.placements||[]).find(p=>p.name===house.lord);
+    const evidence=[];
+    let score=0;
+
+    const add=(text,value=0,kind='neutral')=>{
+      evidence.push({text,value,kind});
+      score+=value;
+    };
+
+    // 1) Occupants of the target house.
+    for(const p of house.planets.filter(p=>CLASSICAL_GRAHAS.has(p.name))){
+      const nature=planetNatureScore(p.name);
+      add(
+        `${p.glyph} ${p.name} occupies H${sector.house}`,
+        nature,
+        nature>0?'positive':nature<0?'negative':'neutral'
+      );
+      const dignity=planetDignity(p);
+      if(dignity.score){
+        add(`${p.name}: ${dignity.label}`,dignity.score,dignity.score>0?'positive':'negative');
+      }
+      if(isGandanta(p.lon)){
+        add(`${p.name} is in the strict gandanta zone`,-0.5,'caution');
+      }
+    }
+
+    // 2) House lord condition.
+    const lordPlanet=findPlacement(house.lord);
     const lordHouse=lordPlanet?planetHouseNumber(lordPlanet.lon,houses):null;
-    const occupants=house.planets||[];
-    const reasons=[];
-    let support=0;
-    let pressure=0;
-
-    for(const p of occupants){
-      if(beneficNames.has(p.name)) support++;
-      if(pressureNames.has(p.name)) pressure++;
-      reasons.push(`${p.glyph} ${p.name} in H${sector.house}`);
-    }
-
     if(lordPlanet){
-      reasons.push(`${house.lord}, the H${sector.house} lord, is in H${lordHouse}`);
-      if([1,4,5,7,9,10].includes(lordHouse)) support++;
-      if([6,8,12].includes(lordHouse)) pressure++;
-    }else{
-      reasons.push(`${house.lord} rules the house`);
+      add(`${house.lord}, H${sector.house} lord, is in H${lordHouse}`,housePlacementScore(lordHouse),housePlacementScore(lordHouse)>=0?'positive':'negative');
+
+      const dignity=planetDignity(lordPlanet);
+      add(`${house.lord}: ${dignity.label}`,dignity.score,dignity.score>0?'positive':dignity.score<0?'negative':'neutral');
+
+      if(isCombust(lordPlanet)){
+        add(`${house.lord} is within its combustion threshold of the Sun`,-1.25,'negative');
+      }
+
+      if(isPlanetRetrograde(lordPlanet.name,date)){
+        add(`${house.lord} is retrograde: stronger internal/revisional emphasis`,0,'caution');
+      }
+
+      if(isGandanta(lordPlanet.lon)){
+        add(`${house.lord} is in strict gandanta`,-0.75,'caution');
+      }
+
+      for(const c of closeConjunctions(lordPlanet,8)){
+        const cScore=planetNatureScore(c.planet.name)*conjunctionStrength(c.diff);
+        add(
+          `${house.lord} conjunct ${c.planet.name} · ${c.diff.toFixed(1)}°`,
+          cScore,
+          cScore>0?'positive':cScore<0?'negative':'neutral'
+        );
+      }
     }
 
-    const ascDiffs=(state.astro?.placements||[])
-      .map(p=>({p,diff:Math.abs(normalize180(normalize360(p.lon)-asc))}))
-      .filter(x=>x.diff<=6);
-    if(sector.house===1 && ascDiffs.length){
-      ascDiffs.forEach(x=>{
-        reasons.push(`${x.p.glyph} ${x.p.name} within ${x.diff.toFixed(1)}° of ASC`);
-        if(beneficNames.has(x.p.name)) support++;
-        if(pressureNames.has(x.p.name)) pressure++;
-      });
+    // 3) Full Jyotish graha aspects to the target house.
+    for(const aspect of fullAspectsToHouse(sector.house,houses)){
+      const val=planetNatureScore(aspect.planet.name)*0.8;
+      add(
+        `${aspect.planet.name} casts its ${aspect.aspectName} full aspect to H${sector.house}`,
+        val,
+        val>0?'positive':val<0?'negative':'neutral'
+      );
     }
 
-    const tone=
-      support>pressure?'supportive':
-      pressure>support?'pressurized':'mixed';
+    // 4) Relationship between target lord and Ascendant lord.
+    if(house.lord!==ascLord && lordPlanet){
+      const ascLordPlanet=findPlacement(ascLord);
+      if(ascLordPlanet){
+        const relation=compoundPlanetaryRelationship(house.lord,ascLord,lordPlanet,ascLordPlanet);
+        add(
+          `H${sector.house} lord ${house.lord} is ${relation.label} with ASC lord ${ascLord}`,
+          relation.score*0.55,
+          relation.score>0?'positive':relation.score<0?'negative':'neutral'
+        );
+      }
+    }
 
-    const message=forecastMessageForSector(sector.house,tone,house,lordHouse,occupants,nakIndex);
+    // 5) Bhavat-bhavam: same house counted from itself.
+    const bb=bhavatBhavamHouse(sector.house);
+    if(bb!==sector.house){
+      const bbHouse=houses[bb-1];
+      const bbLord=findPlacement(bbHouse.lord);
+      let bbScore=0;
+      if(bbLord) bbScore+=planetDignity(bbLord).score*0.3;
+      bbScore+=bbHouse.planets
+        .filter(p=>CLASSICAL_GRAHAS.has(p.name))
+        .reduce((sum,p)=>sum+planetNatureScore(p.name)*0.25,0);
+      add(
+        `Bhavat-bhavam reinforcement: H${bb} (${SIGNS[bbHouse.sign][0]})`,
+        bbScore,
+        bbScore>0?'positive':bbScore<0?'negative':'neutral'
+      );
+    }
+
+    // 6) Rahu/Ketu axis and dispositors.
+    for(const nodeName of ['Rahu','Ketu']){
+      const node=findPlacement(nodeName);
+      if(!node) continue;
+      const nodeHouse=planetHouseNumber(node.lon,houses);
+      if(nodeHouse===sector.house){
+        add(`${nodeName} occupies H${sector.house}`,-1.4,'negative');
+        const disp=dispositorOf(node);
+        if(disp){
+          const dd=planetDignity(disp);
+          add(`${nodeName} dispositor ${disp.name}: ${dd.label}`,dd.score*0.5,dd.score>0?'positive':dd.score<0?'negative':'neutral');
+        }
+      }else if(fullAspectOffsets(nodeName).includes((sector.house-nodeHouse+12)%12)){
+        add(`${nodeName} casts the configured 7th-house aspect to H${sector.house}`,-0.75,'caution');
+      }
+    }
+
+    // 7) Moon context.
+    const moon=findPlacement('Moon');
+    if(moon){
+      const moonHouse=planetHouseNumber(moon.lon,houses);
+      const moonNak=Math.min(26,Math.floor(normalize360(moon.lon)/NAK_SIZE));
+      if(moonHouse===sector.house){
+        add(`Moon activates H${sector.house} from ${NAKSHATRAS[moonNak]}`,0.6,'positive');
+      }else{
+        add(`Moon is in H${moonHouse} · ${NAKSHATRAS[moonNak]}`,0,'neutral');
+      }
+    }
+
+    // 8) Extra Ascendant sensitivity for H1.
+    if(sector.house===1){
+      if(isGandanta(asc)) add('Local Ascendant is in strict gandanta',-0.75,'caution');
+      for(const p of (state.astro?.placements||[])){
+        if(!CLASSICAL_GRAHAS.has(p.name)) continue;
+        const diff=Math.abs(normalize180(normalize360(p.lon)-asc));
+        if(diff<=6){
+          const val=planetNatureScore(p.name)*conjunctionStrength(diff);
+          add(`${p.name} within ${diff.toFixed(1)}° of the local ASC`,val,val>0?'positive':val<0?'negative':'neutral');
+        }
+      }
+    }
+
+    const tone=forecastTone(score);
     return {
       house:sector.house,
       title:sector.title,
       signText:`${SIGNS[house.sign][1]} ${SIGNS[house.sign][0]}`,
       lord:house.lord,
-      message,
-      reasons:reasons.slice(0,5)
+      score,
+      tone:tone.key,
+      balanceText:`${tone.label} · ${score>=0?'+':''}${score.toFixed(1)}`,
+      message:advancedForecastMessage(sector.house,tone,house,lordHouse,nakIndex,evidence),
+      reasons:evidence
+        .sort((a,b)=>Math.abs(b.value)-Math.abs(a.value))
+        .slice(0,9)
     };
   });
 }
 
-function forecastMessageForSector(houseNumber,tone,house,lordHouse,occupants,nakIndex){
+function advancedForecastMessage(houseNumber,tone,house,lordHouse,nakIndex,evidence){
   const sign=SIGNS[house.sign][0];
-  const nak=NAKSHATRAS[nakIndex];
-  const occupied=occupants.length
-    ? `Current occupants: ${occupants.map(p=>p.name).join(', ')}. `
-    : '';
-  const lordText=lordHouse
-    ? `Its lord ${house.lord} is operating through house ${lordHouse}. `
-    : `${house.lord} rules this sector. `;
-
-  const toneText={
-    supportive:'The pattern is comparatively supportive, so movement through this topic may come more easily if you act deliberately.',
-    pressurized:'The pattern is comparatively pressurized, so expect more friction, delay, intensity, or the need for clearer boundaries.',
-    mixed:'The pattern is mixed, so results may depend strongly on timing, attention, and how you respond to changing conditions.'
-  }[tone];
-
-  const sectorText={
-    1:`At this location, ${sign} colors your immediate approach and presentation. ${occupied}${lordText}${toneText}`,
-    3:`For short trips, communication, neighbors, and local movement here, ${sign} sets the style. ${occupied}${lordText}${toneText}`,
-    7:`For meetings and one-to-one encounters at this location, ${sign} describes the immediate relational climate. ${occupied}${lordText}${toneText}`,
-    9:`For long-distance movement, guidance, study, and broader direction from this location, ${sign} sets the tone. ${occupied}${lordText}${toneText}`
+  const lordText=lordHouse?`${house.lord} carries this topic into H${lordHouse}`:`${house.lord} rules this topic`;
+  const sector={
+    1:'immediate experience, initiative and how you meet the environment',
+    3:'short travel, messages, neighbors and local movement',
+    7:'meetings, agreements and direct encounters with other people',
+    9:'long-distance travel, teachers, belief, study and broader direction'
   }[houseNumber];
 
-  return `${sectorText} The local Ascendant is in ${nak}, which adds the current nakshatra context.`;
+  const strongest=evidence
+    .filter(e=>Math.abs(e.value)>=0.7)
+    .slice(0,2)
+    .map(e=>e.text);
+
+  const why=strongest.length?` Strongest factors: ${strongest.join('; ')}.`:'';
+  return `${sign} governs ${sector}; ${lordText}. The evidence balance is ${tone.description}. `+
+    `The local Ascendant remains rooted in ${NAKSHATRAS[nakIndex]}.${why}`;
+}
+
+function forecastTone(score){
+  if(score>=3) return {key:'strong-support',label:'Strong support',description:'strongly supportive within this rule set'};
+  if(score>=1) return {key:'support',label:'Support',description:'supportive overall, with some qualifications'};
+  if(score<=-3) return {key:'high-pressure',label:'High pressure',description:'strongly pressurized within this rule set'};
+  if(score<=-1) return {key:'pressure',label:'Pressure',description:'pressurized overall, with some counterweights'};
+  return {key:'mixed',label:'Mixed',description:'mixed, without a dominant positive or difficult signal'};
+}
+
+function findPlacement(name){
+  return (state.astro?.placements||[]).find(p=>p.name===name)||null;
+}
+
+function planetNatureScore(name){
+  const scores={
+    Jupiter:1.6,Venus:1.5,Mercury:.65,Moon:.7,
+    Sun:-.25,Mars:-1.15,Saturn:-1.35,Rahu:-1.25,Ketu:-1.1
+  };
+  return scores[name]||0;
+}
+
+function planetDignity(planet){
+  if(!planet||!OWN_SIGNS[planet.name]) return {label:'no classical dignity score',score:0};
+  const sign=Math.floor(normalize360(planet.lon)/30);
+  if(EXALTATION_SIGNS[planet.name]===sign) return {label:'exalted sign',score:2.2};
+  if(DEBILITATION_SIGNS[planet.name]===sign) return {label:'debilitated sign',score:-2.2};
+  if(OWN_SIGNS[planet.name].includes(sign)) return {label:'own sign',score:1.6};
+
+  const signLord=SIGN_LORDS[sign];
+  const rel=naturalRelationship(planet.name,signLord);
+  if(rel==='friend') return {label:`friend's sign (${signLord})`,score:.7};
+  if(rel==='enemy') return {label:`enemy's sign (${signLord})`,score:-.7};
+  return {label:`neutral sign (${signLord})`,score:0};
+}
+
+function naturalRelationship(a,b){
+  if(a===b) return 'self';
+  const r=NATURAL_RELATIONS[a];
+  if(!r) return 'neutral';
+  if(r.friends.includes(b)) return 'friend';
+  if(r.enemies.includes(b)) return 'enemy';
+  return 'neutral';
+}
+
+function compoundPlanetaryRelationship(a,b,aPlanet,bPlanet){
+  if(a===b) return {label:'the same graha',score:1};
+  const natural=naturalRelationship(a,b);
+  const aSign=Math.floor(normalize360(aPlanet.lon)/30);
+  const bSign=Math.floor(normalize360(bPlanet.lon)/30);
+  const distance=((bSign-aSign+12)%12)+1;
+  const temporaryFriend=[2,3,4,10,11,12].includes(distance);
+  const naturalScore=natural==='friend'?1:natural==='enemy'?-1:0;
+  const total=naturalScore+(temporaryFriend?1:-1);
+  if(total>=2) return {label:'very friendly',score:2};
+  if(total===1) return {label:'friendly',score:1};
+  if(total===0) return {label:'neutral',score:0};
+  if(total===-1) return {label:'inimical',score:-1};
+  return {label:'strongly inimical',score:-2};
+}
+
+function housePlacementScore(houseNumber){
+  let score=0;
+  if([1,4,7,10].includes(houseNumber)) score+=.8;
+  if([1,5,9].includes(houseNumber)) score+=.9;
+  if([6,8,12].includes(houseNumber)) score-=1;
+  if([3,6,10,11].includes(houseNumber)) score+=.2;
+  return score;
+}
+
+function fullAspectOffsets(name){
+  if(name==='Mars') return [3,6,7];
+  if(name==='Jupiter') return [4,6,8];
+  if(name==='Saturn') return [2,6,9];
+  if(['Sun','Moon','Mercury','Venus','Rahu','Ketu'].includes(name)) return [6];
+  return [];
+}
+
+function fullAspectsToHouse(targetHouse,houses){
+  const out=[];
+  for(const p of (state.astro?.placements||[])){
+    if(!CLASSICAL_GRAHAS.has(p.name)) continue;
+    const from=planetHouseNumber(p.lon,houses);
+    if(!from) continue;
+    const offset=(targetHouse-from+12)%12;
+    if(fullAspectOffsets(p.name).includes(offset)){
+      const count=offset+1;
+      out.push({planet:p,aspectName:ordinal(count)});
+    }
+  }
+  return out;
+}
+
+function ordinal(n){
+  const m=n%100;
+  if(m>=11&&m<=13) return n+'th';
+  return n+({1:'st',2:'nd',3:'rd'}[n%10]||'th');
+}
+
+function closeConjunctions(planet,orb=8){
+  if(!planet) return [];
+  return (state.astro?.placements||[])
+    .filter(p=>p!==planet && CLASSICAL_GRAHAS.has(p.name))
+    .map(p=>({planet:p,diff:Math.abs(normalize180(normalize360(p.lon)-normalize360(planet.lon)))}))
+    .filter(x=>x.diff<=orb)
+    .sort((a,b)=>a.diff-b.diff);
+}
+
+function conjunctionStrength(diff){
+  if(diff<=1) return 1.5;
+  if(diff<=3) return 1.2;
+  if(diff<=6) return .9;
+  return .6;
+}
+
+function isCombust(planet){
+  if(!planet||!COMBUSTION_ORBS[planet.name]) return false;
+  const sun=findPlacement('Sun');
+  if(!sun) return false;
+  const diff=Math.abs(normalize180(normalize360(planet.lon)-normalize360(sun.lon)));
+  return diff<=COMBUSTION_ORBS[planet.name];
+}
+
+function isPlanetRetrograde(name,date){
+  if(name==='Rahu'||name==='Ketu') return true;
+  if(name==='Sun'||name==='Moon') return false;
+  const meta=PLANETS.find(p=>p[0]===name);
+  if(!meta||!A) return false;
+  try{
+    const body=A.Body?.[meta[1]];
+    if(body===undefined||body===null) return false;
+    const before=new Date(date.getTime()-6*3600000);
+    const after=new Date(date.getTime()+6*3600000);
+    const lonBefore=rawSiderealBodyLongitude(body,before);
+    const lonAfter=rawSiderealBodyLongitude(body,after);
+    return normalize180(lonAfter-lonBefore)<0;
+  }catch{
+    return false;
+  }
+}
+
+function rawSiderealBodyLongitude(body,date){
+  const vec=A.GeoVector(body,date,true);
+  const ecl=A.Ecliptic(vec);
+  return normalize360(Number(ecl.elon)-lahiriAyanamsa(date));
+}
+
+function isGandanta(lon){
+  const x=normalize360(lon);
+  const junctions=[0,120,240];
+  return junctions.some(j=>Math.abs(normalize180(x-j))<=.8);
+}
+
+function dispositorOf(planet){
+  if(!planet) return null;
+  const sign=Math.floor(normalize360(planet.lon)/30);
+  return findPlacement(SIGN_LORDS[sign]);
+}
+
+function bhavatBhavamHouse(houseNumber){
+  return ((2*houseNumber-2)%12)+1;
 }
 
 function planetHouseNumber(lon,houses){
