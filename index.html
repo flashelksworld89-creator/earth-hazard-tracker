@@ -127,6 +127,32 @@
 
     <button id="panelReopenBtn" class="panel-reopen-btn" type="button" aria-label="Open transit controls" title="Open transit controls" hidden>⌃</button>
 
+    <aside id="locationInspectPanel" class="inspect-panel glass" hidden>
+      <div class="inspect-head">
+        <div>
+          <strong>LOCATION READING</strong>
+          <span id="inspectCoords">—</span>
+        </div>
+        <button id="closeInspectBtn" class="icon-btn" type="button" aria-label="Close location reading">×</button>
+      </div>
+      <div class="inspect-grid">
+        <div><small>ASCENDANT</small><strong id="inspectAsc">—</strong></div>
+        <div><small>RISING SIGN</small><strong id="inspectSign">—</strong></div>
+        <div><small>NAKSHATRA</small><strong id="inspectNak">—</strong></div>
+        <div><small>PADA</small><strong id="inspectPada">—</strong></div>
+        <div><small>SIGN LORD</small><strong id="inspectSignLord">—</strong></div>
+        <div><small>NAKSHATRA LORD</small><strong id="inspectNakLord">—</strong></div>
+      </div>
+      <div class="inspect-section">
+        <small>PLANETARY INFLUENCES</small>
+        <div id="inspectInfluences" class="inspect-influences">—</div>
+      </div>
+      <div class="inspect-section">
+        <small>LOCATION SUMMARY</small>
+        <p id="inspectSummary">Click anywhere on the map to inspect that location.</p>
+      </div>
+    </aside>
+
     <div class="prototype-badge">FLAT MAP PROTOTYPE</div>
   </main>
 
