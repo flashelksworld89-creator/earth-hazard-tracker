@@ -23,6 +23,15 @@ const PLANETS = [
   ['Neptune','Neptune','♆','#4361ee'],['Pluto','Pluto','♇','#9d4edd']
 ];
 
+const SIGN_LORDS = [
+  'Mars','Venus','Mercury','Moon','Sun','Mercury',
+  'Venus','Mars','Jupiter','Saturn','Saturn','Jupiter'
+];
+
+const NAK_LORD_SEQUENCE = [
+  'Ketu','Venus','Sun','Moon','Mars','Rahu','Jupiter','Saturn','Mercury'
+];
+
 const NAK_SIZE = 360/27;
 const canvas = document.getElementById('worldCanvas');
 const ctx = canvas.getContext('2d');
@@ -58,7 +67,10 @@ const state = {
   focusNak: null,
   panDeg: 0,
   dragging: false,
-  dragX: 0
+  dragX: 0,
+  dragStartX: 0,
+  dragStartY: 0,
+  selectedPoint: null
 };
 
 init();
@@ -196,6 +208,8 @@ function bindControls(){
   canvas.addEventListener('pointerdown',e=>{
     state.dragging=true;
     state.dragX=e.clientX;
+    state.dragStartX=e.clientX;
+    state.dragStartY=e.clientY;
     canvas.setPointerCapture?.(e.pointerId);
   });
 
@@ -208,12 +222,18 @@ function bindControls(){
     draw();
   });
 
-  const endDrag=e=>{
+  canvas.addEventListener('pointerup',e=>{
+    const moved=Math.hypot(e.clientX-state.dragStartX,e.clientY-state.dragStartY);
     state.dragging=false;
     try{canvas.releasePointerCapture?.(e.pointerId);}catch{}
-  };
-  canvas.addEventListener('pointerup',endDrag);
-  canvas.addEventListener('pointercancel',endDrag);
+    if(moved<7) inspectMapPoint(e.clientX,e.clientY);
+  });
+
+  canvas.addEventListener('pointercancel',e=>{
+    state.dragging=false;
+    try{canvas.releasePointerCapture?.(e.pointerId);}catch{}
+  });
+
   canvas.addEventListener('pointerleave',e=>{
     if(e.buttons===0) state.dragging=false;
   });
@@ -225,6 +245,12 @@ function bindControls(){
     e.preventDefault();
     draw();
   },{passive:false});
+
+  document.getElementById('closeInspectBtn').addEventListener('click',()=>{
+    document.getElementById('locationInspectPanel').hidden=true;
+    state.selectedPoint=null;
+    draw();
+  });
 }
 
 function freezePlayback(){
@@ -329,6 +355,7 @@ function draw(){
     }
 
     drawObserverMarker(w,h,earthShiftDeg,frameDate);
+    drawSelectedPoint(w,h,earthShiftDeg);
   }
 
   drawEdgeFade(w,h);
@@ -905,6 +932,116 @@ function drawObserverMarker(w,h,earthShiftDeg,date){
     ctx.shadowColor='rgba(0,0,0,.95)';
     ctx.shadowBlur=5;
     ctx.fillText(`${SIGNS[signIndex][1]} ${NAKSHATRAS[nakIndex]}`,x,y-11);
+  }
+  ctx.restore();
+}
+
+function inspectMapPoint(clientX,clientY){
+  if(!state.astro) return;
+
+  const rect=canvas.getBoundingClientRect();
+  const x=Math.max(0,Math.min(rect.width,clientX-rect.left));
+  const y=Math.max(0,Math.min(rect.height,clientY-rect.top));
+  const date=currentDate();
+  const phase=normalize360(greenwichSiderealDegrees(date));
+  const earthShiftDeg=normalize180(phase+state.panDeg);
+
+  const mapLon=xToLon(x,rect.width);
+  const lon=normalize180(mapLon-earthShiftDeg);
+  const lat=yToLat(y,rect.height);
+
+  state.selectedPoint={lat,lon};
+  updateLocationReading(lat,lon,date);
+  document.getElementById('locationInspectPanel').hidden=false;
+  draw();
+}
+
+function updateLocationReading(lat,lon,date){
+  const aya=lahiriAyanamsa(date);
+  const asc=normalize360(tropicalAscendant(date,lat,lon)-aya);
+  const signIndex=Math.floor(asc/30);
+  const nakIndex=Math.min(26,Math.floor(asc/NAK_SIZE));
+  const withinNak=normalize360(asc)%NAK_SIZE;
+  const pada=Math.min(4,Math.floor(withinNak/(NAK_SIZE/4))+1);
+  const signLord=SIGN_LORDS[signIndex];
+  const nakLord=NAK_LORD_SEQUENCE[nakIndex%9];
+  const influences=locationInfluences(asc,nakIndex);
+
+  document.getElementById('inspectCoords').textContent=
+    `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
+  document.getElementById('inspectAsc').textContent=fullZodiac(asc);
+  document.getElementById('inspectSign').textContent=
+    `${SIGNS[signIndex][1]} ${SIGNS[signIndex][0]}`;
+  document.getElementById('inspectNak').textContent=NAKSHATRAS[nakIndex];
+  document.getElementById('inspectPada').textContent=String(pada);
+  document.getElementById('inspectSignLord').textContent=signLord;
+  document.getElementById('inspectNakLord').textContent=nakLord;
+
+  const influenceEl=document.getElementById('inspectInfluences');
+  influenceEl.innerHTML=influences.length
+    ? influences.map(item=>`<span><b>${item.glyph} ${item.name}</b> · ${item.reason}</span>`).join('')
+    : '<span>No close angular contacts to the Ascendant.</span>';
+
+  document.getElementById('inspectSummary').textContent=
+    `${SIGNS[signIndex][0]} rises here in ${NAKSHATRAS[nakIndex]} pada ${pada}. `+
+    `The sign lord is ${signLord}; the nakshatra lord is ${nakLord}.`;
+}
+
+function locationInfluences(asc,nakIndex){
+  if(!state.astro?.placements) return [];
+
+  return state.astro.placements
+    .map(p=>{
+      const lon=normalize360(p.lon);
+      const diff=Math.abs(normalize180(lon-asc));
+      const pNak=Math.min(26,Math.floor(lon/NAK_SIZE));
+      const pSign=Math.floor(lon/30);
+      const ascSign=Math.floor(asc/30);
+
+      let reason='';
+      let weight=99;
+
+      if(diff<=8){
+        reason=`near Ascendant · ${diff.toFixed(1)}°`;
+        weight=diff;
+      }else if(Math.abs(diff-180)<=8){
+        reason=`opposite Ascendant · ${Math.abs(diff-180).toFixed(1)}°`;
+        weight=10+Math.abs(diff-180);
+      }else if(pNak===nakIndex){
+        reason='same rising nakshatra';
+        weight=20;
+      }else if(pSign===ascSign){
+        reason='same rising sign';
+        weight=30;
+      }
+
+      return reason?{...p,reason,weight}:null;
+    })
+    .filter(Boolean)
+    .sort((a,b)=>a.weight-b.weight)
+    .slice(0,6);
+}
+
+function drawSelectedPoint(w,h,earthShiftDeg){
+  if(!state.selectedPoint) return;
+  const {lat,lon}=state.selectedPoint;
+  const xBase=lonToX(lon+earthShiftDeg,w);
+  const y=latToY(lat,h);
+
+  ctx.save();
+  for(const x of wrappedXs(xBase,w)){
+    ctx.beginPath();
+    ctx.arc(x,y,10,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,214,102,.95)';
+    ctx.lineWidth=2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x-14,y);ctx.lineTo(x+14,y);
+    ctx.moveTo(x,y-14);ctx.lineTo(x,y+14);
+    ctx.strokeStyle='rgba(255,214,102,.75)';
+    ctx.lineWidth=1;
+    ctx.stroke();
   }
   ctx.restore();
 }
