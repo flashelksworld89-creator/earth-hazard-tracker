@@ -253,8 +253,10 @@ function draw(){
     drawRisingField(w,h,earthShiftDeg,frameDate);
 
     if(document.getElementById('showPlanets').checked){
-      drawProjectedPlanets(w,h,earthShiftDeg,frameDate);
+      drawProjectedPlanets(w,h);
     }
+
+    drawObserverMarker(w,h,earthShiftDeg,frameDate);
   }
 
   drawEdgeFade(w,h);
@@ -537,29 +539,34 @@ function drawFieldLabel(text,color,x,y,size){
   ctx.restore();
 }
 
-function drawProjectedPlanets(w,h,earthShiftDeg,frameDate){
-  const date=frameDate;
-  const aya=lahiriAyanamsa(date);
+function drawProjectedPlanets(w,h){
+  if(!state.risingNakGrid) return;
+
+  const rw=risingCanvas.width;
+  const rh=risingCanvas.height;
+  const row=Math.floor(rh*.5);
   const occupied=new Map();
 
   state.astro.placements.forEach(p=>{
     const targetNak=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
-    const candidates=[];
+    let start=-1,end=-1;
 
-    for(let x=0;x<w;x+=4){
-      const mapLng=xToLon(x,w);
-      const earthLng=normalize180(mapLng-earthShiftDeg);
-      const asc=normalize360(tropicalAscendant(date,0,earthLng)-aya);
-      const ni=Math.min(26,Math.floor(asc/NAK_SIZE));
-      if(ni===targetNak) candidates.push(x);
+    for(let x=0;x<rw;x++){
+      const ni=state.risingNakGrid[row*rw+x];
+      if(ni===targetNak){
+        if(start<0) start=x;
+        end=x;
+      }else if(start>=0){
+        break;
+      }
     }
 
-    if(!candidates.length) return;
-    const x=candidates[Math.floor(candidates.length/2)];
-    const bucket=Math.round(x/55);
+    if(start<0) return;
+    const x=((start+end+1)/2)/rw*w;
+    const bucket=Math.round(x/58);
     const slot=occupied.get(bucket)||0;
     occupied.set(bucket,slot+1);
-    const y=h*.42+slot*19;
+    const y=h*.40+slot*19;
 
     ctx.save();
     ctx.font='800 15px system-ui,Segoe UI Symbol,sans-serif';
@@ -571,6 +578,68 @@ function drawProjectedPlanets(w,h,earthShiftDeg,frameDate){
     ctx.fillText(`${p.glyph} ${degreeInSign(p.lon)}`,x,y);
     ctx.restore();
   });
+}
+
+function applyObserver(lat,lng){
+  const latitude=Number(lat);
+  const longitude=Number(lng);
+  if(!Number.isFinite(latitude)||!Number.isFinite(longitude)){
+    document.getElementById('locationStatus').textContent='Enter valid coordinates';
+    return false;
+  }
+
+  const clampedLat=Math.max(-89.9,Math.min(89.9,latitude));
+  const wrappedLng=normalize180(longitude);
+  state.observer={lat:clampedLat,lng:wrappedLng};
+
+  document.getElementById('latitudeInput').value=clampedLat.toFixed(4);
+  document.getElementById('longitudeInput').value=wrappedLng.toFixed(4);
+  document.getElementById('locationStatus').textContent=
+    `${clampedLat.toFixed(4)}°, ${wrappedLng.toFixed(4)}°`;
+  draw();
+  return true;
+}
+
+function drawObserverMarker(w,h,earthShiftDeg,date){
+  if(!state.observer) return;
+
+  const {lat,lng}=state.observer;
+  const xBase=lonToX(lng+earthShiftDeg,w);
+  const y=latToY(lat,h);
+  const aya=lahiriAyanamsa(date);
+  const asc=normalize360(tropicalAscendant(date,lat,lng)-aya);
+  const signIndex=Math.floor(asc/30);
+  const nakIndex=Math.min(26,Math.floor(asc/NAK_SIZE));
+
+  document.getElementById('localSignText').textContent=
+    `${SIGNS[signIndex][1]} ${SIGNS[signIndex][0]}`;
+  document.getElementById('localNakText').textContent=NAKSHATRAS[nakIndex];
+  document.getElementById('localAscText').textContent=fullZodiac(asc);
+
+  ctx.save();
+  for(const x of wrappedXs(xBase,w)){
+    ctx.beginPath();
+    ctx.arc(x,y,8,0,Math.PI*2);
+    ctx.fillStyle='rgba(2,8,18,.92)';
+    ctx.fill();
+    ctx.lineWidth=2;
+    ctx.strokeStyle='#ffffff';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(x,y,3.2,0,Math.PI*2);
+    ctx.fillStyle=SIGNS[signIndex][2];
+    ctx.fill();
+
+    ctx.font='700 11px system-ui,Segoe UI Symbol,sans-serif';
+    ctx.textAlign='center';
+    ctx.textBaseline='bottom';
+    ctx.fillStyle='#ffffff';
+    ctx.shadowColor='rgba(0,0,0,.95)';
+    ctx.shadowBlur=5;
+    ctx.fillText(`${SIGNS[signIndex][1]} ${NAKSHATRAS[nakIndex]}`,x,y-11);
+  }
+  ctx.restore();
 }
 
 function drawEdgeFade(w,h){
