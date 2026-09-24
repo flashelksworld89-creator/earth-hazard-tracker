@@ -55,7 +55,10 @@ const state = {
   risingSignGrid: null,
   risingNakGrid: null,
   focusSign: null,
-  focusNak: null
+  focusNak: null,
+  panDeg: 0,
+  dragging: false,
+  dragX: 0
 };
 
 init();
@@ -177,18 +180,51 @@ function bindControls(){
   });
 
     const collapseBtn=document.getElementById('collapsePanelBtn');
+  const reopenBtn=document.getElementById('panelReopenBtn');
   const panel=document.querySelector('.control-panel');
-  const body=document.getElementById('transitPanelBody');
 
   collapseBtn.addEventListener('click',()=>{
-    const collapsed=!body.hidden;
-    body.hidden=collapsed;
-    panel.classList.toggle('collapsed',collapsed);
-    collapseBtn.textContent=collapsed?'⌃':'⌄';
-    collapseBtn.setAttribute('aria-expanded',String(!collapsed));
-    collapseBtn.setAttribute('aria-label',collapsed?'Expand transit controls':'Collapse transit controls');
-    collapseBtn.title=collapsed?'Expand transit controls':'Collapse transit controls';
+    panel.hidden=true;
+    reopenBtn.hidden=false;
   });
+
+  reopenBtn.addEventListener('click',()=>{
+    panel.hidden=false;
+    reopenBtn.hidden=true;
+  });
+
+  canvas.addEventListener('pointerdown',e=>{
+    state.dragging=true;
+    state.dragX=e.clientX;
+    canvas.setPointerCapture?.(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove',e=>{
+    if(!state.dragging) return;
+    const dx=e.clientX-state.dragX;
+    state.dragX=e.clientX;
+    const w=Math.max(1,canvas.clientWidth);
+    state.panDeg=normalize180(state.panDeg+dx/w*360);
+    draw();
+  });
+
+  const endDrag=e=>{
+    state.dragging=false;
+    try{canvas.releasePointerCapture?.(e.pointerId);}catch{}
+  };
+  canvas.addEventListener('pointerup',endDrag);
+  canvas.addEventListener('pointercancel',endDrag);
+  canvas.addEventListener('pointerleave',e=>{
+    if(e.buttons===0) state.dragging=false;
+  });
+
+  canvas.addEventListener('wheel',e=>{
+    const delta=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
+    const w=Math.max(1,canvas.clientWidth);
+    state.panDeg=normalize180(state.panDeg-delta/w*180);
+    e.preventDefault();
+    draw();
+  },{passive:false});
 }
 
 function freezePlayback(){
@@ -276,7 +312,7 @@ function draw(){
   const frameDate = currentDate();
   const phase = normalize360(greenwichSiderealDegrees(frameDate));
   // Full eastward Earth rotation: one complete wrap per sidereal day.
-  const earthShiftDeg = phase;
+  const earthShiftDeg = normalize180(phase + state.panDeg);
 
   if(document.getElementById('showGrid').checked) drawGrid(w,h,earthShiftDeg);
   if(state.mapReady) drawLand(w,h,earthShiftDeg);
