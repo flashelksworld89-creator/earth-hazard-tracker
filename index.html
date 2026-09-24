@@ -158,7 +158,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
       <section id="zodiacPanel" class="panel zodiac-panel">
         <div class="zodiac-head collapsible-head">
           <div>
-            <strong>ZODIACAL COMPASS</strong>
+            <strong>ECLIPTIC COMPASS</strong>
             <span id="zodiacStatus">Sidereal · Lahiri</span>
           </div>
           <div class="head-actions"><button id="zodiacCloseBtn" class="text-btn">Hide</button><button class="collapse-btn" data-collapse="zodiac-panel" aria-label="Collapse">−</button></div>
@@ -174,13 +174,13 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         </div>
 
         <label class="z-row z-orientation-row">
-          <span>Compass orientation</span>
+          <span>Compass view</span>
           <select id="zOrientation">
-            <option value="traditional" selected>Traditional · MC ↑ ASC →</option>
+            <option value="ecliptic" selected>Ecliptic · MC ↑ ASC →</option>
             <option value="geographic">Geographic · N ↑ E →</option>
           </select>
         </label>
-        <div id="zOrientationNote" class="z-orientation-note">Chart view: MC top, IC bottom, ASC east/right, DSC west/left. Geographic N/E/S/W remain on the outer ring.</div>
+        <div id="zOrientationNote" class="z-orientation-note">Ecliptic view: the sidereal zodiac is the compass. MC is top, ASC is east/right, and true N/E/S/W remain on the outer geographic ring.</div>
 
         <div class="zodiac-time">
           <button data-ztime="-1440">−1D</button>
@@ -212,17 +212,17 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         <div id="zOriginLabel" class="z-origin-label">Origin: —</div>
 
         <label class="z-row">
-          <span>Global rising zones</span>
+          <span>Zodiac rising beams</span>
           <input id="zGlobalZones" type="checkbox" checked />
         </label>
 
         <label class="z-row">
-          <span>Nakshatra boundaries</span>
+          <span>Global nakshatra boundaries</span>
           <input id="zGlobalNak" type="checkbox" checked />
         </label>
 
         <label class="z-row">
-          <span>Highlight rising sign</span>
+          <span>Focus rising beam</span>
           <select id="zGlobalSignSelect">
             <option value="">All signs</option>
             <option value="0">Aries</option>
@@ -244,7 +244,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
           <label><span>Houses</span><input id="zShowHouses" type="checkbox" checked /></label>
           <label><span>Nakshatras</span><input id="zShowNak" type="checkbox" checked /></label>
           <label><span>Aspects</span><input id="zShowAspects" type="checkbox" checked /></label>
-          <label><span>Planet names</span><input id="zPlanetLabels" type="checkbox" checked /></label>
+          <label><span>Planet degrees</span><input id="zPlanetLabels" type="checkbox" checked /></label>
         </div>
 
         <label class="z-row">
@@ -274,7 +274,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         <div class="z-ring-guide">
           <div><b>OUTER</b><span>Geographic N · NE · E · SE · S · SW · W · NW</span></div>
           <div><b>MIDDLE</b><span>MC · IC · ASC · DSC · 12 Porphyry house cusps</span></div>
-          <div><b>INNER</b><span>Sidereal zodiac · nakshatras · planets · aspects</span></div>
+          <div><b>INNER</b><span>Ecliptic · 12 sidereal signs · 27 nakshatras · planet glyphs</span></div>
         </div>
 
         <div class="zodiac-key">
@@ -285,7 +285,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         </div>
 
         <div id="zPlanetList" class="z-planet-list"></div>
-        <div class="z-disclaimer">Traditional view rotates the chart for readability; it does not redefine the astronomy. ASC/DSC still come from the true local eastern/western horizon, MC/IC from the local meridian, and the outer N/E/S/W ring remains geographic. Houses use the Porphyry quadrant system.</div>
+        <div class="z-disclaimer">Ecliptic view is a chart projection of the real sidereal ecliptic. ASC/DSC are still the true eastern/western horizon intersections and MC/IC the local meridian intersections. Colored Earth bands show where each sign is currently rising; they are calculated horizon zones, not fixed geographic zodiac regions. Houses use the Porphyry quadrant system.</div>
         </div>
       </section>
 
