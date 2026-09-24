@@ -61,6 +61,32 @@
         <label><input id="showGrid" type="checkbox" checked /> Grid</label>
       </div>
 
+      <div class="focus-box">
+        <div class="focus-head">
+          <strong>HIGHLIGHT ZONE</strong>
+          <button id="clearFocusBtn" type="button">Clear</button>
+        </div>
+        <div class="focus-grid">
+          <label>
+            <span>Zodiac sign</span>
+            <select id="focusSignSelect">
+              <option value="">All signs</option>
+              <option value="0">Aries</option><option value="1">Taurus</option><option value="2">Gemini</option>
+              <option value="3">Cancer</option><option value="4">Leo</option><option value="5">Virgo</option>
+              <option value="6">Libra</option><option value="7">Scorpio</option><option value="8">Sagittarius</option>
+              <option value="9">Capricorn</option><option value="10">Aquarius</option><option value="11">Pisces</option>
+            </select>
+          </label>
+          <label>
+            <span>Nakshatra</span>
+            <select id="focusNakSelect">
+              <option value="">All nakshatras</option>
+            </select>
+          </label>
+        </div>
+        <div id="focusSummary" class="focus-summary">No zone highlighted</div>
+      </div>
+
       <div class="motion-key">
         <span>EARTH <b>→ east</b></span>
         <span>RISING FIELD <b>← west</b></span>
