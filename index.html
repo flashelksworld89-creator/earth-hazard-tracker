@@ -13,6 +13,14 @@
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.0/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="/styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://esm.sh/three@0.183.2",
+      "three/": "https://esm.sh/three@0.183.2/"
+    }
+  }
+  </script>
 </head>
 <body>
 <script>
@@ -44,8 +52,8 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     </header>
 
     <main>
+      <div id="globe3d" aria-label="Interactive 3D Earth and ecliptic"></div>
       <div id="map"></div>
-      <canvas id="eclipticBandCanvas" aria-label="3D ecliptic band"></canvas>
 
       <section class="panel layers-panel">
         <div class="panel-title collapsible-head">
