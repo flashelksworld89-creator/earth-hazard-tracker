@@ -142,26 +142,44 @@ function refreshAstronomy(){
     return;
   }
 
-  const aya=lahiriAyanamsa(date);
-  const eps=meanObliquityFromDate(date);
-  const gmst=greenwichSiderealDegrees(date);
-  const sun=solarCoordinates(date);
+  try{
+    const aya=lahiriAyanamsa(date);
+    const eps=meanObliquityFromDate(date);
+    const gmst=greenwichSiderealDegrees(date);
+    const sun=solarCoordinates(date);
 
-  const placements=PLANETS.map(([name,bodyKey,glyph,color])=>{
-    const vec=A.GeoVector(A.Body[bodyKey],date,true);
-    const ecl=A.Ecliptic(vec);
-    return {name,glyph,color,lon:normalize360(Number(ecl.elon)-aya)};
-  });
+    const placements=[];
+    for(const [name,bodyKey,glyph,color] of PLANETS){
+      try{
+        const body=A.Body?.[bodyKey];
+        if(body===undefined || body===null) throw new Error('Body not available: '+bodyKey);
+        const vec=A.GeoVector(body,date,true);
+        const ecl=A.Ecliptic(vec);
+        const lon=Number(ecl?.elon);
+        if(!Number.isFinite(lon)) throw new Error('Invalid longitude for '+name);
+        placements.push({name,glyph,color,lon:normalize360(lon-aya)});
+      }catch(bodyErr){
+        console.error('Planet calculation failed:',name,bodyErr);
+      }
+    }
 
-  const rahu=normalize360(meanNodeTropicalLongitude(date)-aya);
-  placements.push(
-    {name:'Rahu',glyph:'☊',color:'#06d6a0',lon:rahu},
-    {name:'Ketu',glyph:'☋',color:'#ef476f',lon:normalize360(rahu+180)}
-  );
+    const rahu=normalize360(meanNodeTropicalLongitude(date)-aya);
+    placements.push(
+      {name:'Rahu',glyph:'☊',color:'#06d6a0',lon:rahu},
+      {name:'Ketu',glyph:'☋',color:'#ef476f',lon:normalize360(rahu+180)}
+    );
 
-  state.astro={date,aya,eps,gmst,sun,placements,realStamp:performance.now()};
-  updateText();
-  draw();
+    state.astro={date,aya,eps,gmst,sun,placements,realStamp:performance.now()};
+    document.getElementById('statusText').textContent=
+      `World loaded · Lahiri sidereal · ${placements.length} bodies`;
+    updateText();
+    draw();
+  }catch(err){
+    console.error('Astronomy refresh failed:',err);
+    document.getElementById('statusText').textContent=
+      'Astronomy layer error · map remains available';
+    draw();
+  }
 }
 
 function draw(){
@@ -486,9 +504,13 @@ function extractPolygons(geo){
 }
 
 function solarCoordinates(date){
-  const sun=A.Equator(A.Body.Sun,date,null,true,true);
-  const raDeg=Number(sun.ra)*15;
-  const dec=Number(sun.dec);
+  const vec=A.GeoVector(A.Body.Sun,date,true);
+  const eq=A.EquatorFromVector(vec);
+  const raDeg=Number(eq.ra)*15;
+  const dec=Number(eq.dec);
+  if(!Number.isFinite(raDeg) || !Number.isFinite(dec)){
+    throw new Error('Invalid geocentric Sun coordinates');
+  }
   const subsolarLon=normalize180(raDeg-greenwichSiderealDegrees(date));
   return {subsolarLat:dec,subsolarLon};
 }
