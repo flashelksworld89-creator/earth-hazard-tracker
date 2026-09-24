@@ -74,7 +74,22 @@ button:hover { border-color: rgba(125,211,252,.6); background: rgba(27, 70, 107,
 .secondary { background: rgba(11, 27, 43, .92); color: #cbe7fa; }
 
 main { position: absolute; inset: 72px 0 31px; }
-#map { position: absolute; inset: 0; }
+#map { position: absolute; inset: 0; z-index:1; }
+#globe3d{
+  position:absolute;
+  inset:0;
+  z-index:3;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(17,54,82,.22), transparent 44%),
+    #020812;
+}
+#globe3d canvas{
+  display:block;
+  width:100%;
+  height:100%;
+  outline:none;
+}
 
 .maplibregl-canvas { outline: none; }
 .maplibregl-ctrl-top-right { top: 12px; right: 360px; }
@@ -1178,18 +1193,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{
   .zodiac-panel{width:auto}
 }
 
-/* 3D celestial ecliptic band */
-#eclipticBandCanvas{
-  position:absolute;
-  inset:0;
-  z-index:4;
-  pointer-events:none;
-  display:block;
-  width:100%;
-  height:100%;
-  filter:drop-shadow(0 0 12px rgba(56,189,248,.10));
-}
-#map{z-index:1}
 .layers-panel,.events-panel,.detail-panel,.zodiac-panel,
 .us-rising-panel,.ar-control-panel,.schumann-panel,
 .auto-refresh-panel,.timeline-panel{z-index:10}
+
+/* ThreeGlobe primary renderer */
+#globe3d{transition:opacity .18s ease}
+#globe3d[style*="display: none"]{pointer-events:none}
+@media(max-width:700px){
+  #globe3d{inset:0}
+}
