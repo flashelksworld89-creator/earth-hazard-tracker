@@ -31,6 +31,11 @@ lightCanvas.width = 240;
 lightCanvas.height = 120;
 const lightCtx = lightCanvas.getContext('2d');
 
+const risingCanvas = document.createElement('canvas');
+risingCanvas.width = 180;
+risingCanvas.height = 90;
+const risingCtx = risingCanvas.getContext('2d');
+
 const state = {
   land: [],
   playing: false,
@@ -204,10 +209,10 @@ function draw(){
       drawDayNight(w,h,earthShiftDeg);
     }
 
-    drawEclipticBand(w,h,skyShiftDeg);
+    drawRisingField(w,h,earthShiftDeg);
 
     if(document.getElementById('showPlanets').checked){
-      drawPlanets(w,h,skyShiftDeg);
+      drawProjectedPlanets(w,h,earthShiftDeg);
     }
   }
 
@@ -342,119 +347,149 @@ function drawDayNight(w,h,earthShiftDeg){
   ctx.restore();
 }
 
-function drawEclipticBand(w,h,skyShiftDeg){
-  const bandHalf=Math.max(18,h*.052);
+function drawRisingField(w,h,earthShiftDeg){
+  const showZodiac=document.getElementById('showZodiac').checked;
+  const showNak=document.getElementById('showNakshatras').checked;
+  if(!showZodiac && !showNak) return;
 
-  if(document.getElementById('showZodiac').checked){
-    for(let i=0;i<12;i++){
-      drawCelestialSegment(i*30,(i+1)*30,SIGNS[i][2],bandHalf,w,h,skyShiftDeg,.54);
-      drawCelestialLabel(i*30+15,`${SIGNS[i][1]} ${SIGNS[i][0]}`,SIGNS[i][2],w,h,skyShiftDeg,-bandHalf*.55);
+  const rw=risingCanvas.width;
+  const rh=risingCanvas.height;
+  const img=risingCtx.createImageData(rw,rh);
+  const data=img.data;
+  const date=state.astro.date;
+  const aya=state.astro.aya;
+
+  for(let py=0;py<rh;py++){
+    const lat=yToLat(py+.5,rh);
+
+    for(let px=0;px<rw;px++){
+      const mapLng=xToLon(px+.5,rw);
+      const earthLng=normalize180(mapLng-earthShiftDeg);
+      const asc=normalize360(tropicalAscendant(date,lat,earthLng)-aya);
+      const signIndex=Math.floor(asc/30);
+      const nakIndex=Math.min(26,Math.floor(asc/NAK_SIZE));
+
+      const signColor=hexToRgb(SIGNS[signIndex][2]);
+      const nakColor=hslToRgb(nakIndex/27,.72,.58);
+
+      let r=signColor[0],g=signColor[1],b=signColor[2],a=0;
+      if(showZodiac){
+        a=.18;
+      }
+      if(showNak){
+        if(showZodiac){
+          r=Math.round(r*.68+nakColor[0]*.32);
+          g=Math.round(g*.68+nakColor[1]*.32);
+          b=Math.round(b*.68+nakColor[2]*.32);
+          a=.22;
+        }else{
+          r=nakColor[0];g=nakColor[1];b=nakColor[2];a=.16;
+        }
+      }
+
+      const i=(py*rw+px)*4;
+      data[i]=r;data[i+1]=g;data[i+2]=b;data[i+3]=Math.round(a*255);
     }
   }
 
-  if(document.getElementById('showNakshatras').checked){
-    for(let i=0;i<27;i++){
-      const a=i*NAK_SIZE,b=(i+1)*NAK_SIZE;
-      const color=nakColorCss(i);
-      drawCelestialSegment(a,b,color,bandHalf*.58,w,h,skyShiftDeg,.44);
+  risingCtx.putImageData(img,0,0);
+  ctx.save();
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(risingCanvas,0,0,w,h);
+  ctx.restore();
 
-      if(w>760 || i%2===0){
-        drawCelestialLabel(
-          a+NAK_SIZE/2,
-          NAKSHATRAS[i],
-          color,w,h,skyShiftDeg,bandHalf*.58
-        );
+  drawRisingLabels(w,h,earthShiftDeg,showZodiac,showNak);
+}
+
+function drawRisingLabels(w,h,earthShiftDeg,showZodiac,showNak){
+  const date=state.astro.date;
+  const aya=state.astro.aya;
+
+  if(showZodiac){
+    const seen=new Set();
+    const samples=180;
+
+    for(let i=0;i<samples;i++){
+      const x=(i+.5)/samples*w;
+      const mapLng=xToLon(x,w);
+      const earthLng=normalize180(mapLng-earthShiftDeg);
+      const asc=normalize360(tropicalAscendant(date,0,earthLng)-aya);
+      const si=Math.floor(asc/30);
+
+      if(!seen.has(si)){
+        seen.add(si);
+        const label=`${SIGNS[si][1]} ${SIGNS[si][0]}`;
+        drawFieldLabel(label,SIGNS[si][2],x,h*.18,13);
+        drawFieldLabel(label,SIGNS[si][2],x,h*.52,13);
+        drawFieldLabel(label,SIGNS[si][2],x,h*.84,13);
+      }
+    }
+  }
+
+  if(showNak && w>720){
+    const seenNak=new Set();
+    const samples=270;
+    for(let i=0;i<samples;i++){
+      const x=(i+.5)/samples*w;
+      const mapLng=xToLon(x,w);
+      const earthLng=normalize180(mapLng-earthShiftDeg);
+      const asc=normalize360(tropicalAscendant(date,12,earthLng)-aya);
+      const ni=Math.min(26,Math.floor(asc/NAK_SIZE));
+
+      if(!seenNak.has(ni)){
+        seenNak.add(ni);
+        drawFieldLabel(NAKSHATRAS[ni],nakColorCss(ni),x,h*.69,9);
       }
     }
   }
 }
 
-function drawCelestialSegment(lonA,lonB,color,halfWidth,w,h,skyShiftDeg,alpha){
-  const top=[],bottom=[];
-  const steps=18;
-
-  for(let j=0;j<=steps;j++){
-    const lon=lonA+(lonB-lonA)*(j/steps);
-    const pt=bandPoint(lon,w,h,skyShiftDeg);
-    top.push([pt.x,pt.y-halfWidth]);
-    bottom.push([pt.x,pt.y+halfWidth]);
-  }
-
-  for(const copy of [-1,0,1]){
-    const dx=copy*w;
-    ctx.beginPath();
-    top.forEach((p,k)=>k?ctx.lineTo(p[0]+dx,p[1]):ctx.moveTo(p[0]+dx,p[1]));
-    bottom.slice().reverse().forEach(p=>ctx.lineTo(p[0]+dx,p[1]));
-    ctx.closePath();
-    ctx.fillStyle=hexToRgba(color,alpha);
-    ctx.fill();
-
-    ctx.strokeStyle=hexToRgba(color,.78);
-    ctx.lineWidth=1.1;
-    ctx.stroke();
-  }
-}
-
-function drawCelestialLabel(lon,text,color,w,h,skyShiftDeg,yOffset){
-  const p=bandPoint(lon,w,h,skyShiftDeg);
+function drawFieldLabel(text,color,x,y,size){
   ctx.save();
-  ctx.font=`600 ${Math.max(9,Math.min(13,w/95))}px system-ui,Segoe UI Symbol,sans-serif`;
+  ctx.font=`700 ${size}px system-ui,Segoe UI Symbol,sans-serif`;
   ctx.textAlign='center';
   ctx.textBaseline='middle';
   ctx.fillStyle=color;
-  ctx.shadowColor='rgba(0,0,0,.95)';
+  ctx.shadowColor='rgba(0,0,0,.98)';
   ctx.shadowBlur=5;
-  for(const x of wrappedXs(p.x,w)){
-    ctx.fillText(text,x,p.y+yOffset);
-  }
+  ctx.fillText(text,x,y);
   ctx.restore();
 }
 
-function drawPlanets(w,h,skyShiftDeg){
+function drawProjectedPlanets(w,h,earthShiftDeg){
+  const date=state.astro.date;
+  const aya=state.astro.aya;
   const occupied=new Map();
 
-  state.astro.placements.forEach((p,index)=>{
-    const pt=bandPoint(p.lon,w,h,skyShiftDeg);
-    const bucket=Math.round(pt.x/55);
+  state.astro.placements.forEach(p=>{
+    const targetNak=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
+    const candidates=[];
+
+    for(let x=0;x<w;x+=4){
+      const mapLng=xToLon(x,w);
+      const earthLng=normalize180(mapLng-earthShiftDeg);
+      const asc=normalize360(tropicalAscendant(date,0,earthLng)-aya);
+      const ni=Math.min(26,Math.floor(asc/NAK_SIZE));
+      if(ni===targetNak) candidates.push(x);
+    }
+
+    if(!candidates.length) return;
+    const x=candidates[Math.floor(candidates.length/2)];
+    const bucket=Math.round(x/55);
     const slot=occupied.get(bucket)||0;
     occupied.set(bucket,slot+1);
-    const y=pt.y-(36+slot*20);
+    const y=h*.42+slot*19;
 
     ctx.save();
-    ctx.font='700 15px system-ui,Segoe UI Symbol,sans-serif';
+    ctx.font='800 15px system-ui,Segoe UI Symbol,sans-serif';
     ctx.textAlign='center';
     ctx.textBaseline='middle';
     ctx.fillStyle=p.color;
-    ctx.shadowColor='rgba(0,0,0,.95)';
+    ctx.shadowColor='rgba(0,0,0,.98)';
     ctx.shadowBlur=6;
-
-    const label=`${p.glyph} ${degreeInSign(p.lon)}`;
-    for(const x of wrappedXs(pt.x,w)){
-      ctx.fillText(label,x,y);
-    }
+    ctx.fillText(`${p.glyph} ${degreeInSign(p.lon)}`,x,y);
     ctx.restore();
   });
-}
-
-function bandPoint(siderealLon,w,h,skyShiftDeg){
-  const tropicalLon=normalize360(siderealLon+state.astro.aya);
-  const lambda=rad(tropicalLon);
-  const eps=rad(state.astro.eps);
-
-  const ra=Math.atan2(
-    Math.sin(lambda)*Math.cos(eps),
-    Math.cos(lambda)
-  )*180/Math.PI;
-
-  const dec=Math.asin(
-    Math.sin(eps)*Math.sin(lambda)
-  )*180/Math.PI;
-
-  const displayLon=normalize180(ra+skyShiftDeg);
-  return {
-    x:lonToX(displayLon,w),
-    y:latToY(dec,h)
-  };
 }
 
 function drawEdgeFade(w,h){
@@ -555,6 +590,45 @@ function meanNodeTropicalLongitude(date){
   const T=(julianDate(date)-2451545.0)/36525;
   return normalize360(125.04452-1934.136261*T+.0020708*T*T+(T*T*T)/450000);
 }
+function tropicalAscendant(date,latDeg,lonDeg){
+  const theta=rad(normalize360(greenwichSiderealDegrees(date)+lonDeg));
+  const phi=rad(latDeg);
+  const eps=rad(meanObliquityFromDate(date));
+
+  return normalize360(
+    Math.atan2(
+      -Math.cos(theta),
+      Math.sin(theta)*Math.cos(eps)+Math.tan(phi)*Math.sin(eps)
+    )*180/Math.PI+180
+  );
+}
+
+function hexToRgb(hex){
+  const h=hex.replace('#','');
+  const n=parseInt(h,16);
+  return [(n>>16)&255,(n>>8)&255,n&255];
+}
+
+function hslToRgb(h,s,l){
+  const hue2rgb=(p,q,t)=>{
+    if(t<0)t+=1;if(t>1)t-=1;
+    if(t<1/6)return p+(q-p)*6*t;
+    if(t<1/2)return q;
+    if(t<2/3)return p+(q-p)*(2/3-t)*6;
+    return p;
+  };
+  let r,g,b;
+  if(s===0){r=g=b=l;}
+  else{
+    const q=l<.5?l*(1+s):l+s-l*s;
+    const p=2*l-q;
+    r=hue2rgb(p,q,h+1/3);
+    g=hue2rgb(p,q,h);
+    b=hue2rgb(p,q,h-1/3);
+  }
+  return [Math.round(r*255),Math.round(g*255),Math.round(b*255)];
+}
+
 function normalize360(x){return ((x%360)+360)%360;}
 function normalize180(x){return ((x+180)%360+360)%360-180;}
 function rad(x){return x*Math.PI/180;}
