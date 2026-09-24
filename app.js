@@ -32,8 +32,8 @@ lightCanvas.height = 120;
 const lightCtx = lightCanvas.getContext('2d');
 
 const risingCanvas = document.createElement('canvas');
-risingCanvas.width = 180;
-risingCanvas.height = 90;
+risingCanvas.width = 360;
+risingCanvas.height = 180;
 const risingCtx = risingCanvas.getContext('2d');
 
 const state = {
@@ -45,7 +45,11 @@ const state = {
   epochReal: performance.now(),
   lastDraw: 0,
   astro: null,
-  mapReady: false
+  mapReady: false,
+  observer: null,
+  risingCacheKey: '',
+  risingSignGrid: null,
+  risingNakGrid: null
 };
 
 init();
@@ -112,7 +116,31 @@ function bindControls(){
   ['showDayNight','showZodiac','showNakshatras','showPlanets','showGrid']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
 
-  const collapseBtn=document.getElementById('collapsePanelBtn');
+  document.getElementById('applyLocationBtn').addEventListener('click',()=>{
+    applyObserver(
+      document.getElementById('latitudeInput').value,
+      document.getElementById('longitudeInput').value
+    );
+  });
+
+  document.getElementById('useLocationBtn').addEventListener('click',()=>{
+    const status=document.getElementById('locationStatus');
+    if(!navigator.geolocation){
+      status.textContent='Geolocation unavailable';
+      return;
+    }
+    status.textContent='Requesting location…';
+    navigator.geolocation.getCurrentPosition(
+      pos=>applyObserver(pos.coords.latitude,pos.coords.longitude),
+      err=>{
+        console.error(err);
+        status.textContent='Location permission denied';
+      },
+      {enableHighAccuracy:true,timeout:10000,maximumAge:60000}
+    );
+  });
+
+    const collapseBtn=document.getElementById('collapsePanelBtn');
   const panel=document.querySelector('.control-panel');
   const body=document.getElementById('transitPanelBody');
 
