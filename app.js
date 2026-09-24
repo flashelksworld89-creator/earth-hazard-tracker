@@ -73,7 +73,10 @@ const state = {
   selectedPoint: null,
   countryLabels: [],
   admin1Labels: [],
-  labelsReady: false
+  labelsReady: false,
+  zoom: 1,
+  viewOffsetX: 0,
+  viewOffsetY: 0
 };
 
 init();
@@ -82,6 +85,7 @@ async function init(){
   buildNakshatraKey();
   populateFocusControls();
   bindControls();
+  updateZoomText();
   loadPoliticalLabels();
   resize();
   window.addEventListener('resize', resize);
@@ -212,6 +216,7 @@ function bindControls(){
   canvas.addEventListener('pointerdown',e=>{
     state.dragging=true;
     state.dragX=e.clientX;
+    state.dragY=e.clientY;
     state.dragStartX=e.clientX;
     state.dragStartY=e.clientY;
     canvas.setPointerCapture?.(e.pointerId);
@@ -220,9 +225,14 @@ function bindControls(){
   canvas.addEventListener('pointermove',e=>{
     if(!state.dragging) return;
     const dx=e.clientX-state.dragX;
+    const dy=e.clientY-state.dragY;
     state.dragX=e.clientX;
+    state.dragY=e.clientY;
     const w=Math.max(1,canvas.clientWidth);
-    state.panDeg=normalize180(state.panDeg+dx/w*360);
+    state.panDeg=normalize180(state.panDeg+dx/(w*state.zoom)*360);
+    if(state.zoom>1){
+      state.viewOffsetY=clampViewOffsetY(state.viewOffsetY+dy,canvas.clientHeight,state.zoom);
+    }
     draw();
   });
 
@@ -243,12 +253,29 @@ function bindControls(){
   });
 
   canvas.addEventListener('wheel',e=>{
-    const delta=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
-    const w=Math.max(1,canvas.clientWidth);
-    state.panDeg=normalize180(state.panDeg-delta/w*180);
     e.preventDefault();
-    draw();
+    const factor=e.deltaY<0?1.18:1/1.18;
+    zoomAtPoint(state.zoom*factor,e.clientX,e.clientY);
   },{passive:false});
+
+  document.getElementById('zoomInBtn').addEventListener('click',()=>{
+    const r=canvas.getBoundingClientRect();
+    zoomAtPoint(state.zoom*1.35,r.left+r.width/2,r.top+r.height/2);
+  });
+
+  document.getElementById('zoomOutBtn').addEventListener('click',()=>{
+    const r=canvas.getBoundingClientRect();
+    zoomAtPoint(state.zoom/1.35,r.left+r.width/2,r.top+r.height/2);
+  });
+
+  document.getElementById('resetViewBtn').addEventListener('click',()=>{
+    state.zoom=1;
+    state.viewOffsetX=0;
+    state.viewOffsetY=0;
+    state.panDeg=0;
+    updateZoomText();
+    draw();
+  });
 
   document.getElementById('closeInspectBtn').addEventListener('click',()=>{
     document.getElementById('locationInspectPanel').hidden=true;
@@ -344,6 +371,9 @@ function draw(){
   // Full eastward Earth rotation: one complete wrap per sidereal day.
   const earthShiftDeg = normalize180(phase + state.panDeg);
 
+  ctx.save();
+  applyMapViewTransform(w,h);
+
   if(document.getElementById('showGrid').checked) drawGrid(w,h,earthShiftDeg);
   if(state.mapReady) drawLand(w,h,earthShiftDeg);
 
@@ -366,7 +396,58 @@ function draw(){
     drawSelectedPoint(w,h,earthShiftDeg);
   }
 
+  ctx.restore();
   drawEdgeFade(w,h);
+}
+
+function applyMapViewTransform(w,h){
+  ctx.translate(w/2+state.viewOffsetX,h/2+state.viewOffsetY);
+  ctx.scale(state.zoom,state.zoom);
+  ctx.translate(-w/2,-h/2);
+}
+
+function screenToMapPoint(screenX,screenY,w,h){
+  return {
+    x:(screenX-(w/2+state.viewOffsetX))/state.zoom+w/2,
+    y:(screenY-(h/2+state.viewOffsetY))/state.zoom+h/2
+  };
+}
+
+function zoomAtPoint(nextZoom,clientX,clientY){
+  const rect=canvas.getBoundingClientRect();
+  const oldZoom=state.zoom;
+  const newZoom=Math.max(1,Math.min(8,nextZoom));
+  if(Math.abs(newZoom-oldZoom)<.001) return;
+
+  const sx=clientX-rect.left;
+  const sy=clientY-rect.top;
+  const mapPoint=screenToMapPoint(sx,sy,rect.width,rect.height);
+
+  state.zoom=newZoom;
+  state.viewOffsetX=
+    sx-rect.width/2-newZoom*(mapPoint.x-rect.width/2);
+  state.viewOffsetY=
+    sy-rect.height/2-newZoom*(mapPoint.y-rect.height/2);
+
+  state.viewOffsetX=clampViewOffsetX(state.viewOffsetX,rect.width,newZoom);
+  state.viewOffsetY=clampViewOffsetY(state.viewOffsetY,rect.height,newZoom);
+  updateZoomText();
+  draw();
+}
+
+function clampViewOffsetX(value,w,zoom){
+  const limit=(zoom-1)*w/2;
+  return Math.max(-limit,Math.min(limit,value));
+}
+
+function clampViewOffsetY(value,h,zoom){
+  const limit=(zoom-1)*h/2;
+  return Math.max(-limit,Math.min(limit,value));
+}
+
+function updateZoomText(){
+  const el=document.getElementById('zoomLevelText');
+  if(el) el.textContent=state.zoom.toFixed(1)+'×';
 }
 
 function drawBackground(w,h){
@@ -1084,15 +1165,16 @@ function inspectMapPoint(clientX,clientY){
   if(!state.astro) return;
 
   const rect=canvas.getBoundingClientRect();
-  const x=Math.max(0,Math.min(rect.width,clientX-rect.left));
-  const y=Math.max(0,Math.min(rect.height,clientY-rect.top));
+  const screenX=Math.max(0,Math.min(rect.width,clientX-rect.left));
+  const screenY=Math.max(0,Math.min(rect.height,clientY-rect.top));
+  const point=screenToMapPoint(screenX,screenY,rect.width,rect.height);
   const date=currentDate();
   const phase=normalize360(greenwichSiderealDegrees(date));
   const earthShiftDeg=normalize180(phase+state.panDeg);
 
-  const mapLon=xToLon(x,rect.width);
+  const mapLon=xToLon(point.x,rect.width);
   const lon=normalize180(mapLon-earthShiftDeg);
-  const lat=yToLat(y,rect.height);
+  const lat=yToLat(point.y,rect.height);
 
   state.selectedPoint={lat,lon};
   updateLocationReading(lat,lon,date);
