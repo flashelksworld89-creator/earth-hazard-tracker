@@ -58,6 +58,12 @@ const DIRS = [
   [180,'S'], [225,'SW'], [270,'W'], [315,'NW']
 ];
 
+const US_RISING_SITES = [
+  {key:'East',label:'East Coast',city:'New York City',lat:40.7128,lng:-74.0060},
+  {key:'Mid',label:'Midwest',city:'Chicago',lat:41.8781,lng:-87.6298},
+  {key:'West',label:'West Coast',city:'Los Angeles',lat:34.0522,lng:-118.2437}
+];
+
 export function initZodiacCompass(map, maplibregl) {
   const state = {
     enabled:true,
@@ -432,6 +438,7 @@ export function initZodiacCompass(map, maplibregl) {
       drawDayNight();
       redrawPlanets();
       updatePlanetList(localPlanets);
+      updateUsRisingPanel(date,aya,placements);
 
       window.dispatchEvent(new CustomEvent('zodiac-sim-time',{
         detail:{
@@ -825,6 +832,23 @@ export function initZodiacCompass(map, maplibregl) {
     setData(ids.planets,points);
   }
 
+  function updateUsRisingPanel(date,aya,placements) {
+    const moon=placements.find(p=>p.name==='Moon');
+    if(!moon) return;
+    const moonText=fullZodiacDegree(moon.lon);
+    US_RISING_SITES.forEach(site=>{
+      const asc=normalize360(tropicalAscendant(date,site.lat,site.lng)-aya);
+      const ascEl=document.getElementById('usAsc'+site.key);
+      const moonEl=document.getElementById('usMoon'+site.key);
+      if(ascEl) ascEl.textContent=fullZodiacDegree(asc);
+      if(moonEl) moonEl.textContent=moonText;
+    });
+    const timeEl=document.getElementById('usRisingTime');
+    if(timeEl) timeEl.textContent='Sidereal · Lahiri · '+date.toLocaleString([],{
+      month:'short',day:'numeric',hour:'numeric',minute:'2-digit'
+    });
+  }
+
   function updatePlanetList(placements) {
     document.getElementById('zPlanetList').innerHTML=placements.map(p=>{
       const color=PLANET_COLORS[p.name]||'#e9d5ff';
@@ -1043,6 +1067,10 @@ export function initZodiacCompass(map, maplibregl) {
   function zodiacDegree(lon){
     const x=normalize360(lon),s=Math.floor(x/30),w=x-s*30,d=Math.floor(w),m=Math.floor((w-d)*60);
     return `${SIGNS[s][1]} ${d}°${String(m).padStart(2,'0')}′`;
+  }
+  function fullZodiacDegree(lon){
+    const x=normalize360(lon),s=Math.floor(x/30),w=x-s*30,d=Math.floor(w),m=Math.floor((w-d)*60);
+    return SIGNS[s][0]+' '+d+'°'+String(m).padStart(2,'0')+'′';
   }
   function shortDegree(lon){
     const x=normalize360(lon),s=Math.floor(x/30),w=x-s*30;
