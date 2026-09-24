@@ -167,29 +167,30 @@ function refreshAstronomy(){
 function draw(){
   const w=canvas.clientWidth;
   const h=canvas.clientHeight;
-  if(!w||!h||!state.astro) return;
+  if(!w||!h) return;
 
   ctx.clearRect(0,0,w,h);
   drawBackground(w,h);
 
-  const phase = normalize360(state.astro.gmst);
+  const phase = state.astro ? normalize360(state.astro.gmst) : 0;
   // Split the daily apparent motion between the two frames so the combined
   // Earth-vs-sky relative motion remains one real sidereal rotation.
   const earthShiftDeg = phase * 0.5;
   const skyShiftDeg = -phase * 0.5;
 
   if(document.getElementById('showGrid').checked) drawGrid(w,h,earthShiftDeg);
-
   if(state.mapReady) drawLand(w,h,earthShiftDeg);
 
-  if(document.getElementById('showDayNight').checked){
-    drawDayNight(w,h,earthShiftDeg);
-  }
+  if(state.astro){
+    if(document.getElementById('showDayNight').checked){
+      drawDayNight(w,h,earthShiftDeg);
+    }
 
-  drawEclipticBand(w,h,skyShiftDeg);
+    drawEclipticBand(w,h,skyShiftDeg);
 
-  if(document.getElementById('showPlanets').checked){
-    drawPlanets(w,h,skyShiftDeg);
+    if(document.getElementById('showPlanets').checked){
+      drawPlanets(w,h,skyShiftDeg);
+    }
   }
 
   drawEdgeFade(w,h);
