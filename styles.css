@@ -495,3 +495,83 @@ button:hover,select:hover{border-color:rgba(103,232,249,.5)}
     max-height:48vh;
   }
 }
+
+.angle-grid,
+.house-theme-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+}
+.angle-grid span,
+.house-theme-grid span{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  padding:6px 7px;
+  border-radius:6px;
+  background:rgba(255,255,255,.035);
+  font-size:9px;
+}
+.angle-grid b,
+.house-theme-grid b{
+  color:#eefaff;
+}
+.angle-grid em,
+.house-theme-grid em{
+  color:#9dc4d8;
+  font-style:normal;
+  text-align:right;
+}
+.house-list{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+.house-row{
+  display:grid;
+  grid-template-columns:34px minmax(96px,1.15fr) 58px minmax(80px,1fr);
+  align-items:center;
+  gap:6px;
+  padding:6px 7px;
+  border:1px solid rgba(255,255,255,.045);
+  border-radius:7px;
+  background:rgba(255,255,255,.025);
+  font-size:9px;
+}
+.house-row.angular-house{
+  border-color:rgba(255,214,102,.34);
+  background:rgba(255,214,102,.055);
+}
+.house-num{
+  color:#ffd666;
+  font-weight:800;
+}
+.house-sign{
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+}
+.house-sign b{
+  color:#eefaff;
+  font-size:9px;
+}
+.house-sign small{
+  color:#7899ad;
+  font-size:8px;
+}
+.house-purpose{
+  color:#9dc4d8;
+}
+.house-planets{
+  color:#d5e8f2;
+  text-align:right;
+}
+@media(max-width:520px){
+  .house-row{
+    grid-template-columns:30px 1fr 52px;
+  }
+  .house-planets{
+    grid-column:2/-1;
+    text-align:left;
+  }
+}
