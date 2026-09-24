@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#02070d">
-<title>Earth Hazard Tracker Dashboard</title>
+<title>Earth Hazard Tracker</title>
 <style>
 :root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.18);--text:#eaf4ff;--muted:#91a8bf;--accent:#38bdf8}
 *{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--bg);font-family:Inter,system-ui,sans-serif;color:var(--text);overflow:hidden}
@@ -17,7 +17,7 @@
 .controls input{min-width:0;padding:9px;background:#020b13;color:var(--text);border:1px solid var(--border);border-radius:7px}
 .controls button{padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:#0b1b2b;color:var(--text);cursor:pointer;font-weight:700}
 .note{grid-column:1/-1;color:var(--muted);font-size:8px;line-height:1.35}
-.launch{position:fixed;right:16px;bottom:16px;z-index:9998;border:1px solid var(--border);border-radius:999px;background:#071420;color:#eaf4ff;padding:10px 13px;cursor:pointer;font-weight:800;box-shadow:0 12px 35px rgba(0,0,0,.45)}
+.launch{position:fixed;right:14px;bottom:14px;z-index:9998;border:1px solid rgba(125,211,252,.20);border-radius:999px;background:rgba(5,17,28,.92);color:#dff5ff;padding:9px 12px;cursor:pointer;font-weight:750;font-size:11px;box-shadow:0 10px 28px rgba(0,0,0,.38);backdrop-filter:blur(12px)}
 .launch.hidden{display:none}
 @media(max-width:650px){.player{right:8px;bottom:8px;width:calc(100vw - 16px)}.launch{right:8px;bottom:8px}}
 </style>
@@ -33,7 +33,7 @@
     <div class="note">This player stays alive while you switch between Earth Tracker, World News and Pattern Lab.</div>
   </div>
 </div>
-<button id="launch" class="launch">▶ Video Player</button>
+<button id="launch" class="launch" aria-label="Open persistent video player">▶ Video</button>
 <script>
 const frame=document.getElementById('siteFrame'),player=document.getElementById('player'),launch=document.getElementById('launch');
 const params=new URLSearchParams(location.search);
