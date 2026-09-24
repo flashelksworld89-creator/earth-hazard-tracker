@@ -114,10 +114,16 @@ function bindControls(){
 
   const collapseBtn=document.getElementById('collapsePanelBtn');
   const panel=document.querySelector('.control-panel');
+  const body=document.getElementById('transitPanelBody');
+
   collapseBtn.addEventListener('click',()=>{
-    const collapsed=panel.classList.toggle('collapsed');
-    collapseBtn.textContent=collapsed?'Expand':'Collapse';
+    const collapsed=!body.hidden;
+    body.hidden=collapsed;
+    panel.classList.toggle('collapsed',collapsed);
+    collapseBtn.textContent=collapsed?'⌃':'⌄';
     collapseBtn.setAttribute('aria-expanded',String(!collapsed));
+    collapseBtn.setAttribute('aria-label',collapsed?'Expand transit controls':'Collapse transit controls');
+    collapseBtn.title=collapsed?'Expand transit controls':'Collapse transit controls';
   });
 }
 
