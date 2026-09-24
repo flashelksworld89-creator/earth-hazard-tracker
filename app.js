@@ -541,16 +541,16 @@ function buildRisingCache(date,showZodiac,showNak){
       const nakColor=hslToRgb(nakIndex/27,.72,.58);
 
       let r=signColor[0],g=signColor[1],b=signColor[2],alpha=0;
-      if(showZodiac) alpha=.14;
+      if(showZodiac) alpha=.19;
 
       if(showNak){
         if(showZodiac){
           r=Math.round(r*.72+nakColor[0]*.28);
           g=Math.round(g*.72+nakColor[1]*.28);
           b=Math.round(b*.72+nakColor[2]*.28);
-          alpha=.18;
+          alpha=.22;
         }else{
-          r=nakColor[0];g=nakColor[1];b=nakColor[2];alpha=.13;
+          r=nakColor[0];g=nakColor[1];b=nakColor[2];alpha=.16;
         }
       }
 
@@ -818,12 +818,16 @@ function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
 
 function drawFieldLabel(text,color,x,y,size){
   ctx.save();
-  ctx.font=`700 ${size}px system-ui,Segoe UI Symbol,sans-serif`;
+  ctx.font=`900 ${size+2}px system-ui,Segoe UI Symbol,sans-serif`;
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-  ctx.fillStyle=color;
+  ctx.lineJoin='round';
+  ctx.lineWidth=Math.max(2.5,(size+2)*.22);
+  ctx.strokeStyle='rgba(0,0,0,.92)';
   ctx.shadowColor='rgba(0,0,0,.98)';
-  ctx.shadowBlur=5;
+  ctx.shadowBlur=8;
+  ctx.strokeText(text,x,y);
+  ctx.fillStyle=color;
   ctx.fillText(text,x,y);
   ctx.restore();
 }
@@ -1005,16 +1009,17 @@ function drawPoliticalLabels(w,h,earthShiftDeg){
     const xBase=lonToX(item.lon+earthShiftDeg,w);
     const y=latToY(item.lat,h);
     const fontSize=isAdmin1
-      ? Math.max(8,Math.min(10,w/150))
-      : Math.max(9,Math.min(13,w/105));
+      ? Math.max(7,Math.min(9,w/170))
+      : Math.max(8,Math.min(11,w/125));
 
     ctx.save();
-    ctx.font=`${isAdmin1?'600':'700'} ${fontSize}px system-ui,sans-serif`;
+    ctx.globalAlpha=isAdmin1?.46:.58;
+    ctx.font=`${isAdmin1?'500':'600'} ${fontSize}px system-ui,sans-serif`;
     ctx.textAlign='center';
     ctx.textBaseline='middle';
-    ctx.fillStyle=isAdmin1?'rgba(220,236,246,.70)':'rgba(244,250,255,.88)';
-    ctx.shadowColor='rgba(0,0,0,.92)';
-    ctx.shadowBlur=4;
+    ctx.fillStyle=isAdmin1?'rgba(196,214,224,.72)':'rgba(214,229,238,.80)';
+    ctx.shadowColor='rgba(0,0,0,.68)';
+    ctx.shadowBlur=2;
 
     for(const x of wrappedXs(xBase,w)){
       ctx.fillText(item.name,x,y);
