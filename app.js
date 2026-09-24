@@ -1,1255 +1,432 @@
-import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.11.0/dist/maplibre-gl.mjs';
-import { initZodiacCompass } from '/zodiac.js';
-import { initHazardGlobe3D } from '/globe3d.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-const REFRESH = {
-  earthquakesMs: 60_000,
-  gdacsMs: 5 * 60_000
-};
+const A = window.Astronomy;
+const OBLIQUITY = THREE.MathUtils.degToRad(23.4393);
+const SIDEREAL_DAY_MS = 86164.0905 * 1000;
+
+const SIGNS = [
+  ['Aries','♈','#ff5a5f'],['Taurus','♉','#59c36a'],['Gemini','♊','#ffd166'],
+  ['Cancer','♋','#8ecae6'],['Leo','♌','#ff9f1c'],['Virgo','♍','#95d5b2'],
+  ['Libra','♎','#e0aaff'],['Scorpio','♏','#c9184a'],['Sagittarius','♐','#9b5de5'],
+  ['Capricorn','♑','#8d99ae'],['Aquarius','♒','#00b4d8'],['Pisces','♓','#577590']
+];
+
+const PLANETS = [
+  ['Sun','Sun','☉','#ffd166'],['Moon','Moon','☽','#f8f9fa'],
+  ['Mercury','Mercury','☿','#2ec4b6'],['Venus','Venus','♀','#ff70a6'],
+  ['Mars','Mars','♂','#ff3b30'],['Jupiter','Jupiter','♃','#f4a261'],
+  ['Saturn','Saturn','♄','#adb5bd'],['Uranus','Uranus','♅','#48cae4'],
+  ['Neptune','Neptune','♆','#4361ee'],['Pluto','Pluto','♇','#9d4edd']
+];
 
 const state = {
-  earthquakeFeatures: [],
-  gdacsEvents: [],
-  markers: [],
-  days: 7,
-  activeFilter: 'all',
-  layerVisibility: {
-    earthquakes: true, TC: true, VO: true, FL: true, WF: true, DR: false
-  },
-  globe: true,
-  rotating: true,
-  rotationFrame: null,
-  celestialSpeed: 1,
-  celestialRunning: false,
-  autoRefresh: true,
-  timers: { earthquakes: null, gdacs: null },
-  sourceUpdated: { earthquakes: null, gdacs: null },
-  knownEventIds: new Set(),
-  newEventIds: new Set(),
-  firstLoadComplete: false,
-  arEnabled: true,
-  arHour: 0,
-  arPoints: [],
-  arLoaded: false
+  offsetMs: 0,
+  playing: false,
+  speed: 1,
+  epochReal: performance.now(),
+  epochAstro: Date.now(),
+  rotateEarth: true,
+  lastFrame: performance.now()
 };
 
-const typeNames = {
-  earthquakes: 'EARTHQUAKE',
-  TC: 'TROPICAL CYCLONE',
-  VO: 'VOLCANO',
-  FL: 'FLOOD',
-  WF: 'WILDFIRE',
-  DR: 'DROUGHT'
-};
-
-const map = new maplibregl.Map({
-  container: 'map',
-  style: 'https://tiles.openfreemap.org/styles/liberty',
-  center: [0, 18],
-  zoom: 1.45,
-  pitch: 0,
-  bearing: 0,
-  attributionControl: true
-});
-
-map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-
-const globe3d = initHazardGlobe3D(document.getElementById('globe3d'));
-window.__hazardGlobe3D = globe3d;
-map.addControl(new maplibregl.GlobeControl(), 'top-right');
-
-map.on('style.load', () => map.setProjection({ type: 'mercator' }));
-
-map.on('error', (e) => {
-  console.error('MapLibre error:', e?.error || e);
-  const message = e?.error?.message || 'Map rendering error';
-  if (message.toLowerCase().includes('source') || message.toLowerCase().includes('style')) {
-    showToast(`Map error: ${message}`, 5000);
-  }
-});
-
-
-map.on('load', async () => {
-  setupCollapsiblePanels();
-  setupDarkMapControls();
-  setupAtmosphericRiverLayer();
-  window.__zodiacCompass = initZodiacCompass(map, maplibregl);
-  setTimeout(() => verifyZodiacCompass(), 500);
-  await Promise.allSettled([loadAllData(), loadAtmosphericRivers(0), loadSchumannResonance()]);
-  state.firstLoadComplete = true;
-  const zToggle = document.getElementById('zodiacLayerToggle');
-  if (zToggle) {
-    zToggle.checked = true;
-    zToggle.dispatchEvent(new Event('change'));
-  }
-  syncZodiacMasterButton();
-  captureKnownEvents();
-  startAutoRefresh();
-  startRotation();
-});
-
-map.on('dragstart', () => stopRotation(false));
-map.on('mousedown', () => stopRotation(false));
-map.on('touchstart', () => stopRotation(false));
-
-map.on('click', async (e) => {
-  const target = e.originalEvent?.target;
-  if (target?.closest?.('.hazard-marker')) return;
-  await showWeatherAt(e.lngLat.lat, e.lngLat.lng);
-});
-
-document.querySelectorAll('.layer-toggle').forEach(input => {
-  input.addEventListener('change', () => {
-    state.layerVisibility[input.dataset.layer] = input.checked;
-    renderMarkers();
-  });
-});
-
-document.querySelectorAll('.timeline-presets button').forEach(btn => {
-  btn.addEventListener('click', () => setDays(Number(btn.dataset.days)));
-});
-
-document.getElementById('timelineRange').addEventListener('input', (e) => {
-  setDays(Number(e.target.value), false);
-});
-
-document.getElementById('refreshBtn').addEventListener('click', async () => {
-  await loadAllData(true);
-});
-
-document.getElementById('clearFilterBtn').addEventListener('click', () => {
-  state.activeFilter = 'all';
-  renderEventList();
-});
-
-document.querySelectorAll('.stat-card').forEach(btn => {
-  btn.addEventListener('click', () => {
-    state.activeFilter = btn.dataset.filter;
-    renderEventList();
-  });
-});
-
-document.getElementById('showNewEventsBtn').addEventListener('click', () => {
-  state.activeFilter = 'new';
-  renderEventList();
-});
-
-document.getElementById('autoRefreshToggle').addEventListener('change', (e) => {
-  state.autoRefresh = e.target.checked;
-  if (state.autoRefresh) {
-    startAutoRefresh();
-    showToast('Automatic live refresh enabled.');
-  } else {
-    stopAutoRefresh();
-    showToast('Automatic live refresh paused.');
-  }
-  updateAutoRefreshText();
-});
-
-
-document.getElementById('arLayerToggle').addEventListener('change', (e) => {
-  state.arEnabled = e.target.checked;
-  setAtmosphericRiverVisibility();
-});
-
-document.getElementById('arRefreshBtn').addEventListener('click', async () => {
-  await loadAtmosphericRivers(state.arHour, true);
-});
-
-document.querySelectorAll('[data-ar-hour]').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const hour = Number(btn.dataset.arHour);
-    state.arHour = hour;
-    document.querySelectorAll('[data-ar-hour]').forEach(b => {
-      b.classList.toggle('active', b === btn);
-    });
-    await loadAtmosphericRivers(hour, true);
-  });
-});
-
-document.getElementById('schumannRefreshBtn')?.addEventListener('click',()=>loadSchumannResonance(true));
-
-document.getElementById('closeDetail').addEventListener('click', () => {
-  document.getElementById('detailPanel').classList.add('hidden');
-});
-
-document.getElementById('projectionBtn').addEventListener('click', () => {
-  state.globe = !state.globe;
-  globe3d?.setVisible(state.globe);
-  map.setProjection({ type: 'mercator' });
-  document.getElementById('projectionBtn').textContent =
-    state.globe ? 'Switch to flat map' : 'Switch to 3D globe';
-  document.getElementById('rotateBtn').textContent = state.rotating
-    ? (state.globe ? 'Pause Earth rotation' : 'Pause flat-map scroll')
-    : (state.globe ? 'Resume Earth rotation' : 'Resume flat-map scroll');
-});
-
-document.getElementById('rotateBtn').addEventListener('click', () => {
-  if (state.rotating) stopRotation(true);
-  else startRotation();
-});
-
-window.addEventListener('zodiac-sim-time',(e)=>{
-  state.celestialSpeed=Math.max(1,Number(e.detail?.speed)||1);
-  state.celestialRunning=Boolean(e.detail?.running);
-  globe3d?.setSpeed(state.celestialRunning ? state.celestialSpeed : 1);
-});
-
-document.getElementById('searchForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const query = document.getElementById('searchInput').value.trim();
-  if (!query) return;
-  await searchPlace(query);
-});
-
-
-function setupAtmosphericRiverLayer() {
-  if (!map.getSource('atmospheric-rivers')) {
-    map.addSource('atmospheric-rivers', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: [] }
-    });
-  }
-
-  if (!map.getLayer('atmospheric-river-halo')) {
-    map.addLayer({
-      id: 'atmospheric-river-halo',
-      type: 'circle',
-      source: 'atmospheric-rivers',
-      paint: {
-        'circle-radius': [
-          'interpolate', ['linear'], ['get', 'ivt'],
-          250, 16,
-          500, 24,
-          750, 32,
-          1000, 40,
-          1250, 50
-        ],
-        'circle-color': [
-          'step', ['get', 'category'],
-          '#67e8f9',
-          2, '#38bdf8',
-          3, '#facc15',
-          4, '#fb923c',
-          5, '#fb7185'
-        ],
-        'circle-opacity': 0.15,
-        'circle-blur': 0.45
-      }
-    });
-  }
-
-  if (!map.getLayer('atmospheric-river-points')) {
-    map.addLayer({
-      id: 'atmospheric-river-points',
-      type: 'circle',
-      source: 'atmospheric-rivers',
-      paint: {
-        'circle-radius': [
-          'interpolate', ['linear'], ['get', 'ivt'],
-          250, 5,
-          500, 7,
-          750, 9,
-          1000, 11,
-          1250, 13
-        ],
-        'circle-color': [
-          'step', ['get', 'category'],
-          '#67e8f9',
-          2, '#38bdf8',
-          3, '#facc15',
-          4, '#fb923c',
-          5, '#fb7185'
-        ],
-        'circle-stroke-width': 1,
-        'circle-stroke-color': '#e0f2fe',
-        'circle-opacity': 0.9
-      }
-    });
-  }
-
-  map.on('click', 'atmospheric-river-points', (e) => {
-    const f = e.features?.[0];
-    if (!f) return;
-
-    const p = f.properties || {};
-    const coords = f.geometry.coordinates.slice();
-    const categoryText = Number(p.category) > 0
-      ? `Approx. AR ${p.category}`
-      : 'AR conditions (<24h / unrated)';
-
-    new maplibregl.Popup({ closeButton: true, maxWidth: '290px' })
-      .setLngLat(coords)
-      .setHTML(`
-        <div class="ar-popup">
-          <h3>${categoryText}</h3>
-          <p><b>IVT:</b> ${Math.round(Number(p.ivt))} kg m⁻¹ s⁻¹</p>
-          <p><b>Intensity:</b> ${escapeHtml(p.intensity || '—')}</p>
-          <p><b>Transport direction:</b> ${Math.round(Number(p.direction))}°</p>
-          <p><b>Estimated duration:</b> ${Number(p.duration)} h above 250</p>
-          <p><b>Event peak IVT:</b> ${Math.round(Number(p.maxIvt))}</p>
-          <p><b>Valid:</b> ${escapeHtml(p.validTime || '—')} UTC</p>
-          <small>Model-derived screening value on a coarse global grid. Not an official atmospheric-river warning.</small>
-        </div>
-      `)
-      .addTo(map);
-  });
-
-  map.on('mouseenter', 'atmospheric-river-points', () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
-  map.on('mouseleave', 'atmospheric-river-points', () => {
-    map.getCanvas().style.cursor = '';
-  });
-}
-
-async function loadAtmosphericRivers(hour = 0, userInitiated = false) {
-  const status = document.getElementById('arStatus');
-  status.textContent = `Scanning global IVT +${hour}h…`;
-  if (userInitiated) showToast('Updating atmospheric river model scan…', 0);
-
-  try {
-    const response = await fetch(`/api/atmospheric-rivers?hour=${hour}&ts=${Date.now()}`, {
-      cache: 'no-store'
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`AR scan HTTP ${response.status}: ${body.slice(0, 200)}`);
-    }
-
-    const data = await response.json();
-    state.arPoints = data.points || [];
-    state.arLoaded = true;
-
-    const features = state.arPoints.map((p, index) => ({
-      type: 'Feature',
-      id: index,
-      geometry: {
-        type: 'Point',
-        coordinates: [p.lon, p.lat]
-      },
-      properties: {
-        ivt: Number(p.ivt),
-        category: Number(p.ar_category),
-        intensity: p.intensity,
-        direction: Number(p.transport_direction),
-        duration: Number(p.duration_hours),
-        maxIvt: Number(p.max_ivt_event),
-        validTime: p.valid_time,
-        shortDuration: Boolean(p.short_duration)
-      }
-    }));
-
-    const source = map.getSource('atmospheric-rivers');
-    if (source) {
-      source.setData({
-        type: 'FeatureCollection',
-        features
-      });
-    }
-
-    setAtmosphericRiverVisibility();
-
-    const rated = state.arPoints.filter(p => Number(p.ar_category) > 0).length;
-    const strongest = state.arPoints.reduce((m, p) => Math.max(m, Number(p.ivt) || 0), 0);
-    status.textContent = state.arPoints.length
-      ? `${state.arPoints.length} threshold points · ${rated} rated · peak ${Math.round(strongest)}`
-      : 'No sampled points above IVT 250';
-
-    if (userInitiated) {
-      showToast('Atmospheric river scan updated.', 1800);
-    }
-  } catch (error) {
-    console.error(error);
-    status.textContent = 'Model scan unavailable';
-    if (userInitiated) showToast('Atmospheric river data could not be loaded.', 3200);
-  }
-}
-
-function setAtmosphericRiverVisibility() {
-  const visibility = state.arEnabled ? 'visible' : 'none';
-  for (const id of ['atmospheric-river-halo', 'atmospheric-river-points']) {
-    if (map.getLayer(id)) {
-      map.setLayoutProperty(id, 'visibility', visibility);
-    }
-  }
-}
-
-
-
-
-function verifyZodiacCompass() {
-  const requiredLayers = [
-    'zodiac-sign-lines',
-    'zodiac-nak-lines',
-    'zodiac-house-lines',
-    'zodiac-direction-lines',
-    'zodiac-labels',
-    'zodiac-planets'
-  ];
-
-  const missing = requiredLayers.filter(id => !map.getLayer(id));
-  const status = document.getElementById('zodiacStatus');
-
-  if (missing.length) {
-    console.error('Zodiac Compass missing layers:', missing);
-    if (status) status.textContent = 'Compass layer error';
-    showToast('Zodiac Compass did not initialize correctly.', 4000);
-    return false;
-  }
-
-  const signSource = map.getSource('zodiac-sign-lines');
-  const panel = document.getElementById('zodiacPanel');
-  if (panel) panel.classList.remove('hidden');
-
-  if (status && !status.textContent.includes('error')) {
-    status.textContent = 'VISIBLE · Sidereal · Lahiri · Great-circle';
-  }
-
-  return Boolean(signSource);
-}
-
-function setupDarkMapControls() {
-  const slider = document.getElementById('mapBrightness');
-
-  const dimmerData = {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[
-            [-179.999, -85],
-            [-0.001, -85],
-            [-0.001, 85],
-            [-179.999, 85],
-            [-179.999, -85]
-          ]]
-        }
-      },
-      {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[
-            [0.001, -85],
-            [179.999, -85],
-            [179.999, 85],
-            [0.001, 85],
-            [0.001, -85]
-          ]]
-        }
-      }
-    ]
-  };
-
-  if (!map.getSource('map-dimmer-source')) {
-    map.addSource('map-dimmer-source', {
-      type: 'geojson',
-      data: dimmerData
-    });
-  }
-
-  if (!map.getLayer('map-dimmer')) {
-    map.addLayer({
-      id: 'map-dimmer',
-      type: 'fill',
-      source: 'map-dimmer-source',
-      paint: {
-        'fill-color': '#000814',
-        'fill-opacity': 0.30
-      }
-    });
-  }
-
-  const apply = () => {
-    if (!slider || !map.getLayer('map-dimmer')) return;
-    const brightness = Number(slider.value) / 100;
-    const opacity = Math.max(0.08, Math.min(0.72, 0.88 - brightness));
-    map.setPaintProperty('map-dimmer', 'fill-opacity', opacity);
-  };
-
-  if (slider) {
-    slider.addEventListener('input', apply);
-    apply();
-  }
-
-  const master = document.getElementById('zodiacMasterBtn');
-  if (master) {
-    master.addEventListener('click', () => {
-      const toggle = document.getElementById('zodiacLayerToggle');
-      if (!toggle) return;
-      toggle.checked = !toggle.checked;
-      toggle.dispatchEvent(new Event('change'));
-      syncZodiacMasterButton();
-    });
-  }
-
-  const toggle = document.getElementById('zodiacLayerToggle');
-  if (toggle) {
-    toggle.addEventListener('change', syncZodiacMasterButton);
-  }
-}
-
-function syncZodiacMasterButton() {
-  const master = document.getElementById('zodiacMasterBtn');
-  const toggle = document.getElementById('zodiacLayerToggle');
-  if (!master || !toggle) return;
-  master.textContent = `Zodiac Compass: ${toggle.checked ? 'ON' : 'OFF'}`;
-  master.classList.toggle('on', toggle.checked);
-}
-
-function setupCollapsiblePanels() {
-  document.querySelectorAll('.collapse-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = btn.dataset.collapse;
-      const panel = document.getElementById(id) || btn.closest('.panel');
-      if (!panel) return;
-      const collapsed = panel.classList.toggle('collapsed');
-      btn.textContent = collapsed ? '+' : '−';
-      btn.setAttribute('aria-label', collapsed ? 'Expand' : 'Collapse');
-    });
-  });
-}
-
-function startAutoRefresh() {
-  stopAutoRefresh();
-  if (!state.autoRefresh) return;
-
-  state.timers.earthquakes = setInterval(async () => {
-    await refreshEarthquakes(true);
-  }, REFRESH.earthquakesMs);
-
-  state.timers.gdacs = setInterval(async () => {
-    await refreshGDACS(true);
-  }, REFRESH.gdacsMs);
-
-  updateAutoRefreshText();
-}
-
-function stopAutoRefresh() {
-  clearInterval(state.timers.earthquakes);
-  clearInterval(state.timers.gdacs);
-  state.timers.earthquakes = null;
-  state.timers.gdacs = null;
-}
-
-function updateAutoRefreshText() {
-  const text = document.getElementById('autoRefreshText');
-  text.textContent = state.autoRefresh
-    ? 'Earthquakes 1 min · Hazards 5 min'
-    : 'Paused';
-}
-
-function startRotation() {
-  state.rotating = true;
-  document.getElementById('rotateBtn').textContent =
-    state.globe ? 'Pause Earth rotation' : 'Pause flat-map scroll';
-  cancelAnimationFrame(state.rotationFrame);
-  globe3d?.setRotating(true);
-
-  if (state.globe) return;
-
-  let last = performance.now();
-  const SIDEREAL_DAY_MS = 86164.0905 * 1000;
-
-  const tick = (now) => {
-    if (!state.rotating || state.globe) return;
-    const elapsed = Math.min(250, Math.max(0, now - last));
-    last = now;
-    const speed = state.celestialRunning ? state.celestialSpeed : 1;
-    const degrees = elapsed * speed * 360 / SIDEREAL_DAY_MS;
-    if (degrees > 0) {
-      const c = map.getCenter();
-      map.setCenter([c.lng - degrees, c.lat]);
-    }
-    state.rotationFrame = requestAnimationFrame(tick);
-  };
-  state.rotationFrame = requestAnimationFrame(tick);
-}
-
-function stopRotation(updateButton = true) {
-  state.rotating = false;
-  globe3d?.setRotating(false);
-  cancelAnimationFrame(state.rotationFrame);
-  state.rotationFrame = null;
-  if (updateButton || document.getElementById('rotateBtn')) {
-    document.getElementById('rotateBtn').textContent =
-      state.globe ? 'Resume Earth rotation' : 'Resume flat-map scroll';
-  }
-}
-
-function setDays(days, syncSlider = true) {
-  state.days = days;
-  document.getElementById('timelineLabel').textContent =
-    `${days} day${days === 1 ? '' : 's'}`;
-  if (syncSlider) document.getElementById('timelineRange').value = days;
-
-  document.querySelectorAll('.timeline-presets button').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.days) === days);
-  });
-
-  updateCounts();
-  renderMarkers();
-  renderEventList();
-}
-
-async function loadAllData(manual = false) {
-  if (manual) showToast('Refreshing all live sources…');
-
-  const [eqResult, gdacsResult] = await Promise.allSettled([
-    refreshEarthquakes(false),
-    refreshGDACS(false)
-  ]);
-
-  if (eqResult.status === 'rejected') console.error(eqResult.reason);
-  if (gdacsResult.status === 'rejected') console.error(gdacsResult.reason);
-
-  updateCounts();
-  renderMarkers();
-  renderEventList();
-  updateOverallUpdatedTime();
-
-  if (manual) {
-    setTimeout(() => hideToast(), 900);
-  }
-}
-
-async function refreshEarthquakes(detectNew = true) {
-  setSourceStatus('earthquakes', 'loading');
-
-  try {
-    const incoming = await fetchUSGS();
-
-    if (detectNew && state.firstLoadComplete) {
-      detectNewEvents(
-        incoming.map(f => makeEventId('earthquakes', f.id))
-      );
-    }
-
-    state.earthquakeFeatures = incoming;
-    state.sourceUpdated.earthquakes = new Date();
-    setSourceStatus('earthquakes', 'ok');
-
-    if (detectNew) {
-      updateCounts();
-      renderMarkers();
-      renderEventList();
-      updateNewEventBanner();
-      updateOverallUpdatedTime();
-    }
-  } catch (error) {
-    setSourceStatus('earthquakes', 'error');
-    console.error(error);
-    throw error;
-  }
-}
-
-async function refreshGDACS(detectNew = true) {
-  setSourceStatus('gdacs', 'loading');
-
-  try {
-    const incoming = await fetchGDACS();
-
-    if (detectNew && state.firstLoadComplete) {
-      detectNewEvents(
-        incoming.map(e => makeEventId(e.type, e.id))
-      );
-    }
-
-    state.gdacsEvents = incoming;
-    state.sourceUpdated.gdacs = new Date();
-    setSourceStatus('gdacs', 'ok');
-
-    if (detectNew) {
-      updateCounts();
-      renderMarkers();
-      renderEventList();
-      updateNewEventBanner();
-      updateOverallUpdatedTime();
-    }
-  } catch (error) {
-    setSourceStatus('gdacs', 'error');
-    console.error(error);
-    throw error;
-  }
-}
-
-function captureKnownEvents() {
-  getVisibleEvents().forEach(event => {
-    state.knownEventIds.add(makeEventId(event.type, event.id));
-  });
-}
-
-function detectNewEvents(eventIds) {
-  let found = 0;
-
-  eventIds.forEach(id => {
-    if (!state.knownEventIds.has(id)) {
-      state.newEventIds.add(id);
-      found++;
-    }
-    state.knownEventIds.add(id);
-  });
-
-  if (found > 0) {
-    showToast(`${found} new live event${found === 1 ? '' : 's'} detected.`, 3200);
-  }
-}
-
-function updateNewEventBanner() {
-  const banner = document.getElementById('newEventBanner');
-  const countEl = document.getElementById('newEventCount');
-
-  if (state.newEventIds.size === 0) {
-    banner.classList.add('hidden');
-    return;
-  }
-
-  countEl.textContent =
-    `${state.newEventIds.size} new event${state.newEventIds.size === 1 ? '' : 's'}`;
-  banner.classList.remove('hidden');
-}
-
-function setSourceStatus(source, status) {
-  const dot = document.getElementById(source === 'earthquakes' ? 'usgsStatusDot' : 'gdacsStatusDot');
-  const text = document.getElementById(source === 'earthquakes' ? 'usgsUpdated' : 'gdacsUpdated');
-
-  dot.classList.remove('ok', 'error');
-
-  if (status === 'ok') {
-    dot.classList.add('ok');
-    text.textContent = `Updated ${timeOnly(state.sourceUpdated[source] || new Date())}`;
-  } else if (status === 'error') {
-    dot.classList.add('error');
-    text.textContent = 'Connection error';
-  } else {
-    text.textContent = 'Updating…';
-  }
-}
-
-function updateOverallUpdatedTime() {
-  const dates = Object.values(state.sourceUpdated).filter(Boolean);
-  if (!dates.length) return;
-  const latest = new Date(Math.max(...dates.map(d => d.getTime())));
-  document.getElementById('updatedAt').textContent =
-    `Latest ${timeOnly(latest)}`;
-}
-
-async function fetchUSGS() {
-  const url =
-    'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson';
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`USGS HTTP ${response.status}`);
-
-  const data = await response.json();
-  return (data.features || []).filter(f => {
-    const [lng, lat] = f.geometry?.coordinates || [];
-    return Number.isFinite(lng) && Number.isFinite(lat);
-  });
-}
-
-async function fetchGDACS() {
-  const response = await fetch(`/api/gdacs?ts=${Date.now()}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`GDACS proxy HTTP ${response.status}`);
-  const data = await response.json();
-  return normalizeGdacs(data);
-}
-
-function normalizeGdacs(data) {
-  let features = [];
-
-  if (Array.isArray(data?.features)) features = data.features;
-  else if (Array.isArray(data)) features = data;
-  else {
-    const candidateArrays = Object.values(data || {}).filter(Array.isArray);
-    const likely = candidateArrays.find(arr =>
-      arr.some(x => x?.geometry || x?.eventtype || x?.eventtypecode)
+const sceneEl = document.getElementById('scene');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020812);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 2000);
+camera.position.set(0, 35, 340);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x020812, 1);
+sceneEl.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 190;
+controls.maxDistance = 600;
+
+scene.add(new THREE.AmbientLight(0x91a4b8, 1.4));
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
+keyLight.position.set(180, 90, 160);
+scene.add(keyLight);
+
+const earthGroup = new THREE.Group();
+const celestialGroup = new THREE.Group();
+scene.add(earthGroup);
+scene.add(celestialGroup);
+
+const EARTH_R = 100;
+const BAND_R = 145;
+const BAND_TUBE = 4.4;
+
+const earth = new THREE.Mesh(
+  new THREE.SphereGeometry(EARTH_R, 96, 64),
+  new THREE.MeshPhongMaterial({
+    color: 0x163451,
+    shininess: 14,
+    specular: 0x24425c
+  })
+);
+earthGroup.add(earth);
+
+const grid = new THREE.LineSegments(
+  new THREE.WireframeGeometry(new THREE.SphereGeometry(EARTH_R * 1.002, 24, 16)),
+  new THREE.LineBasicMaterial({ color: 0x2e678d, transparent: true, opacity: 0.12 })
+);
+earthGroup.add(grid);
+
+const axisMat = new THREE.LineBasicMaterial({ color: 0x8fb8cf, transparent: true, opacity: 0.35 });
+earthGroup.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0,-132,0),
+    new THREE.Vector3(0,132,0)
+  ]),
+  axisMat
+));
+
+const bandGroup = new THREE.Group();
+const planetGroup = new THREE.Group();
+const angleGroup = new THREE.Group();
+celestialGroup.add(bandGroup, planetGroup, angleGroup);
+
+buildBand();
+
+function buildBand() {
+  bandGroup.clear();
+
+  for (let i = 0; i < 12; i++) {
+    const geom = new THREE.TorusGeometry(
+      BAND_R,
+      BAND_TUBE,
+      10,
+      64,
+      THREE.MathUtils.degToRad(30)
     );
-    if (likely) features = likely;
+
+    const mat = new THREE.MeshPhongMaterial({
+      color: SIGNS[i][2],
+      emissive: new THREE.Color(SIGNS[i][2]),
+      emissiveIntensity: 0.17,
+      transparent: true,
+      opacity: 0.86,
+      depthWrite: true
+    });
+
+    const seg = new THREE.Mesh(geom, mat);
+    seg.rotation.x = Math.PI / 2;
+    seg.rotation.z = OBLIQUITY;
+    seg.rotation.y = THREE.MathUtils.degToRad(i * 30);
+    bandGroup.add(seg);
+
+    const sprite = makeLabel(SIGNS[i][1], SIGNS[i][2], 58, '700');
+    sprite.position.copy(eclipticPoint(i * 30 + 15, BAND_R + 11));
+    sprite.scale.set(14, 7, 1);
+    bandGroup.add(sprite);
   }
+}
 
-  return features.map((item, index) => {
-    const p = item.properties || item;
-    const geometry = item.geometry || p.geometry || null;
-    let coords = geometry?.type === 'Point' ? geometry.coordinates : null;
+function eclipticPoint(lonDeg, radius) {
+  const a = THREE.MathUtils.degToRad(lonDeg);
+  const x = radius * Math.cos(a);
+  const z = radius * Math.sin(a);
+  const y = z * Math.sin(OBLIQUITY);
+  const z2 = z * Math.cos(OBLIQUITY);
+  return new THREE.Vector3(x, y, z2);
+}
 
-    if (!coords) {
-      const lng = numeric(p.longitude ?? p.lon ?? p.lng ?? p.x);
-      const lat = numeric(p.latitude ?? p.lat ?? p.y);
-      if (Number.isFinite(lng) && Number.isFinite(lat)) coords = [lng, lat];
-    }
+function makeLabel(text, color='#fff', size=38, weight='600') {
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.font = `${weight} ${size}px system-ui, Segoe UI Symbol, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,.95)';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = color;
+  ctx.fillText(text, canvas.width/2, canvas.height/2);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  return new THREE.Sprite(material);
+}
 
-    const type = String(
-      p.eventtype || p.eventtypecode || p.eventType || p.type || ''
-    ).toUpperCase().trim();
+function currentDate() {
+  if (state.playing) {
+    return new Date(state.epochAstro + (performance.now() - state.epochReal) * state.speed);
+  }
+  return new Date(Date.now() + state.offsetMs);
+}
 
-    if (!['TC','VO','FL','WF','DR'].includes(type) || !coords) return null;
+function refreshAstronomy() {
+  try {
+    if (!A) throw new Error('Astronomy Engine did not load.');
 
-    const dateValue =
-      p.fromdate || p.eventdate || p.date || p.datetime ||
-      p.startdate || p.created || null;
+    const date = currentDate();
+    const aya = lahiriAyanamsa(date);
+    const asc = normalize360(tropicalAscendant(date, 0, 0) - aya);
+    const dsc = normalize360(asc + 180);
+    const mc = normalize360(tropicalMidheaven(date, 0) - aya);
+    const ic = normalize360(mc + 180);
 
+    const placements = computePlanets(date, aya);
+
+    updatePlanets(placements);
+    updateAngles({ asc, dsc, mc, ic });
+    updateReadouts(date, asc, dsc, mc, ic, placements);
+
+    document.getElementById('statusText').textContent = 'Sidereal · Lahiri · 3D ecliptic';
+  } catch (err) {
+    console.error(err);
+    document.getElementById('statusText').textContent = 'Astronomy error';
+  }
+}
+
+function computePlanets(date, aya) {
+  return PLANETS.map(([name, bodyKey, glyph, color]) => {
+    const vec = A.GeoVector(A.Body[bodyKey], date, true);
+    const ecl = A.Ecliptic(vec);
     return {
-      id: p.eventid || p.eventId || p.id || `${type}-${index}`,
-      type,
-      title:
-        p.name || p.eventname || p.description ||
-        p.title || `${typeNames[type]} event`,
-      coords: [Number(coords[0]), Number(coords[1])],
-      date: dateValue ? new Date(dateValue) : new Date(),
-      alert: String(
-        p.alertlevel || p.alertLevel || p.alertscore || ''
-      ).toUpperCase(),
-      severity:
-        p.severity || p.severitytext || p.episodealertscore || '',
-      country: p.country || p.countryname || p.iso3 || '',
-      url: safeUrl(p.url || p.link || p.htmldescription || '')
+      name, glyph, color,
+      lon: normalize360(Number(ecl.elon) - aya)
     };
-  }).filter(Boolean);
+  });
 }
 
-function numeric(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : NaN;
+function updatePlanets(placements) {
+  planetGroup.clear();
+  if (!document.getElementById('showPlanets').checked) return;
+
+  placements.forEach((p, index) => {
+    const sprite = makeLabel(
+      `${p.glyph} ${degreeInSign(p.lon)}`,
+      p.color,
+      34,
+      '700'
+    );
+    sprite.position.copy(eclipticPoint(p.lon, BAND_R + 18 + (index % 2) * 7));
+    sprite.scale.set(24, 10, 1);
+    planetGroup.add(sprite);
+  });
 }
 
-function safeUrl(v) {
-  const text = String(v || '');
-  const match = text.match(/https?:\/\/[^\s"'<>]+/i);
-  return match ? match[0] : '';
+function updateAngles({asc,dsc,mc,ic}) {
+  angleGroup.clear();
+  if (!document.getElementById('showAngles').checked) return;
+
+  [
+    ['ASC',asc,'#a7f3d0'],
+    ['DSC',dsc,'#f9a8d4'],
+    ['MC',mc,'#fff3b0'],
+    ['IC',ic,'#c4b5fd']
+  ].forEach(([name, lon, color]) => {
+    const sprite = makeLabel(`${name} ${degreeInSign(lon)}`, color, 30, '800');
+    sprite.position.copy(eclipticPoint(lon, BAND_R - 15));
+    sprite.scale.set(24, 9, 1);
+    angleGroup.add(sprite);
+  });
 }
 
-function withinDays(date, days) {
-  const t = date instanceof Date ? date.getTime() : new Date(date).getTime();
-  if (!Number.isFinite(t)) return true;
-  return Date.now() - t <= days * 86400000;
+function updateReadouts(date, asc, dsc, mc, ic, placements) {
+  document.getElementById('ascText').textContent = fullZodiac(asc);
+  document.getElementById('dscText').textContent = fullZodiac(dsc);
+  document.getElementById('mcText').textContent = fullZodiac(mc);
+  document.getElementById('icText').textContent = fullZodiac(ic);
+  document.getElementById('timeText').textContent = date.toLocaleString();
+
+  document.getElementById('planetList').innerHTML = placements.map(p =>
+    `<div><span style="color:${p.color}">${p.glyph}</span><b>${p.name}</b><span>${fullZodiac(p.lon)}</span></div>`
+  ).join('');
 }
 
-function makeEventId(type, id) {
-  return `${type}:${id}`;
+function syncEarthToSiderealTime(date) {
+  const gmst = greenwichSiderealDegrees(date);
+  earthGroup.rotation.y = THREE.MathUtils.degToRad(90 - gmst);
 }
 
-function getVisibleEvents() {
-  const eq = state.earthquakeFeatures
-    .filter(f => withinDays(f.properties?.time, state.days))
-    .map(f => ({
-      id: f.id,
-      type: 'earthquakes',
-      title: f.properties?.title || f.properties?.place || 'Earthquake',
-      coords: [f.geometry.coordinates[0], f.geometry.coordinates[1]],
-      date: new Date(f.properties?.time),
-      alert: f.properties?.alert || '',
-      severity: Number.isFinite(f.properties?.mag)
-        ? `M ${Number(f.properties.mag).toFixed(1)}`
-        : '',
-      depth: f.geometry.coordinates[2],
-      mag: f.properties?.mag,
-      tsunami: f.properties?.tsunami,
-      url: f.properties?.url || ''
-    }));
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(100, Math.max(0, now - state.lastFrame));
+  state.lastFrame = now;
 
-  const gdacs = state.gdacsEvents.filter(e => withinDays(e.date, state.days));
+  if (state.rotateEarth) {
+    const speed = state.playing ? state.speed : 1;
+    earthGroup.rotation.y -= dt * speed * (Math.PI * 2 / SIDEREAL_DAY_MS);
+  }
 
-  return [...eq, ...gdacs].map(event => ({
-    ...event,
-    isNew: state.newEventIds.has(makeEventId(event.type, event.id))
-  }));
+  controls.update();
+  renderer.render(scene, camera);
+
+  if (state.playing) refreshAstronomyThrottled();
 }
 
-function renderMarkers() {
-  state.markers.forEach(m => m.remove());
-  state.markers = [];
+let lastAstroRefresh = 0;
+function refreshAstronomyThrottled() {
+  const now = performance.now();
+  if (now - lastAstroRefresh < 500) return;
+  lastAstroRefresh = now;
+  refreshAstronomy();
+}
 
-  const events = getVisibleEvents().filter(event =>
-    state.layerVisibility[event.type] !== false
+function resize() {
+  const w = Math.max(1, sceneEl.clientWidth);
+  const h = Math.max(1, sceneEl.clientHeight);
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function resetView() {
+  camera.position.set(0, 35, 340);
+  controls.target.set(0,0,0);
+  controls.update();
+}
+
+document.querySelectorAll('[data-minutes]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.playing = false;
+    document.getElementById('playBtn').textContent = '▶ Play';
+    state.offsetMs += Number(btn.dataset.minutes) * 60000;
+    syncEarthToSiderealTime(currentDate());
+    refreshAstronomy();
+  });
+});
+
+document.getElementById('nowBtn').addEventListener('click', () => {
+  state.playing = false;
+  state.offsetMs = 0;
+  document.getElementById('playBtn').textContent = '▶ Play';
+  syncEarthToSiderealTime(currentDate());
+  refreshAstronomy();
+});
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (!state.playing) {
+    state.epochAstro = currentDate().getTime();
+    state.epochReal = performance.now();
+    state.playing = true;
+    document.getElementById('playBtn').textContent = '⏸ Pause';
+  } else {
+    state.offsetMs = currentDate().getTime() - Date.now();
+    state.playing = false;
+    document.getElementById('playBtn').textContent = '▶ Play';
+  }
+});
+
+document.getElementById('speedSelect').addEventListener('change', e => {
+  const astroNow = currentDate().getTime();
+  state.speed = Math.max(1, Number(e.target.value) || 1);
+  if (state.playing) {
+    state.epochAstro = astroNow;
+    state.epochReal = performance.now();
+  }
+});
+
+document.getElementById('rotateEarth').addEventListener('change', e => {
+  state.rotateEarth = e.target.checked;
+});
+
+document.getElementById('showPlanets').addEventListener('change', refreshAstronomy);
+document.getElementById('showAngles').addEventListener('change', refreshAstronomy);
+document.getElementById('showSigns').addEventListener('change', e => {
+  bandGroup.visible = e.target.checked;
+});
+
+document.getElementById('resetViewBtn').addEventListener('click', resetView);
+
+window.addEventListener('resize', resize);
+
+function lahiriAyanamsa(date) {
+  const jd = date.getTime() / 86400000 + 2440587.5;
+  const T = (jd - 2451545.0) / 36525;
+  const arcsec =
+    85885.53 +
+    5028.796195 * T +
+    1.1054348 * T*T +
+    .00007964 * T*T*T;
+  return arcsec / 3600;
+}
+
+function julianDate(date) {
+  return date.getTime() / 86400000 + 2440587.5;
+}
+
+function localSiderealDegrees(date, lonDeg) {
+  const jd = julianDate(date);
+  const T = (jd - 2451545.0) / 36525;
+  return normalize360(
+    280.46061837 +
+    360.98564736629 * (jd - 2451545.0) +
+    .000387933 * T*T -
+    (T*T*T) / 38710000 +
+    lonDeg
   );
-
-  const maxMarkers = 650;
-  const prioritized = events
-    .sort((a,b) => eventPriority(b) - eventPriority(a))
-    .slice(0, maxMarkers);
-
-  globe3d?.setEvents(prioritized);
-
-  prioritized.forEach(event => {
-    const el = document.createElement('div');
-    const cls = event.type === 'earthquakes' ? 'eq' : event.type;
-
-    el.className =
-      `hazard-marker ${cls}${event.isNew ? ' new-event' : ''}`;
-    el.title = event.title;
-
-    const scale = markerScale(event);
-    el.style.transform = `scale(${scale})`;
-
-    el.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      acknowledgeEvent(event);
-      showEventDetail(event);
-    });
-
-    const marker = new maplibregl.Marker({
-      element: el,
-      anchor: 'center'
-    }).setLngLat(event.coords).addTo(map);
-
-    state.markers.push(marker);
-  });
 }
 
-function eventPriority(event) {
-  if (event.type === 'earthquakes') {
-    return (event.mag || 0) * 1000 + event.date.getTime() / 1e12;
-  }
-
-  const alert =
-    { RED: 3000, ORANGE: 2000, GREEN: 1000 }[event.alert] || 500;
-
-  return alert + event.date.getTime() / 1e12;
+function meanObliquity(T) {
+  return 23.43929111 -
+    (46.8150 * T + 0.00059 * T*T - 0.001813 * T*T*T) / 3600;
 }
 
-function markerScale(event) {
-  if (event.type === 'earthquakes') {
-    const m = Number(event.mag || 0);
-    return Math.max(.55, Math.min(1.65, .35 + m * .18));
-  }
-  if (event.alert === 'RED') return 1.45;
-  if (event.alert === 'ORANGE') return 1.2;
-  return 1;
+function tropicalMidheaven(date, lonDeg) {
+  const jd = julianDate(date);
+  const T = (jd - 2451545.0) / 36525;
+  const theta = THREE.MathUtils.degToRad(localSiderealDegrees(date, lonDeg));
+  const eps = THREE.MathUtils.degToRad(meanObliquity(T));
+  return normalize360(THREE.MathUtils.radToDeg(
+    Math.atan2(Math.sin(theta), Math.cos(theta) * Math.cos(eps))
+  ));
 }
 
-function renderEventList() {
-  const list = document.getElementById('eventsList');
-  let events = getVisibleEvents();
+function tropicalAscendant(date, latDeg, lonDeg) {
+  const jd = julianDate(date);
+  const T = (jd - 2451545.0) / 36525;
+  const theta = THREE.MathUtils.degToRad(localSiderealDegrees(date, lonDeg));
+  const phi = THREE.MathUtils.degToRad(latDeg);
+  const eps = THREE.MathUtils.degToRad(meanObliquity(T));
 
-  if (state.activeFilter === 'new') {
-    events = events.filter(e => e.isNew);
-    document.getElementById('eventListTitle').textContent = 'Newly detected events';
-  } else if (state.activeFilter !== 'all') {
-    events = events.filter(e => e.type === state.activeFilter);
-    document.getElementById('eventListTitle').textContent =
-      typeNames[state.activeFilter] || 'Filtered events';
-  } else {
-    document.getElementById('eventListTitle').textContent = 'Recent events';
-  }
-
-  events.sort((a,b) => eventPriority(b) - eventPriority(a));
-  events = events.slice(0, 80);
-
-  if (!events.length) {
-    list.innerHTML =
-      '<div class="loading-card">No events in this view.</div>';
-    return;
-  }
-
-  list.innerHTML = '';
-
-  events.forEach(event => {
-    const btn = document.createElement('button');
-    btn.className =
-      `event-card${event.isNew ? ' new-event' : ''}`;
-
-    btn.innerHTML = `
-      <div class="row">
-        <span class="type">
-          ${escapeHtml(typeNames[event.type] || event.type)}
-          ${event.isNew ? '<span class="new-badge">NEW</span>' : ''}
-        </span>
-        <span class="severity">
-          ${escapeHtml(event.severity || event.alert || '')}
-        </span>
-      </div>
-      <strong>${escapeHtml(event.title)}</strong>
-      <small>${escapeHtml(formatDate(event.date))}</small>
-    `;
-
-    btn.addEventListener('click', () => {
-      if (state.globe) {
-        globe3d?.focus(event.coords[1], event.coords[0], 2.2);
-      } else {
-        map.flyTo({
-          center: event.coords,
-          zoom: Math.max(map.getZoom(), 4.2),
-          duration: 1200
-        });
-      }
-      stopRotation();
-      acknowledgeEvent(event);
-      showEventDetail(event);
-    });
-
-    list.appendChild(btn);
-  });
+  return normalize360(
+    THREE.MathUtils.radToDeg(
+      Math.atan2(
+        -Math.cos(theta),
+        Math.sin(theta) * Math.cos(eps) + Math.tan(phi) * Math.sin(eps)
+      )
+    ) + 180
+  );
 }
 
-function acknowledgeEvent(event) {
-  const id = makeEventId(event.type, event.id);
-  state.newEventIds.delete(id);
-  updateNewEventBanner();
-  renderMarkers();
-  renderEventList();
+function greenwichSiderealDegrees(date) {
+  return localSiderealDegrees(date, 0);
 }
 
-function updateCounts() {
-  const events = getVisibleEvents();
-  const count = type => events.filter(e => e.type === type).length;
-
-  document.getElementById('eqCount').textContent = count('earthquakes');
-  document.getElementById('tcCount').textContent = count('TC');
-  document.getElementById('voCount').textContent = count('VO');
-  document.getElementById('flCount').textContent = count('FL');
+function normalize360(x) {
+  return ((x % 360) + 360) % 360;
 }
 
-function showEventDetail(event) {
-  const panel = document.getElementById('detailPanel');
-  const content = document.getElementById('detailContent');
-  const cells = [];
-
-  if (event.type === 'earthquakes') {
-    cells.push([
-      'Magnitude',
-      Number.isFinite(event.mag)
-        ? `M ${Number(event.mag).toFixed(1)}`
-        : 'Unknown'
-    ]);
-    cells.push([
-      'Depth',
-      Number.isFinite(Number(event.depth))
-        ? `${Number(event.depth).toFixed(1)} km`
-        : 'Unknown'
-    ]);
-    cells.push(['Tsunami flag', event.tsunami ? 'Yes' : 'No']);
-  } else {
-    cells.push(['Alert', event.alert || 'Not listed']);
-    if (event.country) cells.push(['Country / region', event.country]);
-    if (event.severity) cells.push(['Severity', String(event.severity)]);
-  }
-
-  cells.push(['Time / date', formatDate(event.date)]);
-  cells.push([
-    'Coordinates',
-    `${event.coords[1].toFixed(2)}, ${event.coords[0].toFixed(2)}`
-  ]);
-
-  content.innerHTML = `
-    <div class="eyebrow">
-      ${escapeHtml(typeNames[event.type] || event.type)}
-    </div>
-    <h2>${escapeHtml(event.title)}</h2>
-    <div class="detail-grid">
-      ${cells.map(([k,v]) =>
-        `<div class="detail-cell">
-          <small>${escapeHtml(k)}</small>
-          <strong>${escapeHtml(v)}</strong>
-        </div>`
-      ).join('')}
-    </div>
-    ${event.url
-      ? `<a class="detail-link"
-            href="${escapeAttr(event.url)}"
-            target="_blank"
-            rel="noopener">
-          Open official source ↗
-        </a>`
-      : ''}
-  `;
-
-  panel.classList.remove('hidden');
+function fullZodiac(lon) {
+  const x = normalize360(lon);
+  const i = Math.floor(x / 30);
+  const within = x - i * 30;
+  const d = Math.floor(within);
+  const m = Math.floor((within - d) * 60);
+  return `${SIGNS[i][1]} ${SIGNS[i][0]} ${d}°${String(m).padStart(2,'0')}′`;
 }
 
-async function showWeatherAt(lat, lng) {
-  stopRotation(false);
-  showToast('Loading weather for this point…');
-
-  try {
-    const params = new URLSearchParams({
-      latitude: lat.toFixed(4),
-      longitude: lng.toFixed(4),
-      current:
-        'temperature_2m,apparent_temperature,relative_humidity_2m,' +
-        'precipitation,weather_code,cloud_cover,pressure_msl,' +
-        'wind_speed_10m,wind_direction_10m,wind_gusts_10m',
-      daily:
-        'weather_code,temperature_2m_max,temperature_2m_min,' +
-        'precipitation_probability_max,wind_speed_10m_max',
-      forecast_days: '7',
-      timezone: 'auto',
-      temperature_unit: 'fahrenheit',
-      wind_speed_unit: 'mph',
-      precipitation_unit: 'inch'
-    });
-
-    const response = await fetch(
-      `https://api.open-meteo.com/v1/forecast?${params}`,
-      { cache: 'no-store' }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Weather HTTP ${response.status}`);
-    }
-
-    const w = await response.json();
-    const c = w.current || {};
-
-    const panel = document.getElementById('detailPanel');
-    document.getElementById('detailContent').innerHTML = `
-      <div class="eyebrow">WEATHER AT MAP POINT</div>
-      <h2>${lat.toFixed(2)}, ${lng.toFixed(2)}</h2>
-      <div class="detail-grid">
-        ${weatherCell('Temperature', valueUnit(c.temperature_2m, '°F'))}
-        ${weatherCell('Feels like', valueUnit(c.apparent_temperature, '°F'))}
-        ${weatherCell('Humidity', valueUnit(c.relative_humidity_2m, '%'))}
-        ${weatherCell('Wind', valueUnit(c.wind_speed_10m, ' mph'))}
-        ${weatherCell('Wind gusts', valueUnit(c.wind_gusts_10m, ' mph'))}
-        ${weatherCell('Pressure', valueUnit(c.pressure_msl, ' hPa'))}
-        ${weatherCell('Cloud cover', valueUnit(c.cloud_cover, '%'))}
-        ${weatherCell('Precipitation', valueUnit(c.precipitation, ' in'))}
-      </div>
-      <div style="margin-top:12px;color:#91a8bf;font-size:10px">
-        Click another place on the globe to inspect its current weather.
-      </div>
-    `;
-
-    panel.classList.remove('hidden');
-  } catch (err) {
-    console.error(err);
-    showToast('Weather data could not be loaded for this point.', 3200);
-  } finally {
-    setTimeout(hideToast, 800);
-  }
+function degreeInSign(lon) {
+  const x = normalize360(lon);
+  const within = x % 30;
+  return `${Math.floor(within)}°`;
 }
 
-function weatherCell(label, value) {
-  return `
-    <div class="detail-cell">
-      <small>${escapeHtml(label)}</small>
-      <strong>${escapeHtml(value)}</strong>
-    </div>
-  `;
-}
-
-function valueUnit(v, unit) {
-  return (v === null || v === undefined)
-    ? 'Unavailable'
-    : `${v}${unit}`;
-}
-
-async function searchPlace(query) {
-  showToast(`Searching for ${query}…`);
-
-  try {
-    const response = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?` +
-      `name=${encodeURIComponent(query)}&count=1&language=en&format=json`
-    );
-
-    const data = await response.json();
-    const place = data.results?.[0];
-
-    if (!place) throw new Error('No place found');
-
-    if (state.globe) {
-      globe3d?.focus(place.latitude, place.longitude, 2.15);
-    } else {
-      map.flyTo({
-        center: [place.longitude, place.latitude],
-        zoom: 5.2,
-        duration: 1500
-      });
-    }
-
-    stopRotation();
-    await showWeatherAt(place.latitude, place.longitude);
-  } catch (err) {
-    console.error(err);
-    showToast('No matching location was found.', 3000);
-  }
-}
-
-function formatDate(date) {
-  const d = date instanceof Date ? date : new Date(date);
-  if (!Number.isFinite(d.getTime())) return 'Date unavailable';
-
-  return d.toLocaleString([], {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-}
-
-function timeOnly(date) {
-  return new Date(date).toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-}
-
-let toastTimer;
-
-function showToast(message, duration = 2200) {
-  clearTimeout(toastTimer);
-  const toast = document.getElementById('statusToast');
-  toast.textContent = message;
-  toast.classList.remove('hidden');
-
-  if (duration) {
-    toastTimer = setTimeout(hideToast, duration);
-  }
-}
-
-function hideToast() {
-  document.getElementById('statusToast').classList.add('hidden');
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
-function escapeAttr(value) {
-  return escapeHtml(value).replaceAll('`', '&#096;');
-}
-
-
-async function loadSchumannResonance(manual=false){
-  const status=document.getElementById('schumannStatus');
-  const freq=document.getElementById('schumannFreq');
-  const score=document.getElementById('schumannScore');
-  const stations=document.getElementById('schumannStations');
-  const updated=document.getElementById('schumannUpdated');
-  if(!status) return;
-  status.textContent=manual?'Refreshing…':'Loading…';
-  try{
-    const r=await fetch('/api/schumann?ts='+Date.now(),{cache:'no-store'});
-    if(!r.ok) throw new Error('Schumann HTTP '+r.status);
-    const d=await r.json();
-    freq.textContent=(Number(d.fundamentalHz)||7.83).toFixed(2)+' Hz';
-    status.textContent=d.status||'Unavailable';
-    score.textContent=Number.isFinite(Number(d.score))?String(Number(d.score))+'/100':'—';
-    stations.textContent=d.observatories
-      ? 'Observatories: '+d.observatories.reporting+' / '+d.observatories.total+' reporting'
-      : (Number.isFinite(Number(d.tomskScore))?'Tomsk activity score: '+d.tomskScore:'Observatories: unavailable');
-    const t=d.sourceUpdatedAt||d.updatedAt;
-    updated.textContent=t?'Source time: '+formatDate(t):'Source time: unavailable';
-    if(manual) showToast('Schumann resonance status updated.',1800);
-  }catch(err){
-    console.error(err);
-    status.textContent='Unavailable';
-    score.textContent='—';
-    stations.textContent='Station status unavailable';
-    updated.textContent='Source time: unavailable';
-    if(manual) showToast('Schumann resonance source unavailable.',2800);
-  }
-}
+resize();
+resetView();
+syncEarthToSiderealTime(currentDate());
+refreshAstronomy();
+requestAnimationFrame(animate);
