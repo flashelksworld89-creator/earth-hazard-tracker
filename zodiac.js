@@ -532,6 +532,17 @@ export function initZodiacCompass(map, maplibregl) {
       updatePlanetList(localPlanets);
       updateUsRisingPanel(date,aya,placements);
 
+      window.dispatchEvent(new CustomEvent('zodiac-astro-state',{
+        detail:{
+          timestamp:date.getTime(),
+          ayanamsa:aya,
+          asc,dsc,mc,ic,
+          placements:localPlanets.map(p=>({
+            name:p.name,glyph:p.glyph,lon:p.lon,lat:p.lat,az:p.az,alt:p.alt
+          }))
+        }
+      }));
+
       window.dispatchEvent(new CustomEvent('zodiac-sim-time',{
         detail:{
           timestamp:date.getTime(),
@@ -980,6 +991,10 @@ export function initZodiacCompass(map, maplibregl) {
     setData(ids.globalBounds,signBounds);
     setData(ids.globalNak,nakBounds);
     setData(ids.globalLabels,labels);
+
+    window.dispatchEvent(new CustomEvent('zodiac-rising-zones',{
+      detail:{features:zoneFeatures}
+    }));
 
     const zoneVis=state.enabled && state.globalZones ? 'visible':'none';
     const nakVis=state.enabled && state.globalNak ? 'visible':'none';
