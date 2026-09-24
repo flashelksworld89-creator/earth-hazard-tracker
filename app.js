@@ -44,6 +44,7 @@ const state = {
   observer: { lat: 0, lng: 0 },
   lastFrame: performance.now(),
   currentAya: 0,
+  lastBandAya: null,
   currentObliquity: THREE.MathUtils.degToRad(23.4393),
   zoneCenters: Array(27).fill(null),
   lastSkinUpdate: 0,
@@ -189,12 +190,18 @@ function refreshAstronomy(forceSkin=false){
     const placements=computePlanets(date,aya);
     state.placements=placements;
 
-    buildEclipticBand();
+    if(state.lastBandAya===null || Math.abs(aya-state.lastBandAya)>.01){
+      buildEclipticBand();
+      state.lastBandAya=aya;
+    }
     updatePlanets(placements);
     updateAngles({asc,dsc,mc,ic});
     updateReadouts(date,asc,dsc,mc,ic,placements);
 
-    const skinDue=forceSkin || performance.now()-state.lastSkinUpdate>900;
+    const skinInterval = state.playing
+      ? (state.speed>=360 ? 350 : state.speed>=60 ? 550 : 900)
+      : 4000;
+    const skinDue=forceSkin || performance.now()-state.lastSkinUpdate>skinInterval;
     if(skinDue){
       updateNakshatraSkin(date,aya);
       state.lastSkinUpdate=performance.now();
