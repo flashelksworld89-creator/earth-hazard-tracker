@@ -51,6 +51,8 @@ const focusCtx = focusCanvas.getContext('2d');
 
 const state = {
   land: [],
+  land50: [],
+  admin1Boundaries: [],
   playing: false,
   speed: 1,
   offsetMs: 0,
@@ -482,13 +484,20 @@ function drawGrid(w,h,shiftDeg){
 }
 
 function drawLand(w,h,shiftDeg){
+  const useDetailed=state.zoom>=2 && state.land50.length;
+  const source=useDetailed?state.land50:state.land;
+
   ctx.save();
   ctx.fillStyle='#183c52';
   ctx.strokeStyle='rgba(135,201,229,.48)';
-  ctx.lineWidth=.8;
+  ctx.lineWidth=.8/Math.max(1,Math.sqrt(state.zoom));
 
-  for(const poly of state.land){
+  for(const poly of source){
     drawPolygon(poly,w,h,shiftDeg);
+  }
+
+  if(state.zoom>=2.2 && state.admin1Boundaries.length){
+    drawAdmin1Boundaries(w,h,shiftDeg);
   }
 
   ctx.restore();
@@ -524,6 +533,54 @@ function drawPolygon(rings,w,h,shiftDeg){
     ctx.fill('evenodd');
     ctx.stroke();
   }
+}
+
+function extractFeatureLines(features){
+  const out=[];
+  const addGeometry=geometry=>{
+    if(!geometry) return;
+    if(geometry.type==='Polygon'){
+      geometry.coordinates.forEach(ring=>out.push(ring));
+    }else if(geometry.type==='MultiPolygon'){
+      geometry.coordinates.forEach(poly=>poly.forEach(ring=>out.push(ring)));
+    }else if(geometry.type==='LineString'){
+      out.push(geometry.coordinates);
+    }else if(geometry.type==='MultiLineString'){
+      geometry.coordinates.forEach(line=>out.push(line));
+    }
+  };
+  features.forEach(f=>addGeometry(f.geometry));
+  return out;
+}
+
+function drawAdmin1Boundaries(w,h,shiftDeg){
+  ctx.save();
+  ctx.strokeStyle='rgba(176,207,222,.30)';
+  ctx.lineWidth=.65/Math.max(1,Math.sqrt(state.zoom));
+  ctx.setLineDash([2/state.zoom,2/state.zoom]);
+
+  for(const line of state.admin1Boundaries){
+    for(const copy of [-1,0,1]){
+      const dx=copy*w;
+      let started=false;
+      let lastX=null;
+      ctx.beginPath();
+
+      for(const coord of line){
+        const lng=normalize180(coord[0]+shiftDeg);
+        const x=lonToX(lng,w)+dx;
+        const y=latToY(coord[1],h);
+
+        if(lastX!==null && Math.abs(x-lastX)>w*.5) started=false;
+        if(!started){ctx.moveTo(x,y);started=true;}
+        else ctx.lineTo(x,y);
+        lastX=x;
+      }
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
 }
 
 function drawDayNight(w,h,earthShiftDeg){
@@ -898,15 +955,18 @@ function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
 }
 
 function drawFieldLabel(text,color,x,y,size){
+  const visualScale=Math.max(1,Math.sqrt(state.zoom));
+  const localSize=(size+2)/visualScale;
+
   ctx.save();
-  ctx.font=`900 ${size+2}px system-ui,Segoe UI Symbol,sans-serif`;
+  ctx.font=`900 ${localSize}px system-ui,Segoe UI Symbol,sans-serif`;
   ctx.textAlign='center';
   ctx.textBaseline='middle';
   ctx.lineJoin='round';
-  ctx.lineWidth=Math.max(2.5,(size+2)*.22);
+  ctx.lineWidth=Math.max(2.2/visualScale,localSize*.20);
   ctx.strokeStyle='rgba(0,0,0,.92)';
   ctx.shadowColor='rgba(0,0,0,.98)';
-  ctx.shadowBlur=8;
+  ctx.shadowBlur=7/visualScale;
   ctx.strokeText(text,x,y);
   ctx.fillStyle=color;
   ctx.fillText(text,x,y);
@@ -990,9 +1050,10 @@ function applyObserver(lat,lng){
 async function loadPoliticalLabels(){
   const status=document.getElementById('statusText');
   try{
-    const [countriesRes,admin1Res]=await Promise.all([
+    const [countriesRes,admin1Res,land50Res]=await Promise.all([
       fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_countries.geojson',{cache:'force-cache'}),
-      fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_admin_1_states_provinces.geojson',{cache:'force-cache'})
+      fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_admin_1_states_provinces.geojson',{cache:'force-cache'}),
+      fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@ca96624a/geojson/ne_50m_land.geojson',{cache:'force-cache'})
     ]);
 
     if(!countriesRes.ok) throw new Error('Country labels HTTP '+countriesRes.status);
@@ -1004,22 +1065,30 @@ async function loadPoliticalLabels(){
 
     if(admin1Res.ok){
       const admin1=await admin1Res.json();
-      state.admin1Labels=(admin1.features||[])
-        .filter(f=>{
-          const p=f.properties||{};
-          const code=String(
-            p.adm0_a3||p.ADM0_A3||p.sov_a3||p.SOV_A3||p.gu_a3||p.GU_A3||''
-          ).toUpperCase();
-          const admin=String(p.admin||p.ADMIN||p.geonunit||p.GEONUNIT||'').toLowerCase();
-          return code==='USA'||code==='CAN'||admin==='united states of america'||admin==='canada';
-        })
+      const usaCan=(admin1.features||[]).filter(f=>{
+        const p=f.properties||{};
+        const code=String(
+          p.adm0_a3||p.ADM0_A3||p.sov_a3||p.SOV_A3||p.gu_a3||p.GU_A3||''
+        ).toUpperCase();
+        const admin=String(p.admin||p.ADMIN||p.geonunit||p.GEONUNIT||'').toLowerCase();
+        return code==='USA'||code==='CAN'||admin==='united states of america'||admin==='canada';
+      });
+
+      state.admin1Labels=usaCan
         .map(f=>featureLabelPoint(f,'admin1'))
         .filter(Boolean);
+
+      state.admin1Boundaries=extractFeatureLines(usaCan);
+    }
+
+    if(land50Res.ok){
+      const land50=await land50Res.json();
+      state.land50=extractPolygons(land50);
     }
 
     state.labelsReady=true;
     status.textContent=
-      `World loaded · Lahiri sidereal · ${state.countryLabels.length} countries · ${state.admin1Labels.length} states/provinces`;
+      `World loaded · Lahiri sidereal · detailed coastlines · ${state.admin1Labels.length} states/provinces`;
     draw();
   }catch(err){
     console.error('Political labels failed:',err);
@@ -1086,21 +1155,27 @@ function geometryCenter(geometry){
 function drawPoliticalLabels(w,h,earthShiftDeg){
   if(!state.labelsReady) return;
 
+  const countryRankLimit=
+    state.zoom<1.8?4:
+    state.zoom<3.2?5:
+    state.zoom<5?6:9;
+
   const drawLabel=(item,isAdmin1)=>{
     const xBase=lonToX(item.lon+earthShiftDeg,w);
     const y=latToY(item.lat,h);
-    const fontSize=isAdmin1
+    const baseSize=isAdmin1
       ? Math.max(7,Math.min(9,w/170))
       : Math.max(8,Math.min(11,w/125));
+    const fontSize=baseSize/Math.max(1,Math.sqrt(state.zoom));
 
     ctx.save();
-    ctx.globalAlpha=isAdmin1?.46:.58;
+    ctx.globalAlpha=isAdmin1?.42:.54;
     ctx.font=`${isAdmin1?'500':'600'} ${fontSize}px system-ui,sans-serif`;
     ctx.textAlign='center';
     ctx.textBaseline='middle';
-    ctx.fillStyle=isAdmin1?'rgba(196,214,224,.72)':'rgba(214,229,238,.80)';
+    ctx.fillStyle=isAdmin1?'rgba(196,214,224,.68)':'rgba(214,229,238,.76)';
     ctx.shadowColor='rgba(0,0,0,.68)';
-    ctx.shadowBlur=2;
+    ctx.shadowBlur=2/Math.max(1,Math.sqrt(state.zoom));
 
     for(const x of wrappedXs(xBase,w)){
       ctx.fillText(item.name,x,y);
@@ -1108,13 +1183,12 @@ function drawPoliticalLabels(w,h,earthShiftDeg){
     ctx.restore();
   };
 
-  // Larger countries first; tiny labels are suppressed at world scale.
   state.countryLabels
-    .filter(item=>item.rank<=5)
+    .filter(item=>item.rank<=countryRankLimit)
     .sort((a,b)=>a.rank-b.rank)
     .forEach(item=>drawLabel(item,false));
 
-  if(w>=760){
+  if(state.zoom>=2 && w>=620){
     state.admin1Labels.forEach(item=>drawLabel(item,true));
   }
 }
