@@ -165,11 +165,22 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         </div>
         <div class="collapsible-body">
 
-        <div class="zodiac-readout">
-          <div><small>ASC</small><strong id="zAsc">—</strong></div>
-          <div><small>DSC</small><strong id="zDsc">—</strong></div>
-          <div><small>Ayanamsa</small><strong id="zAya">—</strong></div>
+        <div class="zodiac-readout zodiac-angle-readout">
+          <div><small>ASC · EAST</small><strong id="zAsc">—</strong></div>
+          <div><small>DSC · WEST</small><strong id="zDsc">—</strong></div>
+          <div><small>MC · TOP</small><strong id="zMc">—</strong></div>
+          <div><small>IC · BOTTOM</small><strong id="zIc">—</strong></div>
+          <div class="z-aya-cell"><small>Lahiri ayanamsa</small><strong id="zAya">—</strong></div>
         </div>
+
+        <label class="z-row z-orientation-row">
+          <span>Compass orientation</span>
+          <select id="zOrientation">
+            <option value="traditional" selected>Traditional · MC ↑ ASC →</option>
+            <option value="geographic">Geographic · N ↑ E →</option>
+          </select>
+        </label>
+        <div id="zOrientationNote" class="z-orientation-note">Chart view: MC top, IC bottom, ASC east/right, DSC west/left. Geographic N/E/S/W remain on the outer ring.</div>
 
         <div class="zodiac-time">
           <button data-ztime="-1440">−1D</button>
@@ -229,8 +240,15 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
           </select>
         </label>
 
+        <div class="z-display-grid">
+          <label><span>Houses</span><input id="zShowHouses" type="checkbox" checked /></label>
+          <label><span>Nakshatras</span><input id="zShowNak" type="checkbox" checked /></label>
+          <label><span>Aspects</span><input id="zShowAspects" type="checkbox" checked /></label>
+          <label><span>Planet names</span><input id="zPlanetLabels" type="checkbox" checked /></label>
+        </div>
+
         <label class="z-row">
-          <span>Opacity</span>
+          <span>Compass opacity</span>
           <input id="zOpacity" type="range" min="15" max="100" value="72" />
         </label>
 
@@ -253,15 +271,21 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
           </select>
         </label>
 
+        <div class="z-ring-guide">
+          <div><b>OUTER</b><span>Geographic N · NE · E · SE · S · SW · W · NW</span></div>
+          <div><b>MIDDLE</b><span>MC · IC · ASC · DSC · 12 Porphyry house cusps</span></div>
+          <div><b>INNER</b><span>Sidereal zodiac · nakshatras · planets · aspects</span></div>
+        </div>
+
         <div class="zodiac-key">
           <span><i class="zkey sign"></i>Signs</span>
           <span><i class="zkey nak"></i>Nakshatras</span>
-          <span><i class="zkey house"></i>Houses</span>
-          <span><i class="zkey direction"></i>Directions</span>
+          <span><i class="zkey house"></i>Houses / angles</span>
+          <span><i class="zkey direction"></i>True directions</span>
         </div>
 
         <div id="zPlanetList" class="z-planet-list"></div>
-        <div class="z-disclaimer">Global rising zones use each location's true eastern horizon, local sidereal time, latitude and Earth's obliquity. Planet glyphs keep geocentric sidereal longitude while local rays use observer azimuth/altitude.</div>
+        <div class="z-disclaimer">Traditional view rotates the chart for readability; it does not redefine the astronomy. ASC/DSC still come from the true local eastern/western horizon, MC/IC from the local meridian, and the outer N/E/S/W ring remains geographic. Houses use the Porphyry quadrant system.</div>
         </div>
       </section>
 
