@@ -76,7 +76,7 @@ export function initZodiacCompass(map, maplibregl) {
     orientation:'ecliptic',
     showHouses:true,
     showNak:true,
-    showAspects:true,
+    showAspects:false,
     planetLabels:true,
     shiftHint:false,
     globalZones:true,
@@ -422,9 +422,9 @@ export function initZodiacCompass(map, maplibregl) {
     if (!map.getLayer(ids.globalBounds)) map.addLayer({
       id:ids.globalBounds,type:'line',source:ids.globalBounds,
       paint:{
-        'line-color':['case',['==',['get','active'],true],'#d8f6ff','#6f8496'],
-        'line-width':['case',['==',['get','active'],true],1.8,.8],
-        'line-opacity':['case',['==',['get','active'],true],.58,.24],
+        'line-color':'#d8f6ff',
+        'line-width':['case',['==',['get','focused'],true],1.8,0],
+        'line-opacity':['case',['==',['get','focused'],true],.58,0],
         'line-blur':0
       }
     });
@@ -570,6 +570,10 @@ export function initZodiacCompass(map, maplibregl) {
     if(map.getLayer(ids.globalZones)){
       map.setLayoutProperty(ids.globalZones,'visibility',
         state.enabled && state.globalZones ? 'visible':'none');
+    }
+    if(map.getLayer(ids.globalLabels)){
+      map.setLayoutProperty(ids.globalLabels,'visibility',
+        state.enabled && state.globalSign!=='' ? 'visible':'none');
     }
     if(map.getLayer(ids.globalNak)){
       map.setLayoutProperty(ids.globalNak,'visibility',
@@ -829,7 +833,11 @@ export function initZodiacCompass(map, maplibregl) {
       segments.forEach(seg=>{
         signBounds.push({
           type:'Feature',
-          properties:{signIndex:i,active:selected===null || selected===i},
+          properties:{
+            signIndex:i,
+            active:selected===null || selected===i,
+            focused:selected!==null && selected===i
+          },
           geometry:{type:'LineString',coordinates:seg}
         });
       });
@@ -867,7 +875,8 @@ export function initZodiacCompass(map, maplibregl) {
     const nakVis=state.enabled && state.globalNak ? 'visible':'none';
     if(map.getLayer(ids.globalZones)) map.setLayoutProperty(ids.globalZones,'visibility',zoneVis);
     if(map.getLayer(ids.globalBounds)) map.setLayoutProperty(ids.globalBounds,'visibility',state.enabled?'visible':'none');
-    if(map.getLayer(ids.globalLabels)) map.setLayoutProperty(ids.globalLabels,'visibility',state.enabled?'visible':'none');
+    if(map.getLayer(ids.globalLabels)) map.setLayoutProperty(ids.globalLabels,'visibility',
+      state.enabled && state.globalSign!=='' ? 'visible':'none');
     if(map.getLayer(ids.globalNak)) map.setLayoutProperty(ids.globalNak,'visibility',nakVis);
   }
 
