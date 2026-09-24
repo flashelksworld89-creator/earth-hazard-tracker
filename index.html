@@ -4,7 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#06111f" />
-  <title>Earth Hazard Tracker</title>
+  <title>Earth Hazard Tracker · Live Global Hazards, Weather & Sidereal Patterns</title>
+  <meta name="description" content="Track earthquakes, cyclones, volcanoes, floods, wildfires, atmospheric rivers, live weather, global rising signs and experimental hazard patterns on an interactive world map." />
+  <meta property="og:title" content="Earth Hazard Tracker" />
+  <meta property="og:description" content="Live global hazards, weather intelligence, sidereal rising zones and experimental pattern analysis in one interactive world map." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.0/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="/styles.css" />
@@ -22,7 +27,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         <div class="planet-mark">◎</div>
         <div>
           <h1>Earth Hazard Tracker</h1>
-          <p>Global weather & natural hazards</p>
+          <p>Live hazards · weather intelligence · sidereal patterns</p>
         </div>
       </div>
 
@@ -260,10 +265,10 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         </div>
       </section>
 
-      <section id="usRisingPanel" class="panel us-rising-panel">
+      <section id="usRisingPanel" class="panel us-rising-panel collapsed">
         <div class="us-rising-head collapsible-head">
           <div><strong>U.S. RISING SIGNS</strong><span id="usRisingTime">Sidereal · Lahiri</span></div>
-          <div class="head-actions"><button class="collapse-btn" data-collapse="us-rising-panel" aria-label="Collapse">−</button></div>
+          <div class="head-actions"><button class="collapse-btn" data-collapse="us-rising-panel" aria-label="Collapse">+</button></div>
         </div>
         <div class="collapsible-body">
           <div class="us-rising-note">Representative locations · exact local eastern horizon</div>
@@ -277,13 +282,13 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         </div>
       </section>
 
-      <section id="arControlPanel" class="panel ar-control-panel">
+      <section id="arControlPanel" class="panel ar-control-panel collapsed">
         <div class="ar-control-head collapsible-head">
           <div>
             <strong>ATMOSPHERIC RIVERS</strong>
             <span id="arStatus">Loading model scan…</span>
           </div>
-          <div class="head-actions"><button id="arRefreshBtn" class="text-btn">Refresh</button><button class="collapse-btn" data-collapse="ar-control-panel" aria-label="Collapse">−</button></div>
+          <div class="head-actions"><button id="arRefreshBtn" class="text-btn">Refresh</button><button class="collapse-btn" data-collapse="ar-control-panel" aria-label="Collapse">+</button></div>
         </div>
         <div class="collapsible-body">
         <div class="ar-time-buttons">
@@ -305,7 +310,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
         </div>
       </section>
 
-      <section id="schumannPanel" class="panel schumann-panel">
+      <section id="schumannPanel" class="panel schumann-panel collapsed">
         <div class="schumann-head collapsible-head">
           <div>
             <strong>SCHUMANN RESONANCE</strong>
@@ -313,7 +318,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
           </div>
           <div class="head-actions">
             <button id="schumannRefreshBtn" class="text-btn">Refresh</button>
-            <button class="collapse-btn" data-collapse="schumann-panel" aria-label="Collapse">−</button>
+            <button class="collapse-btn" data-collapse="schumann-panel" aria-label="Collapse">+</button>
           </div>
         </div>
         <div class="collapsible-body">
