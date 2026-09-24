@@ -320,3 +320,54 @@ button:hover,select:hover{border-color:rgba(103,232,249,.5)}
 @media(max-width:520px){
   .location-grid{grid-template-columns:1fr}
 }
+
+.focus-box{
+  margin-top:10px;
+  padding:9px;
+  border:1px solid rgba(103,232,249,.12);
+  border-radius:10px;
+  background:rgba(1,9,17,.34);
+}
+.focus-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+}
+.focus-head strong{
+  font-size:10px;
+  letter-spacing:.07em;
+}
+.focus-head button{
+  padding:5px 8px;
+  font-size:9px;
+}
+.focus-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+.focus-grid label{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  color:#9fb8ca;
+  font-size:9px;
+}
+.focus-grid select{
+  width:100%;
+  min-width:0;
+}
+.focus-summary{
+  margin-top:7px;
+  padding:6px 7px;
+  border-radius:7px;
+  background:rgba(4,18,30,.72);
+  color:#ccecff;
+  font-size:9px;
+  line-height:1.35;
+}
+@media(max-width:520px){
+  .focus-grid{grid-template-columns:1fr}
+}
