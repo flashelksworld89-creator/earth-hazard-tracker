@@ -1377,7 +1377,7 @@ function updateLocationReading(lat,lon,date){
   const influences=locationInfluences(asc,nakIndex);
   const angles=localAngles(date,lat,lon,aya);
   const houses=buildWholeSignHouses(asc);
-  const coreForecast=buildCoreLocationForecast(houses,asc,nakIndex,date);
+  const lordReport=buildRisingLordReport(houses,asc,nakIndex,date);
 
   document.getElementById('inspectCoords').textContent=
     `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`;
@@ -1406,8 +1406,8 @@ function updateLocationReading(lat,lon,date){
     </div>`;
   }).join('');
 
-  renderNewsCorrelatedForecast(coreForecast,null);
-  updateNewsCorrelation(lat,lon,date,coreForecast);
+  renderRisingLordReport(lordReport,null);
+  updateRisingLordNewsCorrelation(lat,lon,date,lordReport);
 
   const influenceEl=document.getElementById('inspectInfluences');
   influenceEl.innerHTML=influences.length
@@ -1421,82 +1421,164 @@ function updateLocationReading(lat,lon,date){
     `Current planets occupy ${occupied||'no listed houses'} in the local whole-sign chart.`;
 }
 
-function renderNewsCorrelatedForecast(forecast,correlation){
+function renderRisingLordReport(report,correlation){
   const container=document.getElementById('inspectCoreForecast');
   if(!container) return;
 
-  container.innerHTML=forecast.map(item=>{
-    const matches=correlation?.byHouse?.get(item.house)||[];
-    const observed=correlation
-      ? matches.length
-        ? `<div class="observed-events">
-            <b>Observed examples</b>
-            ${matches.slice(0,3).map(m=>`
-              <a class="observed-story" href="${escapeAttr(m.article.url)}" target="_blank" rel="noopener noreferrer">
-                <span>${escapeHtml(m.article.title)}</span>
-                <small>${escapeHtml(m.matchWhy)} · ${formatStoryTime(m.article.publishedAt)}</small>
-              </a>`).join('')}
-          </div>`
-        : `<div class="observed-events empty"><b>Observed examples</b><span>No strong match found in the fetched area headlines.</span></div>`
-      : `<div class="observed-events loading"><b>Observed examples</b><span>Checking current area news…</span></div>`;
+  const observed=correlation
+    ? correlation.matches.length
+      ? `<div class="observed-events">
+          <b>Observed examples for this rising-lord pattern</b>
+          ${correlation.matches.slice(0,5).map(m=>`
+            <a class="observed-story" href="${escapeAttr(m.article.url)}" target="_blank" rel="noopener noreferrer">
+              <span>${escapeHtml(m.article.title)}</span>
+              <small>${escapeHtml(m.matchWhy)} · ${formatStoryTime(m.article.publishedAt)}</small>
+            </a>`).join('')}
+        </div>`
+      : `<div class="observed-events empty"><b>Observed examples</b><span>No strong headline match found for this rising-lord signature.</span></div>`
+    : `<div class="observed-events loading"><b>Observed examples</b><span>Checking current area news for this rising-lord signature…</span></div>`;
 
-    return `
-      <article class="forecast-card">
-        <div class="forecast-card-head">
-          <span class="forecast-house">H${item.house}</span>
-          <div>
-            <b>${escapeHtml(item.title)}</b>
-            <small>${escapeHtml(item.signText)} · lord ${escapeHtml(item.lord)}</small>
-          </div>
-          <span class="forecast-balance ${escapeAttr(item.tone)}">${escapeHtml(item.balanceText)}</span>
+  container.innerHTML=`
+    <article class="forecast-card lord-report-card">
+      <div class="forecast-card-head">
+        <span class="forecast-house">${escapeHtml(report.lordGlyph)}</span>
+        <div>
+          <b>${escapeHtml(report.risingSign)} rising · ${escapeHtml(report.lordName)} report</b>
+          <small>${escapeHtml(report.lordPosition)}</small>
         </div>
-        <p>${escapeHtml(item.message)}</p>
-        <div class="forecast-reasons">${item.reasons.map(r=>`<span class="${escapeAttr(r.kind)}">${escapeHtml(r.text)}</span>`).join('')}</div>
-        ${observed}
-      </article>`;
-  }).join('');
+        <span class="forecast-balance ${escapeAttr(report.tone.key)}">${escapeHtml(report.tone.label)} · ${report.score>=0?'+':''}${report.score.toFixed(1)}</span>
+      </div>
+      <p class="lord-summary">${escapeHtml(report.summary)}</p>
+      <div class="aspect-report-list">
+        ${report.interpretations.map(item=>`
+          <section class="aspect-report-item ${escapeAttr(item.kind)}">
+            <b>${escapeHtml(item.heading)}</b>
+            <p>${escapeHtml(item.text)}</p>
+            <small>${escapeHtml(item.evidence)}</small>
+          </section>`).join('')}
+      </div>
+      ${report.learnedText?`<div class="learning-note"><b>Pattern memory</b><span>${escapeHtml(report.learnedText)}</span></div>`:''}
+      ${observed}
+    </article>`;
 }
 
-async function updateNewsCorrelation(lat,lon,date,forecast){
+async function updateRisingLordNewsCorrelation(lat,lon,date,report){
   const status=document.getElementById('inspectNewsStatus');
   if(!status) return;
 
   const area=resolvePoliticalArea(lat,lon);
   if(!area){
     status.textContent='Area could not be resolved for news comparison';
-    renderNewsCorrelatedForecast(forecast,{byHouse:new Map()});
+    renderRisingLordReport(report,{matches:[]});
     return;
   }
 
   const ageDays=Math.abs(Date.now()-date.getTime())/86400000;
   if(ageDays>7){
     status.textContent=`${area.label} · current-news comparison unavailable more than 7 days from now`;
-    renderNewsCorrelatedForecast(forecast,{byHouse:new Map()});
+    renderRisingLordReport(report,{matches:[]});
     return;
   }
 
   const seq=++state.newsSeq;
-  status.textContent=`${area.label} · checking current headlines…`;
+  status.textContent=`${area.label} · checking headlines against ${report.lordName} pattern…`;
 
   try{
     const articles=await fetchAreaNews(area.query);
     if(seq!==state.newsSeq) return;
 
-    const correlation=correlateNewsToForecast(articles,forecast,date);
-    renderNewsCorrelatedForecast(forecast,correlation);
+    const correlation=correlateNewsToRisingLord(articles,report,date);
+    rememberRisingLordMatches(report,correlation.matches);
+    report.learnedText=describeLearnedPattern(report.signature);
+    renderRisingLordReport(report,correlation);
 
-    const matched=new Set();
-    for(const arr of correlation.byHouse.values()){
-      arr.forEach(x=>matched.add(x.article.id||x.article.url));
-    }
     status.textContent=
-      `${area.label} · ${matched.size} matching example${matched.size===1?'':'s'} from ${articles.length} current headline${articles.length===1?'':'s'}`;
+      `${area.label} · ${correlation.matches.length} rising-lord match${correlation.matches.length===1?'':'es'} from ${articles.length} current headlines`;
   }catch(err){
-    console.error('Area news correlation failed:',err);
+    console.error('Rising-lord news correlation failed:',err);
     if(seq!==state.newsSeq) return;
     status.textContent=`${area.label} · live news unavailable`;
-    renderNewsCorrelatedForecast(forecast,{byHouse:new Map()});
+    renderRisingLordReport(report,{matches:[]});
   }
+}
+
+function correlateNewsToRisingLord(articles,report,chartDate){
+  const maxWindowMs=96*3600000;
+  const matches=[];
+
+  for(const article of articles){
+    const published=new Date(article.publishedAt).getTime();
+    if(Number.isFinite(published) && Math.abs(published-chartDate.getTime())>maxWindowMs) continue;
+
+    const classified=classifyNewsEvent(article);
+    let score=0;
+    const reasons=[];
+
+    for(const signal of report.signalPlanets){
+      const hit=classified.planetScores.find(x=>x.name===signal);
+      if(hit){
+        score+=hit.score;
+        reasons.push(signal);
+      }
+    }
+
+    for(const h of report.signalHouses){
+      const hs=classified.houseScores.get(h)||0;
+      if(hs>0){
+        score+=hs*.7;
+        reasons.push('H'+h);
+      }
+    }
+
+    if(score>=1.8){
+      matches.push({
+        article,
+        score,
+        matchWhy:`${report.lordName} signature → ${[...new Set(reasons)].slice(0,4).join(' + ')}`
+      });
+    }
+  }
+
+  matches.sort((a,b)=>b.score-a.score);
+  return {matches};
+}
+
+function rememberRisingLordMatches(report,matches){
+  if(!matches.length) return;
+  try{
+    const raw=localStorage.getItem('risingLordPatternMemory');
+    const memory=raw?JSON.parse(raw):{};
+    const row=memory[report.signature]||{count:0,terms:{}};
+    row.count+=matches.length;
+
+    for(const m of matches.slice(0,5)){
+      const c=classifyNewsEvent(m.article);
+      for(const p of c.planetScores.slice(0,4)){
+        row.terms[p.name]=(row.terms[p.name]||0)+1;
+      }
+      for(const [house,val] of c.houseScores){
+        if(val>0) row.terms['H'+house]=(row.terms['H'+house]||0)+1;
+      }
+    }
+
+    memory[report.signature]=row;
+    const entries=Object.entries(memory)
+      .sort((a,b)=>(b[1].count||0)-(a[1].count||0))
+      .slice(0,120);
+    localStorage.setItem('risingLordPatternMemory',JSON.stringify(Object.fromEntries(entries)));
+  }catch{}
+}
+
+function describeLearnedPattern(signature){
+  try{
+    const raw=localStorage.getItem('risingLordPatternMemory');
+    if(!raw) return '';
+    const row=JSON.parse(raw)[signature];
+    if(!row||row.count<2) return '';
+    const top=Object.entries(row.terms||{}).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    if(!top.length) return '';
+    return `Across ${row.count} saved headline matches for this aspect signature, recurring themes include ${top.map(([k,v])=>k+' ('+v+')').join(', ')}. This is pattern memory, not proof of causation.`;
+  }catch{return ''}
 }
 
 async function fetchAreaNews(areaQuery){
@@ -1729,190 +1811,214 @@ function buildWholeSignHouses(asc){
   });
 }
 
-function buildCoreLocationForecast(houses,asc,nakIndex,date){
-  const sectors=[
-    {house:1,title:'Self / Immediate Experience'},
-    {house:3,title:'Local Travel / Communication'},
-    {house:7,title:'Other People / Encounters'},
-    {house:9,title:'Long Distance / Guidance'}
-  ];
-  const ascLord=houses[0].lord;
+function buildRisingLordReport(houses,asc,nakIndex,date){
+  const ascSign=Math.floor(normalize360(asc)/30);
+  const lordName=SIGN_LORDS[ascSign];
+  const lord=findPlacement(lordName);
+  const interpretations=[];
+  const signalPlanets=new Set([lordName]);
+  const signalHouses=new Set([1]);
+  let score=0;
 
-  return sectors.map(sector=>{
-    const house=houses[sector.house-1];
-    const evidence=[];
-    let score=0;
-
-    const add=(text,value=0,kind='neutral')=>{
-      evidence.push({text,value,kind});
-      score+=value;
-    };
-
-    // 1) Occupants of the target house.
-    for(const p of house.planets.filter(p=>CLASSICAL_GRAHAS.has(p.name))){
-      const nature=planetNatureScore(p.name);
-      add(
-        `${p.glyph} ${p.name} occupies H${sector.house}`,
-        nature,
-        nature>0?'positive':nature<0?'negative':'neutral'
-      );
-      const dignity=planetDignity(p);
-      if(dignity.score){
-        add(`${p.name}: ${dignity.label}`,dignity.score,dignity.score>0?'positive':'negative');
-      }
-      if(isGandanta(p.lon)){
-        add(`${p.name} is in the strict gandanta zone`,-0.5,'caution');
-      }
-    }
-
-    // 2) House lord condition.
-    const lordPlanet=findPlacement(house.lord);
-    const lordHouse=lordPlanet?planetHouseNumber(lordPlanet.lon,houses):null;
-    if(lordPlanet){
-      add(`${house.lord}, H${sector.house} lord, is in H${lordHouse}`,housePlacementScore(lordHouse),housePlacementScore(lordHouse)>=0?'positive':'negative');
-
-      const dignity=planetDignity(lordPlanet);
-      add(`${house.lord}: ${dignity.label}`,dignity.score,dignity.score>0?'positive':dignity.score<0?'negative':'neutral');
-
-      if(isCombust(lordPlanet)){
-        add(`${house.lord} is within its combustion threshold of the Sun`,-1.25,'negative');
-      }
-
-      if(isPlanetRetrograde(lordPlanet.name,date)){
-        add(`${house.lord} is retrograde: stronger internal/revisional emphasis`,0,'caution');
-      }
-
-      if(isGandanta(lordPlanet.lon)){
-        add(`${house.lord} is in strict gandanta`,-0.75,'caution');
-      }
-
-      for(const c of closeConjunctions(lordPlanet,8)){
-        const cScore=planetNatureScore(c.planet.name)*conjunctionStrength(c.diff);
-        add(
-          `${house.lord} conjunct ${c.planet.name} · ${c.diff.toFixed(1)}°`,
-          cScore,
-          cScore>0?'positive':cScore<0?'negative':'neutral'
-        );
-      }
-    }
-
-    // 3) Full Jyotish graha aspects to the target house.
-    for(const aspect of fullAspectsToHouse(sector.house,houses)){
-      const val=planetNatureScore(aspect.planet.name)*0.8;
-      add(
-        `${aspect.planet.name} casts its ${aspect.aspectName} full aspect to H${sector.house}`,
-        val,
-        val>0?'positive':val<0?'negative':'neutral'
-      );
-    }
-
-    // 4) Relationship between target lord and Ascendant lord.
-    if(house.lord!==ascLord && lordPlanet){
-      const ascLordPlanet=findPlacement(ascLord);
-      if(ascLordPlanet){
-        const relation=compoundPlanetaryRelationship(house.lord,ascLord,lordPlanet,ascLordPlanet);
-        add(
-          `H${sector.house} lord ${house.lord} is ${relation.label} with ASC lord ${ascLord}`,
-          relation.score*0.55,
-          relation.score>0?'positive':relation.score<0?'negative':'neutral'
-        );
-      }
-    }
-
-    // 5) Bhavat-bhavam: same house counted from itself.
-    const bb=bhavatBhavamHouse(sector.house);
-    if(bb!==sector.house){
-      const bbHouse=houses[bb-1];
-      const bbLord=findPlacement(bbHouse.lord);
-      let bbScore=0;
-      if(bbLord) bbScore+=planetDignity(bbLord).score*0.3;
-      bbScore+=bbHouse.planets
-        .filter(p=>CLASSICAL_GRAHAS.has(p.name))
-        .reduce((sum,p)=>sum+planetNatureScore(p.name)*0.25,0);
-      add(
-        `Bhavat-bhavam reinforcement: H${bb} (${SIGNS[bbHouse.sign][0]})`,
-        bbScore,
-        bbScore>0?'positive':bbScore<0?'negative':'neutral'
-      );
-    }
-
-    // 6) Rahu/Ketu axis and dispositors.
-    for(const nodeName of ['Rahu','Ketu']){
-      const node=findPlacement(nodeName);
-      if(!node) continue;
-      const nodeHouse=planetHouseNumber(node.lon,houses);
-      if(nodeHouse===sector.house){
-        add(`${nodeName} occupies H${sector.house}`,-1.4,'negative');
-        const disp=dispositorOf(node);
-        if(disp){
-          const dd=planetDignity(disp);
-          add(`${nodeName} dispositor ${disp.name}: ${dd.label}`,dd.score*0.5,dd.score>0?'positive':dd.score<0?'negative':'neutral');
-        }
-      }else if(fullAspectOffsets(nodeName).includes((sector.house-nodeHouse+12)%12)){
-        add(`${nodeName} casts the configured 7th-house aspect to H${sector.house}`,-0.75,'caution');
-      }
-    }
-
-    // 7) Moon context.
-    const moon=findPlacement('Moon');
-    if(moon){
-      const moonHouse=planetHouseNumber(moon.lon,houses);
-      const moonNak=Math.min(26,Math.floor(normalize360(moon.lon)/NAK_SIZE));
-      if(moonHouse===sector.house){
-        add(`Moon activates H${sector.house} from ${NAKSHATRAS[moonNak]}`,0.6,'positive');
-      }else{
-        add(`Moon is in H${moonHouse} · ${NAKSHATRAS[moonNak]}`,0,'neutral');
-      }
-    }
-
-    // 8) Extra Ascendant sensitivity for H1.
-    if(sector.house===1){
-      if(isGandanta(asc)) add('Local Ascendant is in strict gandanta',-0.75,'caution');
-      for(const p of (state.astro?.placements||[])){
-        if(!CLASSICAL_GRAHAS.has(p.name)) continue;
-        const diff=Math.abs(normalize180(normalize360(p.lon)-asc));
-        if(diff<=6){
-          const val=planetNatureScore(p.name)*conjunctionStrength(diff);
-          add(`${p.name} within ${diff.toFixed(1)}° of the local ASC`,val,val>0?'positive':val<0?'negative':'neutral');
-        }
-      }
-    }
-
-    const tone=forecastTone(score);
+  if(!lord){
     return {
-      house:sector.house,
-      title:sector.title,
-      signText:`${SIGNS[house.sign][1]} ${SIGNS[house.sign][0]}`,
-      lord:house.lord,
-      score,
-      tone:tone.key,
-      balanceText:`${tone.label} · ${score>=0?'+':''}${score.toFixed(1)}`,
-      message:advancedForecastMessage(sector.house,tone,house,lordHouse,nakIndex,evidence),
-      reasons:evidence
-        .sort((a,b)=>Math.abs(b.value)-Math.abs(a.value))
-        .slice(0,9)
+      risingSign:SIGNS[ascSign][0],lordName,lordGlyph:'',lordPosition:'Unavailable',
+      score:0,tone:forecastTone(0),summary:'The rising-sign lord could not be calculated.',
+      interpretations:[],signature:lordName+'-missing',signalPlanets:[],signalHouses:[1],learnedText:''
     };
+  }
+
+  const lordHouse=planetHouseNumber(lord.lon,houses);
+  const lordSign=Math.floor(normalize360(lord.lon)/30);
+  const lordNak=Math.min(26,Math.floor(normalize360(lord.lon)/NAK_SIZE));
+  const dignity=planetDignity(lord);
+  score+=dignity.score+housePlacementScore(lordHouse);
+  signalHouses.add(lordHouse);
+
+  interpretations.push({
+    kind:dignity.score>0?'positive':dignity.score<0?'negative':'neutral',
+    heading:`${lordName} sets the local storyline`,
+    text:interpretLordPlacement(lordName,lordHouse,lordSign,dignity,date),
+    evidence:`${lordName} in H${lordHouse} · ${SIGNS[lordSign][0]} · ${NAKSHATRAS[lordNak]} · ${dignity.label}`
   });
+
+  const incoming=aspectsToPlanet(lord,houses);
+  const outgoing=aspectsFromPlanet(lord,houses);
+
+  for(const a of incoming){
+    signalPlanets.add(a.planet.name);
+    signalHouses.add(a.fromHouse);
+    const val=planetNatureScore(a.planet.name)*.9;
+    score+=val;
+    interpretations.push({
+      kind:val>0?'positive':val<0?'negative':'caution',
+      heading:`${a.planet.name} → ${lordName}`,
+      text:interpretPlanetToLordAspect(a.planet.name,lordName,a.aspectNumber,lordHouse),
+      evidence:`${a.planet.name} in H${a.fromHouse} casts its ${ordinal(a.aspectNumber)} aspect to the house containing ${lordName}`
+    });
+  }
+
+  for(const a of outgoing){
+    signalHouses.add(a.targetHouse);
+    const val=planetNatureScore(lordName)*.35;
+    score+=val;
+    interpretations.push({
+      kind:val>0?'positive':val<0?'negative':'neutral',
+      heading:`${lordName} → H${a.targetHouse}`,
+      text:interpretLordOutgoingAspect(lordName,a.targetHouse,a.aspectNumber,houses[a.targetHouse-1]),
+      evidence:`${lordName} casts its ${ordinal(a.aspectNumber)} aspect from H${lordHouse} to H${a.targetHouse}`
+    });
+  }
+
+  for(const c of closeConjunctions(lord,8)){
+    signalPlanets.add(c.planet.name);
+    const val=planetNatureScore(c.planet.name)*conjunctionStrength(c.diff);
+    score+=val;
+    interpretations.push({
+      kind:val>0?'positive':val<0?'negative':'caution',
+      heading:`${lordName} conjunct ${c.planet.name}`,
+      text:interpretConjunctionWithLord(lordName,c.planet.name,c.diff,lordHouse),
+      evidence:`${c.diff.toFixed(1)}° separation in H${lordHouse}`
+    });
+  }
+
+  if(isCombust(lord)){
+    score-=1.25;
+    interpretations.push({
+      kind:'negative',
+      heading:`${lordName} combust`,
+      text:`${lordName}'s agenda can become harder to express cleanly because its functions are closely merged with solar authority, visibility, urgency, or ego demands. Events may center on being seen, approved, directed, or overpowered.`,
+      evidence:'Within configured combustion threshold of the Sun'
+    });
+    signalPlanets.add('Sun');
+  }
+
+  if(isPlanetRetrograde(lordName,date)){
+    interpretations.push({
+      kind:'caution',
+      heading:`${lordName} retrograde`,
+      text:`The rising lord is operating in a revisional mode. Matters ruled by ${lordName} may repeat, return, require correction, or develop through reconsideration rather than a straight line.`,
+      evidence:'Geocentric longitude decreases across the surrounding 12-hour check'
+    });
+  }
+
+  if(isGandanta(lord.lon)){
+    score-=.75;
+    interpretations.push({
+      kind:'caution',
+      heading:`${lordName} in gandanta`,
+      text:`The rising lord sits in a water-to-fire transition zone, so the local storyline can feel transitional: endings and beginnings may overlap, with incomplete conditions forcing a change of state.`,
+      evidence:'Strict ±0°48′ gandanta zone'
+    });
+  }
+
+  const signature=[
+    lordName,
+    'H'+lordHouse,
+    ...incoming.map(a=>a.planet.name+'>'+lordName+':'+a.aspectNumber),
+    ...outgoing.map(a=>lordName+'>H'+a.targetHouse+':'+a.aspectNumber),
+    ...closeConjunctions(lord,8).map(c=>lordName+'+'+c.planet.name)
+  ].sort().join('|');
+
+  const tone=forecastTone(score);
+  const learnedText=describeLearnedPattern(signature);
+  const summary=composeRisingLordSummary(lordName,lordHouse,lordSign,tone,incoming,outgoing,interpretations,nakIndex);
+
+  return {
+    risingSign:SIGNS[ascSign][0],
+    lordName,
+    lordGlyph:lord.glyph||'',
+    lordPosition:`${fullZodiac(lord.lon)} · H${lordHouse} · ${NAKSHATRAS[lordNak]}`,
+    score,tone,summary,interpretations,
+    signature,
+    signalPlanets:[...signalPlanets],
+    signalHouses:[...signalHouses],
+    learnedText
+  };
 }
 
-function advancedForecastMessage(houseNumber,tone,house,lordHouse,nakIndex,evidence){
-  const sign=SIGNS[house.sign][0];
-  const lordText=lordHouse?`${house.lord} carries this topic into H${lordHouse}`:`${house.lord} rules this topic`;
-  const sector={
-    1:'immediate experience, initiative and how you meet the environment',
-    3:'short travel, messages, neighbors and local movement',
-    7:'meetings, agreements and direct encounters with other people',
-    9:'long-distance travel, teachers, belief, study and broader direction'
-  }[houseNumber];
+function aspectsToPlanet(target,houses){
+  const targetHouse=planetHouseNumber(target.lon,houses);
+  const out=[];
+  for(const p of (state.astro?.placements||[])){
+    if(p===target||!CLASSICAL_GRAHAS.has(p.name)) continue;
+    const fromHouse=planetHouseNumber(p.lon,houses);
+    if(!fromHouse) continue;
+    const offset=(targetHouse-fromHouse+12)%12;
+    if(fullAspectOffsets(p.name).includes(offset)){
+      out.push({planet:p,fromHouse,targetHouse,aspectNumber:offset+1});
+    }
+  }
+  return out;
+}
 
-  const strongest=evidence
-    .filter(e=>Math.abs(e.value)>=0.7)
-    .slice(0,2)
-    .map(e=>e.text);
+function aspectsFromPlanet(planet,houses){
+  const fromHouse=planetHouseNumber(planet.lon,houses);
+  return fullAspectOffsets(planet.name).map(offset=>({
+    targetHouse:((fromHouse-1+offset)%12)+1,
+    aspectNumber:offset+1
+  }));
+}
 
-  const why=strongest.length?` Strongest factors: ${strongest.join('; ')}.`:'';
-  return `${sign} governs ${sector}; ${lordText}. The evidence balance is ${tone.description}. `+
-    `The local Ascendant remains rooted in ${NAKSHATRAS[nakIndex]}.${why}`;
+function interpretLordPlacement(lordName,house,sign,dignity,date){
+  const houseThemes={
+    1:'identity, visibility, body, initiative and immediate conditions',
+    2:'money, resources, speech, food and stored value',
+    3:'short travel, communication, neighbors, courage and local movement',
+    4:'home, land, shelter, emotional security and private conditions',
+    5:'creativity, recreation, children, learning and speculation',
+    6:'workload, service, health routines, disputes and obstacles',
+    7:'other people, contracts, meetings, partners and open opposition',
+    8:'disruption, hidden matters, vulnerability, shared resources and transformation',
+    9:'long travel, teachers, law, belief, higher learning and guidance',
+    10:'career, government, public action, reputation and responsibility',
+    11:'gains, networks, income, alliances and large groups',
+    12:'expense, withdrawal, foreign settings, isolation and release'
+  };
+  const dignityText=dignity.score>0?'has structural support':dignity.score<0?'is under strain':'is operating without a strong dignity advantage';
+  return `Because ${lordName} rules the current Ascendant, its condition describes the main local storyline. In H${house}, attention concentrates on ${houseThemes[house]}. In ${SIGNS[sign][0]}, ${lordName} ${dignityText}. Predictions should therefore begin with how ${lordName}'s agenda is expressed through these H${house} topics rather than treating every house equally.`;
+}
+
+function interpretPlanetToLordAspect(source,lord,aspectNumber,lordHouse){
+  const effects={
+    Sun:'authority, visibility, leadership, government, status or ego pressure',
+    Moon:'public mood, movement, care, family needs, housing or emotional response',
+    Mars:'speed, conflict, heat, machinery, accidents, competition or decisive action',
+    Mercury:'messages, traffic, trade, paperwork, technology, negotiation or information',
+    Jupiter:'expansion, law, education, advice, institutions, opportunity or excess',
+    Venus:'agreements, money, comfort, arts, attraction, social cooperation or pleasure',
+    Saturn:'delay, duty, infrastructure, labor, restriction, endurance or institutional pressure',
+    Rahu:'amplification, novelty, foreign influence, technology, controversy or irregular behavior',
+    Ketu:'separation, shutdown, technical focus, simplification, detachment or abrupt disengagement'
+  };
+  const tone=planetNatureScore(source)>0?'supports and enlarges':planetNatureScore(source)<0?'pressurizes and complicates':'modifies';
+  return `${source}'s ${ordinal(aspectNumber)} aspect ${tone} the rising lord's agenda through ${effects[source]||'its natural significations'}. Because it lands on the house containing ${lord}, those themes become part of the main event stream rather than a secondary background influence.`;
+}
+
+function interpretLordOutgoingAspect(lord,targetHouse,aspectNumber,target){
+  const topics={
+    1:'self and immediate conditions',2:'money and speech',3:'local travel and communications',
+    4:'home and property',5:'creativity, children and recreation',6:'work, health and disputes',
+    7:'meetings, contracts and other people',8:'disruption and shared resources',
+    9:'long travel, law and guidance',10:'career, government and public action',
+    11:'gains, networks and income',12:'expense, withdrawal and foreign settings'
+  };
+  return `The rising lord actively projects its agenda into H${targetHouse}, bringing ${lord}'s style into ${topics[targetHouse]}. This is a likely destination for events: developments centered on ${topics[targetHouse]} can become a visible expression of the current rising-sign lord.`;
+}
+
+function interpretConjunctionWithLord(lord,other,diff,house){
+  const closeness=diff<=1?'very tightly':diff<=3?'tightly':diff<=6?'moderately':'loosely';
+  return `${other} is ${closeness} joined to the rising lord in H${house}, so their significations operate as one combined event mechanism. Interpretations should blend ${lord}'s local agenda with ${other}'s concrete themes instead of reading either planet separately.`;
+}
+
+function composeRisingLordSummary(lordName,lordHouse,lordSign,tone,incoming,outgoing,items,nakIndex){
+  const incomingText=incoming.length
+    ? `It receives full aspects from ${incoming.map(a=>a.planet.name).join(', ')}.`
+    : 'It receives no configured full classical graha aspects.';
+  const outgoingText=outgoing.length
+    ? `It projects full aspects toward H${outgoing.map(a=>a.targetHouse).join(', H')}.`
+    : 'It has no additional configured full-aspect destinations beyond conjunctions.';
+  return `${lordName}, ruler of the current rising sign, is the sole anchor of this report. It is in ${SIGNS[lordSign][0]} and H${lordHouse}. ${incomingText} ${outgoingText} The combined pattern is ${tone.description}. The Ascendant remains in ${NAKSHATRAS[nakIndex]}, providing the local nakshatra context.`;
 }
 
 function forecastTone(score){
