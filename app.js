@@ -27,6 +27,7 @@ const state = {
   epochReal: performance.now(),
   epochAstro: Date.now(),
   rotateEarth: true,
+  observer: { lat: 0, lng: 0 },
   lastFrame: performance.now()
 };
 
@@ -88,6 +89,20 @@ earthGroup.add(new THREE.Line(
   ]),
   axisMat
 ));
+
+const observerGroup = new THREE.Group();
+earthGroup.add(observerGroup);
+
+const observerMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(2.7, 18, 18),
+  new THREE.MeshBasicMaterial({ color: 0xffffff })
+);
+const observerHalo = new THREE.Mesh(
+  new THREE.RingGeometry(4.4, 6.5, 40),
+  new THREE.MeshBasicMaterial({ color: 0x67e8f9, side: THREE.DoubleSide, transparent: true, opacity: 0.8 })
+);
+observerGroup.add(observerMarker);
+observerGroup.add(observerHalo);
 
 const bandGroup = new THREE.Group();
 const planetGroup = new THREE.Group();
@@ -171,9 +186,10 @@ function refreshAstronomy() {
 
     const date = currentDate();
     const aya = lahiriAyanamsa(date);
-    const asc = normalize360(tropicalAscendant(date, 0, 0) - aya);
+    const { lat, lng } = state.observer;
+    const asc = normalize360(tropicalAscendant(date, lat, lng) - aya);
     const dsc = normalize360(asc + 180);
-    const mc = normalize360(tropicalMidheaven(date, 0) - aya);
+    const mc = normalize360(tropicalMidheaven(date, lng) - aya);
     const ic = normalize360(mc + 180);
 
     const placements = computePlanets(date, aya);
@@ -182,7 +198,8 @@ function refreshAstronomy() {
     updateAngles({ asc, dsc, mc, ic });
     updateReadouts(date, asc, dsc, mc, ic, placements);
 
-    document.getElementById('statusText').textContent = 'Sidereal · Lahiri · 3D ecliptic';
+    document.getElementById('statusText').textContent =
+      `Sidereal · Lahiri · Observer ${state.observer.lat.toFixed(2)}°, ${state.observer.lng.toFixed(2)}°`;
   } catch (err) {
     console.error(err);
     document.getElementById('statusText').textContent = 'Astronomy error';
@@ -244,6 +261,38 @@ function updateReadouts(date, asc, dsc, mc, ic, placements) {
   document.getElementById('planetList').innerHTML = placements.map(p =>
     `<div><span style="color:${p.color}">${p.glyph}</span><b>${p.name}</b><span>${fullZodiac(p.lon)}</span></div>`
   ).join('');
+}
+
+function updateObserverMarker() {
+  const { lat, lng } = state.observer;
+  const phi = THREE.MathUtils.degToRad(90 - lat);
+  const theta = THREE.MathUtils.degToRad(lng + 90);
+  const r = EARTH_R * 1.035;
+
+  const x = r * Math.sin(phi) * Math.cos(theta);
+  const y = r * Math.cos(phi);
+  const z = r * Math.sin(phi) * Math.sin(theta);
+
+  observerGroup.position.set(x, y, z);
+  observerGroup.lookAt(0,0,0);
+  observerGroup.rotateY(Math.PI);
+}
+
+function applyObserver(lat, lng) {
+  const nextLat = Math.max(-89.9, Math.min(89.9, Number(lat)));
+  let nextLng = Number(lng);
+  if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) return false;
+  nextLng = ((nextLng + 180) % 360 + 360) % 360 - 180;
+
+  state.observer = { lat: nextLat, lng: nextLng };
+  document.getElementById('latitudeInput').value = nextLat.toFixed(4);
+  document.getElementById('longitudeInput').value = nextLng.toFixed(4);
+  document.getElementById('observerStatus').textContent =
+    `${nextLat.toFixed(4)}°, ${nextLng.toFixed(4)}°`;
+
+  updateObserverMarker();
+  refreshAstronomy();
+  return true;
 }
 
 function syncEarthToSiderealTime(date) {
@@ -339,6 +388,33 @@ document.getElementById('showSigns').addEventListener('change', e => {
   bandGroup.visible = e.target.checked;
 });
 
+document.getElementById('applyLocationBtn').addEventListener('click', () => {
+  const lat = document.getElementById('latitudeInput').value;
+  const lng = document.getElementById('longitudeInput').value;
+  applyObserver(lat, lng);
+});
+
+document.getElementById('useLocationBtn').addEventListener('click', () => {
+  const status = document.getElementById('observerStatus');
+  if (!navigator.geolocation) {
+    status.textContent = 'Geolocation unavailable';
+    return;
+  }
+  status.textContent = 'Requesting location…';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      applyObserver(pos.coords.latitude, pos.coords.longitude);
+      status.textContent =
+        `${state.observer.lat.toFixed(4)}°, ${state.observer.lng.toFixed(4)}°`;
+    },
+    err => {
+      console.error(err);
+      status.textContent = 'Location permission denied';
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  );
+});
+
 document.getElementById('resetViewBtn').addEventListener('click', resetView);
 
 window.addEventListener('resize', resize);
@@ -428,5 +504,6 @@ function degreeInSign(lon) {
 resize();
 resetView();
 syncEarthToSiderealTime(currentDate());
+updateObserverMarker();
 refreshAstronomy();
 requestAnimationFrame(animate);
