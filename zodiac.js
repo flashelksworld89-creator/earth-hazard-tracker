@@ -59,33 +59,12 @@ const DIRS = [
 ];
 
 const US_RISING_SITES = [
-  {key:'East',label:'East Coast',city:'New York City',lat:40.7128,lng:-74.0060},
-  {key:'Mid',label:'Midwest',city:'Chicago',lat:41.8781,lng:-87.6298},
-  {key:'West',label:'West Coast',city:'Los Angeles',lat:34.0522,lng:-118.2437}
+  {key:'East',label:'Eastern Time',city:'New York City',lat:40.7128,lng:-74.0060},
+  {key:'Mid',label:'Central Time',city:'Chicago',lat:41.8781,lng:-87.6298},
+  {key:'Mountain',label:'Mountain Time',city:'Denver',lat:39.7392,lng:-104.9903},
+  {key:'West',label:'Pacific Time',city:'Los Angeles',lat:34.0522,lng:-118.2437}
 ];
 
-const US_PISCES_REFERENCE_SITES = [
-  {city:'Seattle',lat:47.6062,lng:-122.3321},
-  {city:'Portland',lat:45.5152,lng:-122.6784},
-  {city:'San Francisco',lat:37.7749,lng:-122.4194},
-  {city:'Los Angeles',lat:34.0522,lng:-118.2437},
-  {city:'Las Vegas',lat:36.1699,lng:-115.1398},
-  {city:'Phoenix',lat:33.4484,lng:-112.0740},
-  {city:'Salt Lake City',lat:40.7608,lng:-111.8910},
-  {city:'Denver',lat:39.7392,lng:-104.9903},
-  {city:'Albuquerque',lat:35.0844,lng:-106.6504},
-  {city:'Dallas',lat:32.7767,lng:-96.7970},
-  {city:'Houston',lat:29.7604,lng:-95.3698},
-  {city:'Minneapolis',lat:44.9778,lng:-93.2650},
-  {city:'Chicago',lat:41.8781,lng:-87.6298},
-  {city:'St. Louis',lat:38.6270,lng:-90.1994},
-  {city:'New Orleans',lat:29.9511,lng:-90.0715},
-  {city:'Atlanta',lat:33.7490,lng:-84.3880},
-  {city:'Miami',lat:25.7617,lng:-80.1918},
-  {city:'Washington DC',lat:38.9072,lng:-77.0369},
-  {city:'New York City',lat:40.7128,lng:-74.0060},
-  {city:'Boston',lat:42.3601,lng:-71.0589}
-];
 
 export function initZodiacCompass(map, maplibregl) {
   const state = {
@@ -866,26 +845,6 @@ export function initZodiacCompass(map, maplibregl) {
       if(ascEl) ascEl.textContent=fullZodiacDegree(asc);
       if(moonEl) moonEl.textContent=moonText;
     });
-    const piscesSites=US_PISCES_REFERENCE_SITES.map(site=>{
-      const asc=normalize360(tropicalAscendant(date,site.lat,site.lng)-aya);
-      return {...site,asc};
-    }).filter(site=>Math.floor(site.asc/30)===11);
-
-    const areaEl=document.getElementById('usPiscesArea');
-    const degreeEl=document.getElementById('usPiscesDegree');
-    const moonEl=document.getElementById('usPiscesMoon');
-    if(areaEl){
-      areaEl.textContent=piscesSites.length
-        ? piscesSites.map(site=>site.city).join(' · ')
-        : 'No listed U.S. reference city currently has Pisces rising';
-    }
-    if(degreeEl){
-      if(piscesSites.length){
-        const within=piscesSites.map(site=>site.asc-330);
-        degreeEl.textContent=Math.min(...within).toFixed(1)+'°–'+Math.max(...within).toFixed(1)+'° Pisces';
-      } else degreeEl.textContent='—';
-    }
-    if(moonEl) moonEl.textContent=moonText;
 
     const timeEl=document.getElementById('usRisingTime');
     if(timeEl) timeEl.textContent='Sidereal · Lahiri · '+date.toLocaleString([],{
