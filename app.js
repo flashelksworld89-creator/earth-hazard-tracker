@@ -430,12 +430,12 @@ function refreshAstronomy(){
       try{
         const body=A.Body?.[bodyKey];
         if(body===undefined || body===null) throw new Error('Body not available: '+bodyKey);
-        const vec=A.GeoVector(body,date,true);
+        const vec=A.GeoVector(body,date,false);
         const ecl=A.Ecliptic(vec);
         const lon=Number(ecl?.elon);
         if(!Number.isFinite(lon)) throw new Error('Invalid longitude for '+name);
         const dec=Math.atan2(Number(vec.z),Math.hypot(Number(vec.x),Number(vec.y)))*180/Math.PI;
-        placements.push({name,glyph,color,lon:normalize360(lon-aya),dec:Number.isFinite(dec)?dec:0});
+        placements.push({name,glyph,color,lon:normalize360(lon-aya),dec:Number.isFinite(dec)?dec:0,source:'geocentric true ecliptic of date'});
       }catch(bodyErr){
         console.error('Planet calculation failed:',name,bodyErr);
       }
@@ -443,8 +443,8 @@ function refreshAstronomy(){
 
     const rahu=normalize360(meanNodeTropicalLongitude(date)-aya);
     placements.push(
-      {name:'Rahu',glyph:'☊',color:'#06d6a0',lon:rahu,dec:eclipticLongitudeToDeclination(rahu,eps)},
-      {name:'Ketu',glyph:'☋',color:'#ef476f',lon:normalize360(rahu+180),dec:eclipticLongitudeToDeclination(normalize360(rahu+180),eps)}
+      {name:'Rahu',glyph:'☊',color:'#06d6a0',lon:rahu,dec:eclipticLongitudeToDeclination(rahu,eps),source:'mean lunar node'},
+      {name:'Ketu',glyph:'☋',color:'#ef476f',lon:normalize360(rahu+180),dec:eclipticLongitudeToDeclination(normalize360(rahu+180),eps),source:'mean lunar node'}
     );
 
     state.astro={date,aya,eps,gmst,sun,placements,realStamp:performance.now()};
@@ -1189,39 +1189,28 @@ function drawDeclinationGrid(w,h){
 }
 
 function drawProjectedPlanets(w,h,earthShiftDeg){
-  if(!state.risingNakGrid) return;
+  if(!state.astro?.placements?.length) return;
 
-  const rw=risingCanvas.width;
-  const rh=risingCanvas.height;
-  const row=Math.floor(rh*.5);
   const occupied=new Map();
 
   state.astro.placements.forEach(p=>{
-    const targetNak=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
-    let start=-1,end=-1;
+    // Direct sidereal-longitude projection: 0° Aries begins at the left edge,
+    // increases eastward through 360°, then follows the rotating Earth layer.
+    const zodiacX=normalize360(p.lon)/360*w;
+    const xBase=zodiacX + earthShiftDeg/360*w;
+    const visibleXs=[xBase-w,xBase,xBase+w].filter(x=>x>-120&&x<w+120);
+    if(!visibleXs.length) return;
 
-    for(let x=0;x<rw;x++){
-      const ni=state.risingNakGrid[row*rw+x];
-      if(ni===targetNak){
-        if(start<0) start=x;
-        end=x;
-      }else if(start>=0){
-        break;
-      }
-    }
-
-    if(start<0) return;
-    const xBase=((start+end+1)/2)/rw*w + earthShiftDeg/360*w;
-    const visibleXs=[xBase-w,xBase,xBase+w].filter(x=>x>-70&&x<w+70);
-    const x=visibleXs.length?visibleXs[0]:xBase;
     const y=declinationToY(p.dec,h);
-    const bucket=Math.round(x/58);
-    const key=bucket+':'+Math.round(y/18);
-    const slot=occupied.get(key)||0;
-    occupied.set(key,slot+1);
-    const yOffset=slot*14;
+    const x=visibleXs[0];
+    const bucket=Math.round(x/70);
+    const rowKey=bucket+':'+Math.round(y/18);
+    const slot=occupied.get(rowKey)||0;
+    occupied.set(rowKey,slot+1);
+    const yOffset=slot*15;
 
     const signIndex=Math.floor(normalize360(p.lon)/30);
+    const targetNak=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
     const matchesFocus=
       state.focusSign===null && state.focusNak===null
         ? true
@@ -1230,13 +1219,14 @@ function drawProjectedPlanets(w,h,earthShiftDeg){
           : targetNak===state.focusNak;
 
     ctx.save();
-    ctx.globalAlpha=matchesFocus?1:.16;
-    ctx.font=`${matchesFocus?'900':'700'} ${matchesFocus?17:14}px system-ui,Segoe UI Symbol,sans-serif`;
+    ctx.globalAlpha=matchesFocus?1:.20;
+    ctx.font=`${matchesFocus?'900':'700'} ${matchesFocus?18:15}px system-ui,Segoe UI Symbol,sans-serif`;
     ctx.textAlign='center';
     ctx.textBaseline='middle';
     ctx.fillStyle=p.color;
     ctx.shadowColor='rgba(0,0,0,.98)';
-    ctx.shadowBlur=matchesFocus?8:3;
+    ctx.shadowBlur=matchesFocus?9:4;
+
     for(const px of visibleXs){
       ctx.fillText(`${p.glyph} ${degreeInSign(p.lon)} · ${formatDeclination(p.dec)}`,px,y+yOffset);
     }
@@ -2419,7 +2409,7 @@ function updateText(){
   updateFocusSummary();
   document.getElementById('planetList').innerHTML=placements.map(p=>{
     const ni=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
-    return `<div><span style="color:${p.color}">${p.glyph}</span><b>${p.name}</b><span>${fullZodiac(p.lon)} · ${NAKSHATRAS[ni]}</span></div>`;
+    return `<div><span style="color:${p.color}">${p.glyph}</span><b>${p.name}</b><span>${fullZodiac(p.lon)} · ${NAKSHATRAS[ni]} · ${formatDeclination(p.dec)}</span></div>`;
   }).join('');
 }
 
