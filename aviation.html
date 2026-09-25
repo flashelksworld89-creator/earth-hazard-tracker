@@ -448,7 +448,9 @@ function renderMonthlyReport(){
     const n=r.tithi?.number||calculateTithi(new Date(r.eventAt)).number;
     counts.set(n,(counts.get(n)||0)+1);
   });
-  const top=[...counts.entries()].sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0];
+  const ranked=[...counts.entries()].sort((a,b)=>b[1]-a[1]||a[0]-b[0]);
+  const top=ranked[0];
+  const low=ranked.length?[...ranked].sort((a,b)=>a[1]-b[1]||a[0]-b[0])[0]:null;
   const now=new Date();
   const future=reportYear>now.getUTCFullYear()||(reportYear===now.getUTCFullYear()&&reportMonth>now.getUTCMonth());
   const monthLabel=new Date(Date.UTC(reportYear,reportMonth,1)).toLocaleString('en-US',{month:'long',year:'numeric',timeZone:'UTC'});
@@ -457,6 +459,7 @@ function renderMonthlyReport(){
   document.getElementById('monthlySummary').innerHTML=
     patternCard('Month',monthLabel,monthIncidents.length+' recorded aviation incidents')+
     patternCard('Highest-incident lunar day',top?tithiName(top[0]):'No recorded incidents',top?top[1]+' incident'+(top[1]===1?'':'s')+' on tithi '+top[0]:'No tithi count yet')+
+    patternCard('Lowest-incident lunar day',low?tithiName(low[0]):'No recorded incidents',low?low[1]+' incident'+(low[1]===1?'':'s')+' on tithi '+low[0]:'No tithi count yet')+
     patternCard('Distinct tithis with incidents',String(counts.size),future?'Future incident counts remain empty until observed':'Observed during this month');
 
   const tg=document.getElementById('tithiGrid');
