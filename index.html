@@ -43,6 +43,22 @@
         <button data-minutes="1440">+1D</button>
       </div>
 
+      <div class="datetime-jump">
+        <div class="location-head">
+          <strong>JUMP TO DATE & TIME</strong>
+          <span id="dateEntryStatus">UTC · 1900–2100</span>
+        </div>
+        <div class="location-grid">
+          <label><span>Date</span><input id="dateInput" type="date" min="1900-01-01" max="2100-12-31" /></label>
+          <label><span>Time (UTC)</span><input id="timeInput" type="time" step="60" /></label>
+        </div>
+        <div class="row">
+          <button id="applyDateTimeBtn" type="button">Go to date/time</button>
+          <button data-years="-1" type="button">−1Y</button>
+          <button data-years="1" type="button">+1Y</button>
+        </div>
+      </div>
+
       <div class="row">
         <button id="playBtn">▶ Play</button>
         <select id="speedSelect">
