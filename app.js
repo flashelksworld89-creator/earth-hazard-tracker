@@ -89,6 +89,7 @@ const state = {
   playing: false,
   speed: 1,
   offsetMs: 0,
+  frozenDateMs: null,
   epochAstro: Date.now(),
   epochReal: performance.now(),
   lastDraw: 0,
@@ -152,9 +153,8 @@ function bindControls(){
   document.querySelectorAll('[data-minutes]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       freezePlayback();
-      state.offsetMs += Number(btn.dataset.minutes)*60000;
-      refreshAstronomy();
-      syncDateTimeInputs(currentDate());
+      const target=new Date(currentDate().getTime()+Number(btn.dataset.minutes)*60000);
+      setCompassDate(target);
     });
   });
 
@@ -194,6 +194,7 @@ function bindControls(){
   document.getElementById('resetBtn').addEventListener('click',()=>{
     state.playing=false;
     state.offsetMs=0;
+    state.frozenDateMs=null;
     document.getElementById('playBtn').textContent='▶ Play';
     refreshAstronomy();
     syncDateTimeInputs(currentDate());
@@ -362,7 +363,7 @@ function bindControls(){
 
 function freezePlayback(){
   if(state.playing){
-    state.offsetMs=currentDate().getTime()-Date.now();
+    state.frozenDateMs=currentDate().getTime();
   }
   state.playing=false;
   document.getElementById('playBtn').textContent='▶ Play';
@@ -372,7 +373,8 @@ function setCompassDate(target){
   const min=Date.UTC(1900,0,1,0,0,0,0),max=Date.UTC(2100,11,31,23,59,59,999);
   const t=Math.min(max,Math.max(min,target.getTime()));
   state.playing=false;
-  state.offsetMs=t-Date.now();
+  state.offsetMs=0;
+  state.frozenDateMs=t;
   state.epochAstro=t;
   state.epochReal=performance.now();
   const play=document.getElementById('playBtn');
@@ -396,7 +398,10 @@ function currentDate(){
   if(state.playing){
     return new Date(state.epochAstro+(performance.now()-state.epochReal)*state.speed);
   }
-  return new Date(Date.now()+state.offsetMs);
+  if(Number.isFinite(state.frozenDateMs)){
+    return new Date(state.frozenDateMs);
+  }
+  return new Date(Date.now());
 }
 
 function loop(now){
