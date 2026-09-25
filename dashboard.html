@@ -39,7 +39,7 @@ const frame=document.getElementById('siteFrame'),player=document.getElementById(
 const params=new URLSearchParams(location.search);
 const allowed=['/','/news.html','/aviation.html','/worldfocus.html','/patterns.html'];
 const initial=allowed.includes(params.get('page'))?params.get('page'):'/';
-frame.src=initial;
+frame.src=initial+(initial.includes('?')?'&':'?')+'build=20260924c';
 
 function extractYouTubeId(value){
  const v=String(value||'').trim();
@@ -71,7 +71,7 @@ launch.onclick=()=>{launch.classList.add('hidden');player.classList.remove('hidd
 addEventListener('message',e=>{
  if(e.origin!==location.origin||!e.data)return;
  if(e.data.type==='play-youtube') playVideo(e.data.value);
- if(e.data.type==='site-page'&&allowed.includes(e.data.page)){frame.src=e.data.page;history.replaceState(null,'','/dashboard.html?page='+encodeURIComponent(e.data.page))}
+ if(e.data.type==='site-page'&&allowed.includes(e.data.page)){frame.src=e.data.page+'?build=20260924c';history.replaceState(null,'','/dashboard.html?page='+encodeURIComponent(e.data.page))}
 });
 </script>
 </body>
