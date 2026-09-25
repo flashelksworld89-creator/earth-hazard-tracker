@@ -156,6 +156,7 @@ const DEFAULT_PROFILE={
 const LS_PROFILES='leader-agent-profiles-v1';
 const LS_ACTIVE='leader-agent-active-v1';
 const LS_MEMORY='leader-agent-pattern-memory-v1';
+const LS_OBSERVATIONS='leader-agent-observations-v1';
 let profiles=loadProfiles();
 let activeId=localStorage.getItem(LS_ACTIVE)||profiles[0].id;
 let currentTransits=null;
@@ -451,6 +452,7 @@ function storyHtml(a,category){
 function rememberMatches(profile,ch,t,matches){
   if(!matches.length)return;
   try{
+    appendObservationLog(profile,ch,t,matches);
     const memory=JSON.parse(localStorage.getItem(LS_MEMORY)||'{}');
     const sig=signature(profile,ch,t);
     const row=memory[sig]||{count:0,categories:{}};
@@ -459,6 +461,41 @@ function rememberMatches(profile,ch,t,matches){
     memory[sig]=row;
     const trimmed=Object.fromEntries(Object.entries(memory).sort((a,b)=>(b[1].count||0)-(a[1].count||0)).slice(0,300));
     localStorage.setItem(LS_MEMORY,JSON.stringify(trimmed));
+  }catch{}
+}
+
+function appendObservationLog(profile,ch,t,matches){
+  try{
+    const log=JSON.parse(localStorage.getItem(LS_OBSERVATIONS)||'[]');
+    const today=new Date().toISOString().slice(0,10);
+    for(const m of matches){
+      const article=m.x.article;
+      const categories=m.x.categories||[];
+      const key=[today,profile.id,ch.key,article.url||article.title].join('|');
+      if(log.some(x=>x.key===key)) continue;
+      log.push({
+        key,
+        observedAt:new Date().toISOString(),
+        day:today,
+        profileId:profile.id,
+        leaderName:profile.name,
+        planetCategory:profile.planet||'Unassigned',
+        channel:ch.key,
+        transitHouse:t.house,
+        transitSign:t.sign,
+        conjunctNatalMars:!!t.conjunctNatalMars,
+        aspectsNatalMars:!!t.aspectsNatalMars,
+        signature:signature(profile,ch,t),
+        storyTitle:article.title||'',
+        storyUrl:article.url||'',
+        source:article.source||'',
+        categories,
+        score:m.score
+      });
+    }
+    const cutoff=Date.now()-120*86400000;
+    const trimmed=log.filter(x=>new Date(x.observedAt).getTime()>=cutoff).slice(-5000);
+    localStorage.setItem(LS_OBSERVATIONS,JSON.stringify(trimmed));
   }catch{}
 }
 
