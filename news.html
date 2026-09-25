@@ -249,16 +249,19 @@ async function refreshActive(manual){
   }
 
   try{
-    const r=await fetch('/api/news?q='+encodeURIComponent(p.newsQuery),{cache:'no-store'});
+    const leaderQuery=buildLeaderNewsQuery(p);
+    const r=await fetch('/api/news?q='+encodeURIComponent(leaderQuery),{cache:'no-store'});
     if(!r.ok) throw new Error('News HTTP '+r.status);
     const data=await r.json();
     if(seq!==refreshSeq)return;
-    currentArticles=(Array.isArray(data.articles)?data.articles:[]).filter(a=>isToday(a.publishedAt));
+    currentArticles=(Array.isArray(data.articles)?data.articles:[])
+      .filter(a=>isToday(a.publishedAt))
+      .filter(a=>storyMatchesActiveLeader(a,p));
     const classified=currentArticles.map(article=>({article,...classifyStory(article)}));
     currentCategories=summarizeCategories(classified);
     renderBreakingSummary(currentCategories,currentArticles.length);
     renderChannels(p,currentTransits,classified);
-    document.getElementById('newsStatus').textContent=currentArticles.length+" same-day breaking headline"+(currentArticles.length===1?'':'s')+' · '+p.newsQuery;
+    document.getElementById('newsStatus').textContent=currentArticles.length+" same-day breaking headline"+(currentArticles.length===1?'':'s')+' · '+leaderQuery;
   }catch(e){
     console.error(e);
     currentArticles=[];currentCategories=[];
@@ -266,6 +269,37 @@ async function refreshActive(manual){
     renderChannels(p,currentTransits,[]);
     document.getElementById('newsStatus').textContent="Today's news feed unavailable";
   }
+}
+
+function buildLeaderNewsQuery(profile){
+  const parts=[profile.name,profile.institution,profile.newsQuery]
+    .map(v=>String(v||'').trim())
+    .filter(Boolean);
+  const unique=[...new Set(parts)];
+  return unique.join(' ');
+}
+
+function storyMatchesActiveLeader(article,profile){
+  const text=((article.title||'')+' '+(article.description||'')+' '+(article.source||'')).toLowerCase();
+  const name=String(profile.name||'').toLowerCase().trim();
+  const institution=String(profile.institution||'').toLowerCase().trim();
+  const query=String(profile.newsQuery||'').toLowerCase().trim();
+
+  const nameParts=name.split(/\s+/).filter(x=>x.length>2);
+  const hasFullName=name && text.includes(name);
+  const hasStrongName=nameParts.length>=2 && nameParts.filter(x=>text.includes(x)).length>=2;
+
+  const institutionTokens=institution
+    .split(/[^a-z0-9]+/)
+    .filter(x=>x.length>3 && !['president','minister','government','united','states'].includes(x));
+  const institutionHit=institutionTokens.some(x=>text.includes(x));
+
+  const queryTokens=query
+    .split(/[^a-z0-9]+/)
+    .filter(x=>x.length>4 && !nameParts.includes(x));
+  const queryHit=queryTokens.some(x=>text.includes(x));
+
+  return hasFullName || hasStrongName || (institutionHit && (hasFullName||hasStrongName||queryHit));
 }
 
 function calculateTrackedTransits(date,profile){
