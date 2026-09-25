@@ -44,16 +44,17 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     <div class="metric"><small>Last scan</small><b id="lastScan">—</b><span>30-minute interval</span></div>
     <div class="metric"><small>Next scan</small><b id="nextScan">—</b><span>while page remains open</span></div>
     <div class="metric"><small>Exact/reported times</small><b id="exactCount">0</b><span>otherwise publication time fallback</span></div>
-    <div class="metric"><small>Moon mean sample</small><b id="meanSample">0</b><span>circular mean</span></div>
+    <div class="metric"><small>Moon transit sample</small><b id="meanSample">0</b><span>records with Moon placement</span></div>
   </section>
   <section class="panel">
-    <div class="panel-head"><strong>SECONDARY CIRCULAR-MEAN STATISTICS</strong><span id="meanStatus" class="status">supplementary only</span></div>
+    <div class="panel-head"><strong>ALL-MONTHS MOON INCIDENT SUMMARY</strong><span id="meanStatus" class="status">full recorded dataset</span></div>
     <div class="focus-grid">
-      <div class="focus-card"><small>Mean Moon</small><b id="meanMoon">—</b><p>Supplementary center-of-concentration statistic.</p></div>
-      <div class="focus-card"><small>Mean Mercury</small><b id="meanMercury">—</b><p>Supplementary center-of-concentration statistic.</p></div>
-      <div class="focus-card"><small>Mean Moon–Mercury separation</small><b id="meanMoonMercury">—</b><p>Supplementary angular-center statistic.</p></div>
+      <div class="focus-card"><small>Most incidents · Moon zodiac</small><b id="meanMoon">—</b><p id="meanMoonNote">Across all recorded months.</p></div>
+      <div class="focus-card"><small>Least incidents · Moon zodiac</small><b id="meanMercury">—</b><p id="meanMercuryNote">Among Moon signs with at least one incident.</p></div>
+      <div class="focus-card"><small>Most incidents · Moon nakshatra</small><b id="meanMoonMercury">—</b><p id="meanMoonMercuryNote">Across all recorded months.</p></div>
+      <div class="focus-card"><small>Least incidents · Moon nakshatra</small><b id="leastMoonNak">—</b><p id="leastMoonNakNote">Among nakshatras with at least one incident.</p></div>
     </div>
-    <div class="note">Primary analysis is based on frequency distributions by sign, nakshatra, aspect, severity, aircraft type, and geography. Means are retained only as secondary context.</div>
+    <div class="note">Frequency counts use the entire recorded aviation dataset across all available months. Categories with zero recorded incidents are excluded from the “least” result.</div>
   </section>
   <section class="panel">
     <div class="panel-head"><strong>GEOGRAPHIC + ASCENDANT PATTERN SUMMARY</strong><span class="status">recorded incident sample</span></div>
@@ -61,7 +62,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     <div class="note">Ascendant statistics only use incidents with both a geocoded event location and a usable event timestamp. Incidents lacking enough evidence are excluded from that ranking rather than guessed.</div>
   </section>
   <section class="panel">
-    <div class="panel-head"><strong>MONTHLY MOON TRANSIT REPORT</strong><span id="monthlyStatus" class="status">Tithi incident analysis</span></div>
+    <div class="panel-head"><strong>MONTHLY MOON TRANSIT REPORT</strong><span id="monthlyStatus" class="status">Moon sign + nakshatra analysis</span></div>
     <div class="month-nav">
       <button id="prevMonthBtn" type="button">← Previous</button>
       <select id="reportYear"></select>
@@ -551,49 +552,51 @@ function renderDataset(){
 }
 
 function renderMean(){
-  if(!incidents.length){
+  const valid=incidents.filter(r=>r.astro?.Moon&&Number.isFinite(r.astro.Moon.sign)&&r.astro.Moon.nakshatraName);
+  document.getElementById('meanSample').textContent=valid.length;
+
+  if(!valid.length){
     document.getElementById('meanMoon').textContent='—';
     document.getElementById('meanMercury').textContent='—';
     document.getElementById('meanMoonMercury').textContent='—';
-    document.getElementById('meanStatus').textContent='No incident sample yet';
+    document.getElementById('leastMoonNak').textContent='—';
+    document.getElementById('meanStatus').textContent='No Moon-placement sample yet';
     return;
   }
-  const moonVals=incidents.map(r=>r.astro?.Moon?.lon).filter(Number.isFinite);
-  const mercVals=incidents.map(r=>r.astro?.Mercury?.lon).filter(Number.isFinite);
-  const separations=incidents.map(r=>{
-    const m=r.astro?.Moon?.lon,me=r.astro?.Mercury?.lon;
-    return Number.isFinite(m)&&Number.isFinite(me)?norm(me-m):null;
-  }).filter(Number.isFinite);
 
-  const moonMean=circularMean(moonVals);
-  const mercMean=circularMean(mercVals);
-  const sepMean=circularMean(separations);
+  const signCounts=new Map(),nakCounts=new Map();
+  valid.forEach(r=>{
+    const moon=r.astro.Moon;
+    const sign=SIGNS[moon.sign];
+    signCounts.set(sign,(signCounts.get(sign)||0)+1);
+    const nak=moon.nakshatraName;
+    nakCounts.set(nak,(nakCounts.get(nak)||0)+1);
+  });
 
-  document.getElementById('meanMoon').textContent=formatZodiacMean(moonMean);
-  document.getElementById('meanMercury').textContent=formatZodiacMean(mercMean);
-  document.getElementById('meanMoonMercury').textContent=Number.isFinite(sepMean)?sepMean.toFixed(2)+'°':'—';
+  const mostSign=rankCount(signCounts,'max');
+  const leastSign=rankCount(signCounts,'min');
+  const mostNak=rankCount(nakCounts,'max');
+  const leastNak=rankCount(nakCounts,'min');
 
-  const moonStrength=circularStrength(moonVals);
-  const mercStrength=circularStrength(mercVals);
+  document.getElementById('meanMoon').textContent=mostSign?mostSign.value:'—';
+  document.getElementById('meanMercury').textContent=leastSign?leastSign.value:'—';
+  document.getElementById('meanMoonMercury').textContent=mostNak?mostNak.value:'—';
+  document.getElementById('leastMoonNak').textContent=leastNak?leastNak.value:'—';
+
+  document.getElementById('meanMoonNote').textContent=mostSign?mostSign.count+' incidents · '+mostSign.rate.toFixed(1)+'% of Moon-sign sample':'—';
+  document.getElementById('meanMercuryNote').textContent=leastSign?leastSign.count+' incidents · '+leastSign.rate.toFixed(1)+'% of Moon-sign sample':'—';
+  document.getElementById('meanMoonMercuryNote').textContent=mostNak?mostNak.count+' incidents · '+mostNak.rate.toFixed(1)+'% of nakshatra sample':'—';
+  document.getElementById('leastMoonNakNote').textContent=leastNak?leastNak.count+' incidents · '+leastNak.rate.toFixed(1)+'% of nakshatra sample':'—';
+
+  const months=new Set(valid.map(r=>{
+    const d=new Date(r.eventAt);
+    return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
+  }));
   document.getElementById('meanStatus').textContent=
-    'Moon n='+moonVals.length+' · concentration '+moonStrength.toFixed(3)+
-    ' · Mercury n='+mercVals.length+' · concentration '+mercStrength.toFixed(3);
+    valid.length+' incidents · '+months.size+' recorded month'+(months.size===1?'':'s');
 }
-function circularMean(values){
-  if(!values.length)return NaN;
-  let x=0,y=0;for(const v of values){const r=v*Math.PI/180;x+=Math.cos(r);y+=Math.sin(r)}
-  let d=Math.atan2(y,x)*180/Math.PI;if(d<0)d+=360;return d;
-}
-function circularStrength(values){
-  if(!values.length)return 0;
-  let x=0,y=0;for(const v of values){const r=v*Math.PI/180;x+=Math.cos(r);y+=Math.sin(r)}
-  return Math.sqrt(x*x+y*y)/values.length;
-}
-function formatZodiacMean(mean){
-  if(!Number.isFinite(mean))return'—';
-  const sign=Math.floor(mean/30),deg=mean%30;
-  return GLYPHS[sign]+' '+SIGNS[sign]+' '+deg.toFixed(2)+'°';
-}
+
+
 function renderList(){
   const el=document.getElementById('incidentList');if(!incidents.length){el.innerHTML='<div class="empty">No aviation incidents recorded yet.</div>';return}
   el.innerHTML=incidents.slice(0,250).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+(r.geo?.found?' · '+esc(r.geo.displayName||r.locationText||''):'')+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span><span class="tag">severity: '+esc(r.severity||'—')+'</span><span class="tag">'+esc(r.aircraftType||'—')+'</span>'+(r.region?'<span class="tag">'+esc(r.region)+'</span>':'')+(r.ascendant?'<span class="tag">ASC '+esc(SIGNS[r.ascendant.sign])+' '+r.ascendant.degree.toFixed(1)+'°</span>':'')+
