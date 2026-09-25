@@ -204,6 +204,9 @@ function enrichIncident(r){
   const text=((r.title||'')+' '+(r.description||'')).toLowerCase();
   if(!r.severity)r.severity=classifySeverity(text);
   if(!r.aircraftType)r.aircraftType=classifyAircraftType(text,r.categories||[]);
+  if(r.eventAt&&(!r.astro||!r.astro.Mercury)){
+    try{r.astro=calculateAstro(new Date(r.eventAt))}catch{}
+  }
   return r;
 }
 function classifySeverity(text){
