@@ -36,7 +36,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 <main>
   <section class="hero">
     <div><span class="eyebrow">GLOBAL BREAKING-NEWS MONITOR</span><h1>Aircraft crashes & emergency incidents</h1><p>Checks global breaking aviation news every 30 minutes while this page is open, records the reported event time when one can be extracted, calculates Lahiri sidereal Moon/Rahu/Ketu/Uranus/Pluto positions for that event, and maintains a circular mean of the Moon’s zodiac longitude across the recorded incident set.</p></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="scanBtn" class="btn">Scan now</button><button id="backfillBtn" class="btn">Backfill Sep 1–24</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="scanBtn" class="btn">Scan now</button><button id="backfillBtn" class="btn">Backfill Jan 1–Sep 24</button></div>
   </section>
   <section class="metrics">
     <div class="metric"><small>Recorded incidents</small><b id="incidentCount">0</b><span>deduplicated locally</span></div>
@@ -83,9 +83,9 @@ const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒',
 const STORE='aviation-incident-agent-v1';
 const SCAN_MS=30*60*1000;
 const QUERY='aircraft crash OR plane crash OR aviation emergency OR emergency landing OR aircraft incident OR helicopter crash';
-const BACKFILL_START='2026-09-01';
+const BACKFILL_START='2026-01-01';
 const BACKFILL_END='2026-09-24';
-const BACKFILL_MARK='aviation-backfill-2026-09-01-24-v1';
+const BACKFILL_MARK='aviation-backfill-2026-01-01-09-24-v2';
 let incidents=loadIncidents();
 let lastScanAt=Number(localStorage.getItem('aviation-agent-last-scan')||0);
 let nextScanAt=Date.now()+SCAN_MS;
@@ -172,7 +172,7 @@ async function backfillHistorical(manual){
       saveIncidents();render();
     }
     localStorage.setItem(BACKFILL_MARK,'done');
-    document.getElementById('scanStatus').textContent='September backfill complete · '+added+' historical incident'+(added===1?'':'s')+' added';
+    document.getElementById('scanStatus').textContent='2026 backfill complete · '+added+' historical incident'+(added===1?'':'s')+' added';
   }finally{
     scanning=false;
     if(btn)btn.disabled=false;
