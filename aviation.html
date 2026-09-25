@@ -61,7 +61,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     <div class="note">Ascendant statistics only use incidents with both a geocoded event location and a usable event timestamp. Incidents lacking enough evidence are excluded from that ranking rather than guessed.</div>
   </section>
   <section class="panel">
-    <div class="panel-head"><strong>MONTHLY LUNAR REPORT</strong><span id="monthlyStatus" class="status">Tithi incident analysis</span></div>
+    <div class="panel-head"><strong>MONTHLY MOON TRANSIT REPORT</strong><span id="monthlyStatus" class="status">Tithi incident analysis</span></div>
     <div class="month-nav">
       <button id="prevMonthBtn" type="button">← Previous</button>
       <select id="reportYear"></select>
@@ -71,7 +71,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     <div id="monthlySummary" class="focus-grid"></div>
     <div id="tithiGrid" class="tithi-grid"></div>
     <div id="futureTithiCalendar"></div>
-    <div class="note">A tithi is one 12° step of Moon–Sun angular separation. Past/current-month incident counts use the event timestamp. Future months show projected tithis only; no future incident counts are invented.</div>
+    <div class="note">Past/current-month incident counts are grouped by the Moon’s sidereal zodiac sign and nakshatra at the event timestamp. Future months show projected Moon sign/nakshatra movement only; no future incident counts are invented.</div>
   </section>
   <section class="panel">
     <div class="panel-head"><strong>AVIATION DATASET</strong><span id="datasetCount" class="status">0 records</span></div>
@@ -84,7 +84,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
       <select id="filterConfidence"><option value="all">All timing confidence</option><option value="reported">reported</option><option value="inferred">inferred</option><option value="fallback">fallback</option></select>
     </div>
     <div class="table-wrap"><table class="dataset"><thead><tr>
-      <th data-sort="eventAt">Date/time</th><th data-sort="severity">Severity</th><th data-sort="aircraftType">Aircraft type</th><th data-sort="region">Region</th><th>Location</th><th data-sort="asc">Ascendant</th><th data-sort="moon">Moon</th><th>Moon nakshatra</th><th>Tithi</th><th data-sort="mercury">Mercury</th><th>Mercury nakshatra</th><th data-sort="timeConfidence">Time quality</th><th>Incident</th>
+      <th data-sort="eventAt">Date/time</th><th data-sort="severity">Severity</th><th data-sort="aircraftType">Aircraft type</th><th data-sort="region">Region</th><th>Location</th><th data-sort="asc">Ascendant</th><th data-sort="moon">Moon</th><th>Moon nakshatra</th><th data-sort="mercury">Mercury</th><th>Mercury nakshatra</th><th data-sort="timeConfidence">Time quality</th><th>Incident</th>
     </tr></thead><tbody id="datasetBody"></tbody></table></div>
     <div class="note">Severity and aircraft type are headline/description classifications. They should be treated as provisional until verified against an authoritative accident report.</div>
   </section>
@@ -443,44 +443,65 @@ function renderMonthlyReport(){
     const d=new Date(r.eventAt);
     return d.getUTCFullYear()===reportYear&&d.getUTCMonth()===reportMonth;
   });
-  const counts=new Map();
+
+  const signCounts=new Map(),nakCounts=new Map();
   monthIncidents.forEach(r=>{
-    const n=r.tithi?.number||calculateTithi(new Date(r.eventAt)).number;
-    counts.set(n,(counts.get(n)||0)+1);
+    const moon=r.astro?.Moon;
+    if(moon&&Number.isFinite(moon.sign)){
+      const sign=SIGNS[moon.sign];
+      signCounts.set(sign,(signCounts.get(sign)||0)+1);
+    }
+    const nak=moon?.nakshatraName;
+    if(nak)nakCounts.set(nak,(nakCounts.get(nak)||0)+1);
   });
-  const ranked=[...counts.entries()].sort((a,b)=>b[1]-a[1]||a[0]-b[0]);
-  const top=ranked[0];
-  const low=ranked.length?[...ranked].sort((a,b)=>a[1]-b[1]||a[0]-b[0])[0]:null;
+
+  const topSign=rankCount(signCounts,'max');
+  const lowSign=rankCount(signCounts,'min');
+  const topNak=rankCount(nakCounts,'max');
+  const lowNak=rankCount(nakCounts,'min');
+
   const now=new Date();
   const future=reportYear>now.getUTCFullYear()||(reportYear===now.getUTCFullYear()&&reportMonth>now.getUTCMonth());
   const monthLabel=new Date(Date.UTC(reportYear,reportMonth,1)).toLocaleString('en-US',{month:'long',year:'numeric',timeZone:'UTC'});
 
-  document.getElementById('monthlyStatus').textContent=monthLabel+(future?' · future lunar calendar':' · '+monthIncidents.length+' recorded incidents');
+  document.getElementById('monthlyStatus').textContent=monthLabel+(future?' · future Moon transit calendar':' · '+monthIncidents.length+' recorded incidents');
   document.getElementById('monthlySummary').innerHTML=
     patternCard('Month',monthLabel,monthIncidents.length+' recorded aviation incidents')+
-    patternCard('Highest-incident lunar day',top?tithiName(top[0]):'No recorded incidents',top?top[1]+' incident'+(top[1]===1?'':'s')+' on tithi '+top[0]:'No tithi count yet')+
-    patternCard('Lowest-incident lunar day',low?tithiName(low[0]):'No recorded incidents',low?low[1]+' incident'+(low[1]===1?'':'s')+' on tithi '+low[0]:'No tithi count yet')+
-    patternCard('Distinct tithis with incidents',String(counts.size),future?'Future incident counts remain empty until observed':'Observed during this month');
+    patternCard('Most incidents · Moon sign',topSign?topSign.value:'No recorded incidents',topSign?topSign.count+' incident'+(topSign.count===1?'':'s')+' · '+topSign.rate.toFixed(1)+'%':'No Moon-sign count yet')+
+    patternCard('Least incidents · Moon sign',lowSign?lowSign.value:'No recorded incidents',lowSign?lowSign.count+' incident'+(lowSign.count===1?'':'s')+' · '+lowSign.rate.toFixed(1)+'%':'No Moon-sign count yet')+
+    patternCard('Most incidents · Moon nakshatra',topNak?topNak.value:'No recorded incidents',topNak?topNak.count+' incident'+(topNak.count===1?'':'s')+' · '+topNak.rate.toFixed(1)+'%':'No nakshatra count yet')+
+    patternCard('Least incidents · Moon nakshatra',lowNak?lowNak.value:'No recorded incidents',lowNak?lowNak.count+' incident'+(lowNak.count===1?'':'s')+' · '+lowNak.rate.toFixed(1)+'%':'No nakshatra count yet');
 
   const tg=document.getElementById('tithiGrid');
-  tg.innerHTML=Array.from({length:30},(_,i)=>{
-    const n=i+1,c=counts.get(n)||0;
-    return '<div class="tithi-card"><small>Tithi '+n+'</small><b>'+esc(tithiName(n))+'</b><span>'+c+' incident'+(c===1?'':'s')+'</span></div>';
-  }).join('');
+  tg.innerHTML=
+    '<div class="tithi-card"><small>Moon sign distribution</small><b>'+esc(formatCountList(signCounts))+'</b><span>Counts for this month</span></div>'+
+    '<div class="tithi-card"><small>Moon nakshatra distribution</small><b>'+esc(formatCountList(nakCounts))+'</b><span>Counts for this month</span></div>';
 
-  renderFutureTithiCalendar(future,monthLabel);
+  renderFutureMoonCalendar(future,monthLabel);
 }
-function renderFutureTithiCalendar(isFuture,monthLabel){
+function rankCount(map,mode){
+  const arr=[...map.entries()];
+  if(!arr.length)return null;
+  arr.sort((a,b)=>mode==='min'?(a[1]-b[1]||a[0].localeCompare(b[0])):(b[1]-a[1]||a[0].localeCompare(b[0])));
+  const [value,count]=arr[0],total=arr.reduce((s,x)=>s+x[1],0);
+  return{value,count,total,rate:total?count/total*100:0};
+}
+function formatCountList(map){
+  const arr=[...map.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+  return arr.length?arr.map(([k,v])=>k+' '+v).join(' · '):'No recorded incidents';
+}
+
+function renderFutureMoonCalendar(isFuture,monthLabel){
   const el=document.getElementById('futureTithiCalendar');if(!el)return;
   if(!isFuture){el.innerHTML='';return}
   const days=new Date(Date.UTC(reportYear,reportMonth+1,0)).getUTCDate();
   const rows=[];
   for(let day=1;day<=days;day++){
     const d=new Date(Date.UTC(reportYear,reportMonth,day,12,0,0));
-    const t=calculateTithi(d);
-    rows.push('<div class="future-day"><b>'+day+'</b>'+esc(t.name)+'<br>Tithi '+t.number+' · noon UTC</div>');
+    const astro=calculateAstro(d),moon=astro.Moon;
+    rows.push('<div class="future-day"><b>'+day+'</b>'+esc(SIGNS[moon.sign])+'<br>'+esc(moon.nakshatraName)+' · noon UTC</div>');
   }
-  el.innerHTML='<div class="panel-head" style="margin-top:12px"><strong>PROJECTED DAILY TITHI · '+esc(monthLabel)+'</strong><span class="status">12:00 UTC snapshot</span></div><div class="future-days">'+rows.join('')+'</div>';
+  el.innerHTML='<div class="panel-head" style="margin-top:12px"><strong>PROJECTED MOON TRANSITS · '+esc(monthLabel)+'</strong><span class="status">12:00 UTC snapshot</span></div><div class="future-days">'+rows.join('')+'</div>';
 }
 
 function renderDatasetFilters(){
@@ -522,7 +543,6 @@ function renderDataset(){
     '<td>'+(r.ascendant?esc(SIGNS[r.ascendant.sign]+' '+r.ascendant.degree.toFixed(1)+'°'):'—')+'</td>'+
     '<td>'+(r.astro?.Moon?esc(SIGNS[r.astro.Moon.sign]+' '+r.astro.Moon.degree.toFixed(1)+'°'):'—')+'</td>'+
     '<td>'+esc(r.astro?.Moon?.nakshatraName||'—')+'</td>'+
-    '<td>'+esc(r.tithi?.name||'—')+'</td>'+
     '<td>'+(r.astro?.Mercury?esc(SIGNS[r.astro.Mercury.sign]+' '+r.astro.Mercury.degree.toFixed(1)+'°'):'—')+'</td>'+
     '<td>'+esc(r.astro?.Mercury?.nakshatraName||'—')+'</td>'+
     '<td>'+esc(r.timeConfidence||'—')+'</td>'+
@@ -576,7 +596,7 @@ function formatZodiacMean(mean){
 }
 function renderList(){
   const el=document.getElementById('incidentList');if(!incidents.length){el.innerHTML='<div class="empty">No aviation incidents recorded yet.</div>';return}
-  el.innerHTML=incidents.slice(0,250).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+(r.geo?.found?' · '+esc(r.geo.displayName||r.locationText||''):'')+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span><span class="tag">tithi: '+esc(r.tithi?.name||'—')+'</span><span class="tag">severity: '+esc(r.severity||'—')+'</span><span class="tag">'+esc(r.aircraftType||'—')+'</span>'+(r.region?'<span class="tag">'+esc(r.region)+'</span>':'')+(r.ascendant?'<span class="tag">ASC '+esc(SIGNS[r.ascendant.sign])+' '+r.ascendant.degree.toFixed(1)+'°</span>':'')+
+  el.innerHTML=incidents.slice(0,250).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+(r.geo?.found?' · '+esc(r.geo.displayName||r.locationText||''):'')+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span><span class="tag">severity: '+esc(r.severity||'—')+'</span><span class="tag">'+esc(r.aircraftType||'—')+'</span>'+(r.region?'<span class="tag">'+esc(r.region)+'</span>':'')+(r.ascendant?'<span class="tag">ASC '+esc(SIGNS[r.ascendant.sign])+' '+r.ascendant.degree.toFixed(1)+'°</span>':'')+
       '<span class="tag">Moon aspects: '+esc(aspectList(r.astro?.MoonAspects))+'</span>'+
       '<span class="tag">Mercury aspects: '+esc(aspectList(r.astro?.MercuryAspects))+'</span></div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+astroBox('☿ Mercury',r.astro.Mercury.lon,r.astro.Mercury.sign,r.astro.Mercury.degree,'Moon: '+r.astro.Mercury.moonRelation.aspect)+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
 }
