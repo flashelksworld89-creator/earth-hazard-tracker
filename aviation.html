@@ -62,6 +62,7 @@ const STORE='aviation-incident-agent-v1';
 const SCAN_MS=30*60*1000;
 const QUERY='aircraft crash OR plane crash OR aviation emergency OR emergency landing OR aircraft incident OR helicopter crash';
 let incidents=loadIncidents();
+let lastScanAt=Number(localStorage.getItem('aviation-agent-last-scan')||0);
 let nextScanAt=Date.now()+SCAN_MS;
 let scanning=false;
 render();scan();setInterval(scan,SCAN_MS);setInterval(updateCountdown,1000);
@@ -81,7 +82,7 @@ async function scan(){
     }
     saveIncidents();document.getElementById('scanStatus').textContent='Scan complete · '+added+' new incident'+(added===1?'':'s');
   }catch(e){console.error(e);document.getElementById('scanStatus').textContent='Breaking-news scan unavailable'}
-  finally{scanning=false;nextScanAt=Date.now()+SCAN_MS;render()}
+  finally{scanning=false;lastScanAt=Date.now();localStorage.setItem('aviation-agent-last-scan',String(lastScanAt));nextScanAt=Date.now()+SCAN_MS;render()}
 }
 function looksLikeAviationIncident(a){const t=((a.title||'')+' '+(a.description||'')).toLowerCase();return /(aircraft|airplane|plane|jet|helicopter|flight|aviation)/.test(t)&&/(crash|crashed|collision|emergency|emergency landing|forced landing|mayday|incident|fire|engine failure|runway excursion|ditched|ditch|hard landing)/.test(t)}
 function classifyAviation(a){
@@ -107,7 +108,7 @@ function positionRecord(lon){return{lon,sign:Math.floor(lon/30),degree:lon%30}}
 function relationRecord(moonLon,lon){const sep=Math.abs(norm180(lon-moonLon));return{lon,sign:Math.floor(lon/30),degree:lon%30,separation:sep,aspect:nearestAspect(sep)}}
 function nearestAspect(sep){const aspects=[['conjunction',0],['sextile',60],['square',90],['trine',120],['opposition',180]];let best=null;for(const [name,deg] of aspects){const orb=Math.abs(sep-deg);if(!best||orb<best.orb)best={name,deg,orb}}return best.orb<=8?best.name+' · orb '+best.orb.toFixed(1)+'°':'no major aspect · '+sep.toFixed(1)+'° apart'}
 function render(){
-  document.getElementById('incidentCount').textContent=incidents.length;document.getElementById('lastScan').textContent=incidents.length?new Date(Math.max(...incidents.map(x=>new Date(x.storedAt).getTime()))).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
+  document.getElementById('incidentCount').textContent=incidents.length;document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
 }
 function renderMean(){
   if(!incidents.length){document.getElementById('meanMoon').textContent='—';document.getElementById('meanStatus').textContent='No incident sample yet';return}
