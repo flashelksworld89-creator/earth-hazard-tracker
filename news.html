@@ -461,7 +461,7 @@ function saveMeetingObservations(meetings){
     for(const m of meetings){
       if(log.some(x=>x.key===m.key))continue;
       const active=m.planetSnapshots.find(x=>x.profileId===m.activeProfileId)||m.planetSnapshots[0];
-      log.push({
+      const dbRecord={
         key:m.key,
         observedAt:m.observedAt,
         day:m.day,
@@ -483,11 +483,23 @@ function saveMeetingObservations(meetings){
         counterpartProfiles:m.counterpartProfiles,
         planetSnapshots:m.planetSnapshots,
         score:1
-      });
+      };
+      log.push(dbRecord);
+      persistObservation('leader_meeting',m.key,m.meetingTime,m.day,dbRecord);
     }
     const cutoff=Date.now()-180*86400000;
     const trimmed=log.filter(x=>new Date(x.observedAt).getTime()>=cutoff).slice(-5000);
     localStorage.setItem(LS_OBSERVATIONS,JSON.stringify(trimmed));
+  }catch{}
+}
+
+async function persistObservation(type,eventKey,eventTime,day,payload){
+  try{
+    await fetch('/api/observations',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type,eventKey,eventTime,day,payload})
+    });
   }catch{}
 }
 
