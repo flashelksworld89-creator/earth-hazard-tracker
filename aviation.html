@@ -48,6 +48,11 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     <div class="mean-box"><div id="meanMoon" class="mean-degree">—</div><div class="mean-note">The mean is calculated as a circular mean of sidereal lunar longitude, not a normal arithmetic average. This avoids the 359° + 1° problem, which should average near 0° rather than 180°.</div></div>
   </section>
   <section class="panel">
+    <div class="panel-head"><strong>GEOGRAPHIC + ASCENDANT PATTERN SUMMARY</strong><span class="status">recorded incident sample</span></div>
+    <div id="patternSummary" class="focus-grid"></div>
+    <div class="note">Ascendant statistics only use incidents with both a geocoded event location and a usable event timestamp. Incidents lacking enough evidence are excluded from that ranking rather than guessed.</div>
+  </section>
+  <section class="panel">
     <div class="panel-head"><strong>RECORDED INCIDENTS</strong><span id="scanStatus" class="status">Starting…</span></div>
     <div id="incidentList" class="list"></div>
     <div class="note">Incident time extraction is best-effort from the headline/description. When an explicit event time with a recognizable timezone is unavailable, the agent marks the record as a publication-time fallback. The astrology is a pattern-analysis layer and does not establish causation.</div>
@@ -77,8 +82,13 @@ async function scan(){
     for(const article of articles){
       if(!looksLikeAviationIncident(article))continue;
       const key=article.url||article.id||article.title;if(incidents.some(x=>x.key===key))continue;
-      const timing=extractIncidentTime(article);const astro=calculateAstro(timing.date);
-      const record={key,title:article.title,url:article.url,source:article.source||'Source',publishedAt:article.publishedAt,eventAt:timing.date.toISOString(),timeBasis:timing.basis,timeConfidence:timing.confidence,categories:classifyAviation(article),astro,storedAt:new Date().toISOString()};
+      const timing=extractIncidentTime(article);
+      const locationText=extractIncidentLocation(article);
+      const geo=locationText?await geocodeIncident(locationText):null;
+      const astro=calculateAstro(timing.date);
+      const ascendant=geo?.found?calculateLocalAscendant(timing.date,geo.lat,geo.lon):null;
+      const region=geo?.found?worldRegion(geo.lat,geo.lon,geo.countryCode):'Unknown';
+      const record={key,title:article.title,url:article.url,source:article.source||'Source',publishedAt:article.publishedAt,eventAt:timing.date.toISOString(),timeBasis:timing.basis,timeConfidence:timing.confidence,categories:classifyAviation(article),astro,locationText,geo,region,ascendant,storedAt:new Date().toISOString()};
       incidents.unshift(record);
       persistObservation('aviation_incident',key,record.eventAt,record.eventAt.slice(0,10),record);
       added++;
@@ -102,6 +112,58 @@ function extractIncidentTime(article){
   }
   return{date:published,basis:'publication time fallback',confidence:'fallback'};
 }
+function extractIncidentLocation(article){
+  const text=(article.title||'')+' '+(article.description||'');
+  const patterns=[
+    /\b(?:near|outside|over|in|at)\s+([A-Z][A-Za-z.'’\-]+(?:\s+[A-Z][A-Za-z.'’\-]+){0,4})(?=,|\.|\s(?:after|before|when|where|during|on|as|following|killing|injuring)\b|$)/,
+    /\b([A-Z][A-Za-z.'’\-]+,\s*[A-Z][A-Za-z.'’\-]+)\b/
+  ];
+  for(const re of patterns){const m=text.match(re);if(m)return (m[1]||m[0]).trim()}
+  return '';
+}
+async function geocodeIncident(q){
+  try{
+    const r=await fetch('/api/geocode?q='+encodeURIComponent(q),{cache:'force-cache'});
+    if(!r.ok)return null;
+    return await r.json();
+  }catch{return null}
+}
+function calculateLocalAscendant(date,latDeg,lonDeg){
+  const aya=lahiriAyanamsa(date);
+  const tropical=tropicalAscendant(date,latDeg,lonDeg);
+  const lon=norm(tropical-aya),sign=Math.floor(lon/30),degree=lon%30;
+  return {lon,sign,degree};
+}
+function tropicalAscendant(date,latDeg,lonDeg){
+  const theta=rad(norm(greenwichSiderealDegrees(date)+lonDeg));
+  const phi=rad(latDeg);
+  const eps=rad(meanObliquityFromDate(date));
+  return norm(Math.atan2(-Math.cos(theta),Math.sin(theta)*Math.cos(eps)+Math.tan(phi)*Math.sin(eps))*180/Math.PI+180);
+}
+function greenwichSiderealDegrees(date){
+  const jd=date.getTime()/86400000+2440587.5;
+  const T=(jd-2451545.0)/36525;
+  return norm(280.46061837+360.98564736629*(jd-2451545.0)+0.000387933*T*T-T*T*T/38710000);
+}
+function meanObliquityFromDate(date){
+  const jd=date.getTime()/86400000+2440587.5,T=(jd-2451545.0)/36525;
+  return 23.4392911111-(46.8150*T+0.00059*T*T-0.001813*T*T*T)/3600;
+}
+function rad(v){return v*Math.PI/180}
+function worldRegion(lat,lon,countryCode){
+  const cc=String(countryCode||'').toUpperCase();
+  if(['US','CA','MX','GT','BZ','HN','SV','NI','CR','PA'].includes(cc))return 'North & Central America';
+  if(['BR','AR','CL','PE','CO','VE','EC','BO','PY','UY','GY','SR'].includes(cc))return 'South America';
+  if(['GB','IE','FR','DE','ES','PT','IT','NL','BE','CH','AT','PL','CZ','SE','NO','FI','DK','UA','RU','GR','RO','BG','HU','RS','HR'].includes(cc))return 'Europe';
+  if(['CN','JP','KR','KP','MN','TW'].includes(cc))return 'East Asia';
+  if(['IN','PK','BD','LK','NP','BT','AF'].includes(cc))return 'South Asia';
+  if(['TH','VN','MY','SG','ID','PH','MM','KH','LA','BN','TL'].includes(cc))return 'Southeast Asia';
+  if(['SA','AE','QA','KW','OM','BH','IL','JO','LB','SY','IQ','IR','YE','TR'].includes(cc))return 'Middle East';
+  if(['AU','NZ','PG','FJ'].includes(cc))return 'Oceania';
+  if(lat>=-35&&lat<=37&&lon>=-20&&lon<=55)return 'Africa';
+  return 'Other / Remote';
+}
+
 function calculateAstro(date){
   const aya=lahiriAyanamsa(date);const bodyLon=name=>{const v=A.GeoVector(A.Body[name],date,true);const e=A.Ecliptic(v);return norm(Number(e.elon)-aya)};
   const moon=bodyLon('Moon'),uranus=bodyLon('Uranus'),pluto=bodyLon('Pluto');const rahu=norm(meanNodeTropicalLongitude(date)-aya),ketu=norm(rahu+180);
@@ -111,8 +173,30 @@ function positionRecord(lon){return{lon,sign:Math.floor(lon/30),degree:lon%30}}
 function relationRecord(moonLon,lon){const sep=Math.abs(norm180(lon-moonLon));return{lon,sign:Math.floor(lon/30),degree:lon%30,separation:sep,aspect:nearestAspect(sep)}}
 function nearestAspect(sep){const aspects=[['conjunction',0],['sextile',60],['square',90],['trine',120],['opposition',180]];let best=null;for(const [name,deg] of aspects){const orb=Math.abs(sep-deg);if(!best||orb<best.orb)best={name,deg,orb}}return best.orb<=8?best.name+' · orb '+best.orb.toFixed(1)+'°':'no major aspect · '+sep.toFixed(1)+'° apart'}
 function render(){
-  document.getElementById('incidentCount').textContent=incidents.length;document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
+  document.getElementById('incidentCount').textContent=incidents.length;renderPatternSummary();document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
 }
+function renderPatternSummary(){
+  const el=document.getElementById('patternSummary');if(!el)return;
+  if(!incidents.length){el.innerHTML='<div class="focus-card"><small>Geography</small><b>—</b><p>No incidents recorded yet.</p></div>';return}
+  const regions=new Map(),asc=new Map();
+  let geoN=0,ascN=0;
+  incidents.forEach(r=>{
+    if(r.region&&r.region!=='Unknown'){regions.set(r.region,(regions.get(r.region)||0)+1);geoN++}
+    if(r.ascendant&&Number.isFinite(r.ascendant.sign)){const s=SIGNS[r.ascendant.sign];asc.set(s,(asc.get(s)||0)+1);ascN++}
+  });
+  const topRegion=[...regions.entries()].sort((a,b)=>b[1]-a[1])[0];
+  const topAsc=[...asc.entries()].sort((a,b)=>b[1]-a[1])[0];
+  const topMoon=(()=>{
+    const m=new Map();incidents.forEach(r=>{const s=SIGNS[r.astro?.Moon?.sign];if(s)m.set(s,(m.get(s)||0)+1)});
+    return [...m.entries()].sort((a,b)=>b[1]-a[1])[0];
+  })();
+  el.innerHTML=
+    patternCard('Majority region',topRegion?topRegion[0]:'Insufficient geocoded data',topRegion?topRegion[1]+' of '+geoN+' geocoded incidents':'0 geocoded incidents')+
+    patternCard('Most frequent Ascendant',topAsc?topAsc[0]:'Insufficient timed/geocoded data',topAsc?topAsc[1]+' of '+ascN+' usable local charts':'0 usable local charts')+
+    patternCard('Most frequent Moon sign',topMoon?topMoon[0]:'—',topMoon?topMoon[1]+' of '+incidents.length+' recorded incidents':'No sample');
+}
+function patternCard(label,value,note){return '<div class="focus-card"><small>'+esc(label)+'</small><b>'+esc(value)+'</b><p>'+esc(note)+'</p></div>'}
+
 function renderMean(){
   if(!incidents.length){document.getElementById('meanMoon').textContent='—';document.getElementById('meanStatus').textContent='No incident sample yet';return}
   let x=0,y=0;for(const r of incidents){const rad=r.astro.Moon.lon*Math.PI/180;x+=Math.cos(rad);y+=Math.sin(rad)}
@@ -120,7 +204,7 @@ function renderMean(){
 }
 function renderList(){
   const el=document.getElementById('incidentList');if(!incidents.length){el.innerHTML='<div class="empty">No aviation incidents recorded yet.</div>';return}
-  el.innerHTML=incidents.slice(0,100).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span></div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
+  el.innerHTML=incidents.slice(0,100).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+(r.geo?.found?' · '+esc(r.geo.displayName||r.locationText||''):'')+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span>'+(r.region?'<span class="tag">'+esc(r.region)+'</span>':'')+(r.ascendant?'<span class="tag">ASC '+esc(SIGNS[r.ascendant.sign])+' '+r.ascendant.degree.toFixed(1)+'°</span>':'')+'</div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
 }
 function astroBox(name,lon,sign,degree,note){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[sign]+' '+SIGNS[sign]+' '+degree.toFixed(2)+'°</span><span>'+note+'</span></div>'}
 function relationBox(name,r){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[r.sign]+' '+SIGNS[r.sign]+' '+r.degree.toFixed(2)+'°</span><span>Moon: '+esc(r.aspect)+'</span></div>'}
