@@ -219,7 +219,7 @@ function bindControls(){
     }
   });
 
-  ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showGrid','showPlaceLabels']
+  ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showDeclination','showGrid','showPlaceLabels']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
 
   document.getElementById('focusSignSelect').addEventListener('change',e=>{
@@ -434,7 +434,9 @@ function refreshAstronomy(){
         const ecl=A.Ecliptic(vec);
         const lon=Number(ecl?.elon);
         if(!Number.isFinite(lon)) throw new Error('Invalid longitude for '+name);
-        placements.push({name,glyph,color,lon:normalize360(lon-aya)});
+        const eq=A.Equator(body,date,null,true,true);
+        const dec=Number(eq?.dec);
+        placements.push({name,glyph,color,lon:normalize360(lon-aya),dec:Number.isFinite(dec)?dec:0});
       }catch(bodyErr){
         console.error('Planet calculation failed:',name,bodyErr);
       }
@@ -442,8 +444,8 @@ function refreshAstronomy(){
 
     const rahu=normalize360(meanNodeTropicalLongitude(date)-aya);
     placements.push(
-      {name:'Rahu',glyph:'☊',color:'#06d6a0',lon:rahu},
-      {name:'Ketu',glyph:'☋',color:'#ef476f',lon:normalize360(rahu+180)}
+      {name:'Rahu',glyph:'☊',color:'#06d6a0',lon:rahu,dec:eclipticLongitudeToDeclination(rahu,eps)},
+      {name:'Ketu',glyph:'☋',color:'#ef476f',lon:normalize360(rahu+180),dec:eclipticLongitudeToDeclination(normalize360(rahu+180),eps)}
     );
 
     state.astro={date,aya,eps,gmst,sun,placements,realStamp:performance.now()};
@@ -490,6 +492,10 @@ function draw(){
 
     if(document.getElementById('showPlaceLabels').checked){
       drawPoliticalLabels(w,h,earthShiftDeg);
+    }
+
+    if(document.getElementById('showDeclination').checked){
+      drawDeclinationGrid(w,h);
     }
 
     if(document.getElementById('showPlanets').checked){
@@ -1141,6 +1147,48 @@ function drawFieldLabel(text,color,x,y,size){
   ctx.restore();
 }
 
+function declinationToY(dec,h){
+  const max=30;
+  const clamped=Math.max(-max,Math.min(max,Number(dec)||0));
+  return h*.5-(clamped/max)*(h*.42);
+}
+function formatDeclination(dec){
+  const v=Number(dec)||0;
+  return (v>=0?'+':'')+v.toFixed(1)+'°';
+}
+function eclipticLongitudeToDeclination(lon,eps){
+  const l=lon*Math.PI/180,e=eps*Math.PI/180;
+  return Math.asin(Math.sin(e)*Math.sin(l))*180/Math.PI;
+}
+function drawDeclinationGrid(w,h){
+  const minor=state.zoom>=3;
+  const step=minor?1:5;
+  ctx.save();
+  ctx.font=(Math.max(7,9/Math.sqrt(state.zoom)))+'px system-ui,sans-serif';
+  ctx.textAlign='left';
+  ctx.textBaseline='middle';
+
+  for(let dec=-30;dec<=30;dec+=step){
+    const y=declinationToY(dec,h);
+    const major=dec%5===0;
+    const equator=dec===0;
+    if(minor&&!major){
+      ctx.strokeStyle='rgba(170,205,225,.055)';
+      ctx.lineWidth=.45/Math.max(1,Math.sqrt(state.zoom));
+    }else{
+      ctx.strokeStyle=equator?'rgba(255,224,138,.42)':'rgba(137,193,221,.18)';
+      ctx.lineWidth=(equator?1.4:.8)/Math.max(1,Math.sqrt(state.zoom));
+    }
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
+
+    if(major||equator){
+      ctx.fillStyle=equator?'rgba(255,224,138,.78)':'rgba(164,201,220,.62)';
+      ctx.fillText((dec>0?'+':'')+dec+'°',6,y-7/Math.max(1,state.zoom));
+    }
+  }
+  ctx.restore();
+}
+
 function drawProjectedPlanets(w,h,earthShiftDeg){
   if(!state.risingNakGrid) return;
 
@@ -1167,10 +1215,12 @@ function drawProjectedPlanets(w,h,earthShiftDeg){
     const xBase=((start+end+1)/2)/rw*w + earthShiftDeg/360*w;
     const visibleXs=[xBase-w,xBase,xBase+w].filter(x=>x>-70&&x<w+70);
     const x=visibleXs.length?visibleXs[0]:xBase;
+    const y=declinationToY(p.dec,h);
     const bucket=Math.round(x/58);
-    const slot=occupied.get(bucket)||0;
-    occupied.set(bucket,slot+1);
-    const y=h*.40+slot*19;
+    const key=bucket+':'+Math.round(y/18);
+    const slot=occupied.get(key)||0;
+    occupied.set(key,slot+1);
+    const yOffset=slot*14;
 
     const signIndex=Math.floor(normalize360(p.lon)/30);
     const matchesFocus=
@@ -1189,7 +1239,7 @@ function drawProjectedPlanets(w,h,earthShiftDeg){
     ctx.shadowColor='rgba(0,0,0,.98)';
     ctx.shadowBlur=matchesFocus?8:3;
     for(const px of visibleXs){
-      ctx.fillText(`${p.glyph} ${degreeInSign(p.lon)}`,px,y);
+      ctx.fillText(`${p.glyph} ${degreeInSign(p.lon)} · ${formatDeclination(p.dec)}`,px,y+yOffset);
     }
     ctx.restore();
   });
