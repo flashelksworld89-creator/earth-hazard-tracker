@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#06111f">
+<title>Planetary World Focus Agent</title>
+<style>
+:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.15);--text:#eaf4ff;--muted:#91a8bf;--accent:#38bdf8;--gold:#ffd166}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#02070d;color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{background:radial-gradient(circle at 50% 0,#0b1b2c 0,#02070d 40%)}
+header{position:sticky;top:0;z-index:12;display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 18px;background:rgba(2,7,13,.96);border-bottom:1px solid var(--border)}
+.brand{color:inherit;text-decoration:none;font-weight:850;letter-spacing:.05em}.brand small{display:block;color:var(--muted);font-size:10px;font-weight:500;margin-top:2px}
+nav{display:flex;gap:8px;flex-wrap:wrap}nav a{color:#cbe7fa;text-decoration:none;padding:8px 11px;border:1px solid var(--border);border-radius:999px;font-size:11px;font-weight:700;background:rgba(8,20,32,.7)}nav a.active{border-color:var(--accent);color:#7dd3fc}
+main{width:min(1450px,calc(100% - 24px));margin:auto;padding:22px 0 48px}.hero{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:14px}.eyebrow{color:#67e8f9;font-size:10px;font-weight:850;letter-spacing:.13em}h1{font-size:clamp(26px,4vw,44px);margin:5px 0 7px}.hero p{max-width:920px;color:var(--muted);font-size:12px;line-height:1.55;margin:0}.btn{padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:#0b1b2b;color:var(--text);font-size:10px;font-weight:800;cursor:pointer}
+.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}.metric,.panel{border:1px solid var(--border);border-radius:12px;background:rgba(7,20,32,.86);box-shadow:0 14px 36px rgba(0,0,0,.2)}.metric{padding:10px}.metric small{display:block;color:#7896a8;font-size:8px;text-transform:uppercase}.metric b{display:block;margin-top:4px;font-size:15px}.metric span{display:block;margin-top:2px;color:#87a8ba;font-size:8px}
+.panel{padding:12px;margin-bottom:12px}.panel-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}.panel-head strong{font-size:10px;letter-spacing:.07em}.status{color:#7d9aac;font-size:9px}
+.focus-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.focus-card{padding:12px;border:1px solid rgba(124,185,255,.1);border-radius:10px;background:#06111f}.focus-card small{display:block;color:#87a8ba;font-size:8px;text-transform:uppercase}.focus-card b{display:block;margin-top:4px;font-size:13px}.focus-card p{margin:5px 0 0;color:#91a8bf;font-size:8px;line-height:1.45}
+.planet-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.planet{padding:10px;border:1px solid rgba(124,185,255,.1);border-radius:10px;background:linear-gradient(180deg,#071622,#050e16)}.planet-head{display:flex;gap:8px;align-items:center}.planet-glyph{font-size:20px}.planet b{font-size:10px}.planet span{display:block;color:#88a7b8;font-size:8px;line-height:1.4;margin-top:2px}.planet .focus{margin-top:7px;padding-top:6px;border-top:1px solid rgba(124,185,255,.08);color:#cbdce5}
+.cluster-list{display:grid;gap:7px}.cluster{padding:9px;border:1px solid rgba(124,185,255,.09);border-radius:9px;background:#06111f}.cluster b{font-size:10px}.cluster span{display:block;color:#86a4b5;font-size:8px;margin-top:3px}.cluster a{color:#bde9ff;text-decoration:none}.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}.tag{padding:3px 6px;border-radius:999px;border:1px solid rgba(56,189,248,.08);background:rgba(56,189,248,.05);color:#91b9cb;font-size:7px}
+.note{margin-top:8px;padding-top:8px;border-top:1px solid rgba(124,185,255,.08);color:#6e8796;font-size:8px;line-height:1.5}.empty{padding:24px;text-align:center;color:#7893a4;font-size:9px}
+@media(max-width:1000px){.metrics{grid-template-columns:repeat(3,1fr)}.planet-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){header,.hero{align-items:stretch;flex-direction:column}.metrics,.focus-grid,.planet-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/worldfocus.html'));</script>
+<header>
+<a class="brand" href="/">◎ SIDEREAL TRANSIT MAP<small>Planetary World Focus Agent</small></a>
+<nav><a href="/">🌎 Earth Tracker</a><a href="/news.html">◉ Leader Agents</a><a href="/aviation.html">✈ Aviation Agent</a><a class="active" href="/worldfocus.html">◎ World Focus</a><a href="/patterns.html">◫ Pattern Lab</a></nav>
+</header>
+<main>
+<section class="hero"><div><span class="eyebrow">GLOBAL DAILY ATTENTION MODEL</span><h1>Planetary World Focus Agent</h1><p>Clusters today's global headlines into underlying events, identifies primary/secondary/emerging themes, and stores that world-focus profile with sidereal transit states. Moon is tracked daily and by sign/nakshatra. Rahu, Ketu, Uranus, Neptune and Pluto are explicitly profiled by nakshatra transit.</p></div><button id="scanBtn" class="btn">Analyze today</button></section>
+
+<section class="metrics">
+<div class="metric"><small>Today's headlines</small><b id="headlineCount">0</b><span>same-day global feed</span></div>
+<div class="metric"><small>Distinct event clusters</small><b id="clusterCount">0</b><span>duplicate stories collapsed</span></div>
+<div class="metric"><small>Top focus score</small><b id="topScore">—</b><span>event diversity + source breadth</span></div>
+<div class="metric"><small>Stored daily profiles</small><b id="storedCount">0</b><span>browser history</span></div>
+<div class="metric"><small>Updated</small><b id="updated">—</b><span id="status">Ready</span></div>
+</section>
+
+<section class="panel"><div class="panel-head"><strong>TODAY'S WORLD FOCUS</strong><span class="status">primary · secondary · emerging</span></div><div id="focusGrid" class="focus-grid"></div></section>
+<section class="panel"><div class="panel-head"><strong>PLANET TRANSIT PROFILES</strong><span class="status">Lahiri sidereal</span></div><div id="planetGrid" class="planet-grid"></div><div class="note">The same observed world-focus profile is stored against each planet's transit state. This supports later baseline comparisons such as “how often was diplomacy the primary theme during this transit condition versus its overall rate?” Correlation is descriptive and does not establish causation.</div></section>
+<section class="panel"><div class="panel-head"><strong>TOP UNDERLYING EVENT CLUSTERS</strong><span class="status">syndicated headlines collapsed</span></div><div id="clusterList" class="cluster-list"></div></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+<script>
+const A=window.Astronomy;
+const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const SG=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
+const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
+const PG={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Rahu:'☊',Ketu:'☋',Uranus:'♅',Neptune:'♆',Pluto:'♇'};
+const PLANETS=['Moon','Sun','Mercury','Venus','Mars','Jupiter','Saturn','Rahu','Ketu','Uranus','Neptune','Pluto'];
+const NAK_SUMMARY=new Set(['Rahu','Ketu','Uranus','Neptune','Pluto']);
+const STORE='planetary-world-focus-v1';
+const CATEGORIES={
+ 'War / Conflict':['war','attack','strike','missile','military','troops','bomb','invasion','ceasefire','combat','shooting'],
+ 'Diplomacy / Leader Meetings':['summit','meeting','bilateral','talks','diplomatic','president','prime minister','leaders meet','negotiations'],
+ 'Government / Political Change':['government','election','parliament','congress','cabinet','minister','president','policy','law','court','ruling'],
+ 'Economy / Markets':['market','stocks','economy','trade','tariff','inflation','jobs','bank','interest rate','investment','currency'],
+ 'Natural Disaster':['earthquake','hurricane','typhoon','flood','wildfire','volcano','storm','tornado','landslide','tsunami'],
+ 'Aviation / Transport':['aircraft','plane','airline','flight','airport','train','rail','ship','transport','crash'],
+ 'Technology / AI':['technology','artificial intelligence',' ai ','chip','cyber','software','internet','robot','spacecraft'],
+ 'Crime / Public Safety':['police','crime','arrest','killed','shooting','security','terror','explosion'],
+ 'Health':['health','virus','disease','hospital','vaccine','outbreak','medical'],
+ 'Science / Space':['science','space','nasa','research','satellite','astronomy','discovery'],
+ 'Energy':['oil','gas','energy','nuclear','electricity','power grid'],
+ 'Migration':['migration','migrant','immigration','refugee','border','asylum'],
+ 'Climate / Environment':['climate','environment','emissions','temperature','drought','ocean'],
+ 'Culture / Entertainment':['film','music','celebrity','sports','festival','award','entertainment']
+};
+let state={articles:[],clusters:[],focus:[],transits:{}};
+document.getElementById('scanBtn').onclick=analyze;
+analyze();
+
+async function analyze(){
+ document.getElementById('status').textContent='Analyzing global headlines…';
+ try{
+  const r=await fetch('/api/news?ts='+Date.now(),{cache:'no-store'});
+  if(!r.ok)throw new Error('News HTTP '+r.status);
+  const data=await r.json();
+  state.articles=(data.articles||[]).filter(a=>isToday(a.publishedAt));
+  state.clusters=clusterArticles(state.articles);
+  state.focus=scoreWorldFocus(state.clusters);
+  state.transits=calculateAllTransits(new Date());
+  saveTodayProfile();
+  render();
+  document.getElementById('status').textContent='Analysis complete';
+ }catch(e){console.error(e);document.getElementById('status').textContent='Analysis unavailable'}
+}
+function clusterArticles(articles){
+ const clusters=[];
+ for(const a of articles){
+  const tokens=importantTokens((a.title||'')+' '+(a.description||''));
+  let best=null,bestScore=0;
+  for(const c of clusters){
+   const score=jaccard(tokens,c.tokens);
+   if(score>bestScore){bestScore=score;best=c}
+  }
+  if(best&&bestScore>=.34){
+   best.articles.push(a);best.sources.add(a.source||'Unknown');best.tokens=union(best.tokens,tokens);
+  }else{
+   clusters.push({id:'c'+clusters.length,tokens,articles:[a],sources:new Set([a.source||'Unknown'])});
+  }
+ }
+ return clusters.map(c=>{
+  const cats=classifyText(c.articles.map(a=>(a.title||'')+' '+(a.description||'')).join(' '));
+  const title=c.articles[0]?.title||'Untitled event';
+  return {...c,categories:cats,title,score:c.sources.size*2+Math.sqrt(c.articles.length)};
+ }).sort((a,b)=>b.score-a.score);
+}
+function importantTokens(text){
+ const stop=new Set(['about','after','again','against','being','could','from','have','into','more','over','said','says','than','that','their','there','these','they','this','with','would','world','news','breaking','today']);
+ return [...new Set(String(text).toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(x=>x.length>3&&!stop.has(x)))];
+}
+function jaccard(a,b){const A=new Set(a),B=new Set(b);let i=0;A.forEach(x=>{if(B.has(x))i++});const u=A.size+B.size-i;return u?i/u:0}
+function union(a,b){return [...new Set([...a,...b])]}
+function classifyText(text){
+ const t=' '+String(text).toLowerCase()+' ';const out=[];
+ for(const [name,terms] of Object.entries(CATEGORIES)){
+  let hits=0;for(const term of terms)if(t.includes(term))hits++;
+  if(hits)out.push({name,hits});
+ }
+ return out.sort((a,b)=>b.hits-a.hits);
+}
+function scoreWorldFocus(clusters){
+ const m=new Map();
+ for(const c of clusters){
+  for(const cat of c.categories.slice(0,3)){
+   const row=m.get(cat.name)||{name:cat.name,score:0,clusters:0,sources:new Set()};
+   row.score+=c.score*(1+Math.min(cat.hits,3)*.2);row.clusters++;
+   c.sources.forEach(s=>row.sources.add(s));m.set(cat.name,row);
+  }
+ }
+ return [...m.values()].map(x=>({...x,sourceCount:x.sources.size})).sort((a,b)=>b.score-a.score);
+}
+function calculateAllTransits(date){
+ const aya=lahiriAyanamsa(date),out={};
+ for(const name of PLANETS){
+  let lon;
+  if(name==='Rahu')lon=norm(meanNodeTropicalLongitude(date)-aya);
+  else if(name==='Ketu')lon=norm(meanNodeTropicalLongitude(date)-aya+180);
+  else{const v=A.GeoVector(A.Body[name],date,true),e=A.Ecliptic(v);lon=norm(Number(e.elon)-aya)}
+  const sign=Math.floor(lon/30),degree=lon%30,nak=Math.floor(lon/(360/27)),nakDegree=lon%(360/27);
+  out[name]={name,lon,sign,degree,nak,nakDegree,summaryUnit:NAK_SUMMARY.has(name)?'nakshatra transit':name==='Moon'?'daily + sign/nakshatra':'sign transit'};
+ }
+ return out;
+}
+function saveTodayProfile(){
+ const day=new Date().toISOString().slice(0,10);
+ const history=loadHistory();
+ const profile={
+  day,createdAt:new Date().toISOString(),
+  headlineCount:state.articles.length,clusterCount:state.clusters.length,
+  focus:state.focus.slice(0,8).map(x=>({name:x.name,score:x.score,clusters:x.clusters,sourceCount:x.sourceCount})),
+  transits:state.transits
+ };
+ const i=history.findIndex(x=>x.day===day);
+ if(i>=0)history[i]=profile;else history.push(profile);
+ localStorage.setItem(STORE,JSON.stringify(history.slice(-730)));
+}
+function loadHistory(){try{const x=JSON.parse(localStorage.getItem(STORE)||'[]');return Array.isArray(x)?x:[]}catch{return[]}}
+function render(){
+ const h=loadHistory();
+ document.getElementById('headlineCount').textContent=state.articles.length;
+ document.getElementById('clusterCount').textContent=state.clusters.length;
+ document.getElementById('topScore').textContent=state.focus[0]?state.focus[0].score.toFixed(1):'—';
+ document.getElementById('storedCount').textContent=h.length;
+ document.getElementById('updated').textContent=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ renderFocus();renderPlanets();renderClusters();
+}
+function renderFocus(){
+ const labels=['Primary','Secondary','Emerging'];
+ document.getElementById('focusGrid').innerHTML=[0,1,2].map(i=>{
+  const x=state.focus[i];return '<div class="focus-card"><small>'+labels[i]+'</small><b>'+(x?esc(x.name):'—')+'</b><p>'+(x?x.clusters+' distinct event clusters · '+x.sourceCount+' sources · score '+x.score.toFixed(1):'Not enough data')+'</p></div>';
+ }).join('');
+}
+function renderPlanets(){
+ const primary=state.focus[0]?.name||'No dominant focus yet';
+ document.getElementById('planetGrid').innerHTML=PLANETS.map(name=>{
+  const t=state.transits[name];
+  const unit=t.summaryUnit;
+  const nakLine=NAK_SUMMARY.has(name)||name==='Moon'?'<span>Nakshatra: '+NAK[t.nak]+' '+t.nakDegree.toFixed(2)+'°</span>':'';
+  return '<div class="planet"><div class="planet-head"><span class="planet-glyph">'+PG[name]+'</span><div><b>'+name+'</b><span>'+SG[t.sign]+' '+SIGNS[t.sign]+' '+t.degree.toFixed(2)+'°</span>'+nakLine+'</div></div><span>Profile unit: '+unit+'</span><span class="focus">Today’s primary world focus: '+esc(primary)+'</span></div>';
+ }).join('');
+}
+function renderClusters(){
+ const el=document.getElementById('clusterList');
+ if(!state.clusters.length){el.innerHTML='<div class="empty">No same-day event clusters found.</div>';return}
+ el.innerHTML=state.clusters.slice(0,12).map(c=>'<div class="cluster"><b><a href="'+escAttr(c.articles[0]?.url||'')+'" target="_blank" rel="noopener noreferrer">'+esc(c.title)+'</a></b><span>'+c.articles.length+' headline'+(c.articles.length===1?'':'s')+' · '+c.sources.size+' source'+(c.sources.size===1?'':'s')+' · cluster score '+c.score.toFixed(1)+'</span><div class="tags">'+c.categories.slice(0,3).map(x=>'<span class="tag">'+esc(x.name)+'</span>').join('')+'</div></div>').join('');
+}
+function isToday(v){const d=new Date(v),n=new Date();return Number.isFinite(d.getTime())&&d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()}
+function lahiriAyanamsa(date){const jd=date.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
+function meanNodeTropicalLongitude(date){const jd=date.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return norm(125.04452-1934.136261*T+.0020708*T*T+(T*T*T)/450000)}
+function norm(x){return((x%360)+360)%360}
+function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}function escAttr(v){return esc(v).replace(/`/g,'&#96;')}
+</script>
+</body></html>
