@@ -75,6 +75,13 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 <div class="panel"><h2>Moon nakshatra experiment</h2><div class="sub">Observed earthquake timestamps versus an expected Moon-nakshatra distribution sampled uniformly across the same time window.</div><div id="nakGrid" class="nak-grid"><div class="loading">Loading astronomy…</div></div><div id="astroNote" class="note">This is an exploratory correlation screen. It does not show that lunar position causes earthquakes.</div></div>
 <div class="panel"><h2>Regional seismic activity</h2><div class="sub">Broad geographic regions for comparing where the selected seismic activity is concentrated.</div><div id="regionBars" class="bars"><div class="loading">Loading regions…</div></div></div>
 <div class="panel"><h2>Monthly seismic–nakshatra report</h2><div class="sub">Current calendar month. Ranks nakshatras by observed-versus-expected activity and shows where the events were concentrated.</div><div id="monthlyReport"><div class="loading">Building monthly report…</div></div></div>
+<div class="panel"><h2>Planetary World Focus history</h2><div class="sub">Compares saved daily world-focus profiles against the Moon and slower-planet transit conditions. Rahu, Ketu, Uranus, Neptune and Pluto are grouped by nakshatra transit.</div>
+<div class="leader-analysis-controls">
+<label>Planet<select id="worldFocusPlanet"><option>Moon</option><option>Rahu</option><option>Ketu</option><option>Uranus</option><option>Neptune</option><option>Pluto</option></select></label>
+<label>History window<select id="worldFocusDays"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></label>
+</div>
+<div id="worldFocusAnalysis"><div class="loading">No World Focus history loaded yet.</div></div>
+<div class="note">Sample size is shown with every transit bucket. These summaries are descriptive comparisons of news attention and planetary positions, not evidence of causation.</div></div>
 <div class="panel"><h2>Leader meeting ↔ assigned-planet pattern analysis</h2><div class="sub">Weekly and monthly summaries of leader-to-leader meetings recorded by Leader Agents. Compares meeting type, place, topic, counterpart pair and each leader’s assigned-planet transit position.</div>
 <div class="leader-analysis-controls">
 <label>Analysis window<select id="leaderWindow"><option value="7">Weekly · 7 days</option><option value="30" selected>Monthly · 30 days</option></select></label>
@@ -97,6 +104,8 @@ document.getElementById('astroMag').addEventListener('change',()=>{renderAstro()
 document.getElementById('region').addEventListener('change',render);
 document.getElementById('leaderWindow').addEventListener('change',renderLeaderAnalysis);
 document.getElementById('leaderProfile').addEventListener('change',renderLeaderAnalysis);
+document.getElementById('worldFocusPlanet').addEventListener('change',renderWorldFocusAnalysis);
+document.getElementById('worldFocusDays').addEventListener('change',renderWorldFocusAnalysis);
 populateLeaderProfileFilter();
 load();
 
@@ -129,7 +138,7 @@ function render(){
  document.getElementById('sEq').textContent=a.length;
  document.getElementById('sM6').textContent=a.filter(x=>x.mag>=6).length;
  document.getElementById('sHaz').textContent=state.haz.length;
- renderHours(a);renderHotspots(a);renderHaz();renderRegions(a);renderAstro();renderMonthlyReport();renderLeaderAnalysis();
+ renderHours(a);renderHotspots(a);renderHaz();renderRegions(a);renderAstro();renderMonthlyReport();renderLeaderAnalysis();renderWorldFocusAnalysis();
 }
 function renderHours(a){
  const counts=Array(24).fill(0);a.forEach(x=>counts[new Date(x.time).getUTCHours()]++);
@@ -151,6 +160,52 @@ function renderRegions(a){
  const rows=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
  const max=Math.max(1,...rows.map(x=>x[1]));
  document.getElementById('regionBars').innerHTML=rows.length?rows.map(([name,v])=>'<div class="barrow"><span>'+name+'</span><div class="track"><div class="fill" style="width:'+(v/max*100).toFixed(1)+'%"></div></div><span class="value">'+v+'</span></div>').join(''):'<div class="loading">No events in this filter.</div>';
+}
+
+function loadWorldFocusHistory(){
+ try{
+  const rows=JSON.parse(localStorage.getItem('planetary-world-focus-v1')||'[]');
+  return Array.isArray(rows)?rows:[];
+ }catch{return[]}
+}
+function renderWorldFocusAnalysis(){
+ const target=document.getElementById('worldFocusAnalysis');if(!target)return;
+ const planet=document.getElementById('worldFocusPlanet')?.value||'Moon';
+ const days=Number(document.getElementById('worldFocusDays')?.value||30);
+ const cutoff=Date.now()-days*86400000;
+ const rows=loadWorldFocusHistory().filter(r=>new Date(r.createdAt||r.day).getTime()>=cutoff&&r.transits?.[planet]);
+ if(!rows.length){target.innerHTML='<div class="loading">No saved World Focus profiles for this window yet.</div>';return}
+
+ const slow=['Rahu','Ketu','Uranus','Neptune','Pluto'].includes(planet);
+ const labels=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+ const nak=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
+ const buckets=new Map();
+ for(const r of rows){
+   const t=r.transits[planet];
+   const key=slow?nak[t.nak]:(planet==='Moon'?(labels[t.sign]+' · '+nak[t.nak]):labels[t.sign]);
+   const b=buckets.get(key)||{n:0,focus:new Map()};
+   b.n++;
+   const primary=r.focus?.[0]?.name||'No dominant focus';
+   b.focus.set(primary,(b.focus.get(primary)||0)+1);
+   buckets.set(key,b);
+ }
+ const ranked=[...buckets.entries()].map(([name,b])=>{
+   const top=[...b.focus.entries()].sort((a,b)=>b[1]-a[1])[0]||['—',0];
+   return {name,n:b.n,focus:top[0],count:top[1],rate:b.n?top[1]/b.n*100:0};
+ }).sort((a,b)=>b.n-a.n||b.rate-a.rate);
+
+ const overall=countBy(rows,r=>r.focus?.[0]?.name||'No dominant focus');
+ target.innerHTML=
+   '<div class="analysis-cards">'+
+     analysisCard('Saved daily profiles',rows.length,days+'-day window')+
+     analysisCard('Planet',planet,slow?'Grouped by nakshatra transit':'Moon grouped by sign + nakshatra')+
+     analysisCard('Most common primary focus',overall[0]?.[0]||'—',(overall[0]?.[1]||0)+' of '+rows.length+' days')+
+     analysisCard('Transit buckets',ranked.length,'Conditions with saved observations')+
+   '</div>'+
+   '<div class="analysis-list"><strong style="font-size:9px">'+escapePattern(planet)+' transit → primary world focus</strong>'+
+   ranked.slice(0,18).map(x=>'<div class="analysis-row"><strong>'+escapePattern(x.name)+' · '+escapePattern(x.focus)+'</strong><span>'+x.count+'/'+x.n+' · '+x.rate.toFixed(0)+'%</span></div>').join('')+
+   '</div>'+
+   analysisList('Overall primary-focus baseline',overall.slice(0,10));
 }
 
 function loadLeaderObservations(){
