@@ -53,8 +53,8 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
   <section class="hero">
     <div>
       <span class="eyebrow">CONFIGURABLE LEADER TRANSIT AGENTS</span>
-      <h1>Leader profiles + same-day event tracking</h1>
-      <p>Create profiles for public leaders, define the natal framework you want to use, and compare today's public actions and statements with selected sidereal transit channels. Astrology is presented as a symbolic correlation layer, not evidence of private mental states or causation.</p>
+      <h1>Leader meetings + assigned-planet tracking</h1>
+      <p>Create leader profiles, assign each leader a planet, and track only reports of leaders meeting one another. Each meeting is recorded with place, meeting type, topic and the sidereal position of each tracked leader’s assigned planet.</p>
     </div>
     <div class="hero-actions">
       <button id="refreshBtn" class="btn">Refresh today</button>
@@ -85,10 +85,10 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 
       <div class="report-intro">
         <b>REPORT LOGIC</b>
-        <p><strong>Mars</strong> = observable actions · <strong>Sun</strong> = stated/public purpose · <strong>Moon</strong> = reaction and timing climate · <strong>Rahu</strong> = surprise, amplification and irregularity · <strong>Ketu</strong> = withdrawal, reversal, severance and simplifying pressure. The report compares these symbolic channels with same-day public reporting; it does not claim access to a person's private thoughts or hidden motives.</p>
+        <p>This agent now tracks <strong>leader-to-leader meetings only</strong>. For every qualifying meeting it records who met, where they met, whether it was private or open/public, what the meeting was about, and the sidereal position of the planet assigned to each tracked leader at that meeting time.</p>
       </div>
 
-      <div id="breakingSummary" class="breaking-summary"><b>Today's breaking-news categories</b><p>Loading…</p></div>
+      <div id="breakingSummary" class="breaking-summary"><b>Today's leader meetings</b><p>Loading…</p></div>
       <div id="channelGrid" class="channel-grid"></div>
 
       <div class="disclaimer">This page is a research and pattern-comparison tool. News links remain attributable to their publishers. The transit interpretations are symbolic astrological interpretations, and recurring correlations should not be treated as proof that a transit caused an event or that it reveals a person's private mental state.</div>
@@ -236,286 +236,263 @@ function activateProfile(id){
 async function refreshActive(manual){
   const seq=++refreshSeq;
   const p=getActiveProfile();
-  document.getElementById('astroStatus').textContent='Calculating Lahiri sidereal transits…';
-  document.getElementById('newsStatus').textContent=(manual?'Refreshing':'Loading')+" today's breaking news…";
+  document.getElementById('astroStatus').textContent='Calculating assigned-planet transit…';
+  document.getElementById('newsStatus').textContent=(manual?'Refreshing':'Loading')+" today's leader meetings…";
+
   try{
-    currentTransits=calculateTrackedTransits(new Date(),p);
+    currentTransits=calculateAssignedPlanetTransit(new Date(),p);
     if(seq!==refreshSeq)return;
-    renderTransits(p,currentTransits);
-    document.getElementById('astroStatus').textContent='Lahiri sidereal · '+new Date().toLocaleString();
+    renderAssignedPlanetTransit(p,currentTransits);
+    document.getElementById('astroStatus').textContent=(PLANET_GLYPHS[p.planet]||'')+' '+(p.planet||'Unassigned')+' · Lahiri sidereal · '+new Date().toLocaleString();
   }catch(e){
     console.error(e);
-    document.getElementById('astroStatus').textContent='Transit calculation unavailable';
+    document.getElementById('astroStatus').textContent='Assigned-planet calculation unavailable';
     currentTransits=null;
   }
 
   try{
-    const leaderQuery=buildLeaderNewsQuery(p);
+    const leaderQuery=buildLeaderMeetingQuery(p);
     const r=await fetch('/api/news?q='+encodeURIComponent(leaderQuery),{cache:'no-store'});
     if(!r.ok) throw new Error('News HTTP '+r.status);
     const data=await r.json();
     if(seq!==refreshSeq)return;
-    currentArticles=(Array.isArray(data.articles)?data.articles:[])
+
+    const articles=(Array.isArray(data.articles)?data.articles:[])
       .filter(a=>isToday(a.publishedAt))
-      .filter(a=>storyMatchesActiveLeader(a,p));
-    const classified=currentArticles.map(article=>({article,...classifyStory(article)}));
-    currentCategories=summarizeCategories(classified);
-    renderBreakingSummary(currentCategories,currentArticles.length);
-    renderChannels(p,currentTransits,classified);
-    document.getElementById('newsStatus').textContent=currentArticles.length+" same-day breaking headline"+(currentArticles.length===1?'':'s')+' · '+leaderQuery;
+      .filter(a=>storyMatchesActiveLeader(a,p))
+      .filter(isLeaderMeetingStory);
+
+    const meetings=articles
+      .map(a=>buildMeetingObservation(a,p))
+      .filter(Boolean);
+
+    saveMeetingObservations(meetings);
+    currentArticles=articles;
+    currentCategories=summarizeMeetingTypes(meetings);
+    renderMeetingSummary(meetings);
+    renderMeetingReports(p,meetings);
+
+    document.getElementById('newsStatus').textContent=
+      meetings.length+" same-day leader meeting"+(meetings.length===1?'':'s')+' · '+leaderQuery;
   }catch(e){
     console.error(e);
     currentArticles=[];currentCategories=[];
-    renderBreakingSummary([],0);
-    renderChannels(p,currentTransits,[]);
-    document.getElementById('newsStatus').textContent="Today's news feed unavailable";
+    renderMeetingSummary([]);
+    renderMeetingReports(p,[]);
+    document.getElementById('newsStatus').textContent="Today's leader-meeting feed unavailable";
   }
 }
 
-function buildLeaderNewsQuery(profile){
-  const parts=[profile.name,profile.institution,profile.newsQuery]
-    .map(v=>String(v||'').trim())
-    .filter(Boolean);
-  const unique=[...new Set(parts)];
-  return unique.join(' ');
+function buildLeaderMeetingQuery(profile){
+  const base=[profile.name,profile.institution]
+    .map(v=>String(v||'').trim()).filter(Boolean).join(' ');
+  return base+' summit meeting bilateral talks leaders meeting';
 }
 
 function storyMatchesActiveLeader(article,profile){
-  const text=((article.title||'')+' '+(article.description||'')+' '+(article.source||'')).toLowerCase();
+  const text=((article.title||'')+' '+(article.description||'')).toLowerCase();
   const name=String(profile.name||'').toLowerCase().trim();
-  const institution=String(profile.institution||'').toLowerCase().trim();
-  const query=String(profile.newsQuery||'').toLowerCase().trim();
-
-  const nameParts=name.split(/\s+/).filter(x=>x.length>2);
-  const hasFullName=name && text.includes(name);
-  const hasStrongName=nameParts.length>=2 && nameParts.filter(x=>text.includes(x)).length>=2;
-
-  const institutionTokens=institution
-    .split(/[^a-z0-9]+/)
-    .filter(x=>x.length>3 && !['president','minister','government','united','states'].includes(x));
-  const institutionHit=institutionTokens.some(x=>text.includes(x));
-
-  const queryTokens=query
-    .split(/[^a-z0-9]+/)
-    .filter(x=>x.length>4 && !nameParts.includes(x));
-  const queryHit=queryTokens.some(x=>text.includes(x));
-
-  return hasFullName || hasStrongName || (institutionHit && (hasFullName||hasStrongName||queryHit));
+  const parts=name.split(/\s+/).filter(x=>x.length>2);
+  return (name&&text.includes(name)) || (parts.length>=2&&parts.filter(x=>text.includes(x)).length>=2);
 }
 
-function calculateTrackedTransits(date,profile){
-  if(!A) throw new Error('Astronomy Engine missing');
-  const aya=lahiriAyanamsa(date);
-  const out={};
-  for(const name of ['Sun','Moon','Mars']){
-    const body=A.Body[name];
-    const vec=A.GeoVector(body,date,true);
-    const ecl=A.Ecliptic(vec);
-    const lon=normalize360(Number(ecl.elon)-aya);
-    out[name]=transitRecord(name,lon,profile);
+function isLeaderMeetingStory(article){
+  const text=((article.title||'')+' '+(article.description||'')).toLowerCase();
+  const meetingTerms=[
+    'meeting','meets','met with','summit','bilateral','talks','held talks','private talks',
+    'closed-door','closed door','one-on-one','one on one','working dinner','working lunch',
+    'state visit','official visit','hosted','hosts','sit-down','roundtable','plenary',
+    'joint meeting','delegation meeting','leaders gather','leader summit'
+  ];
+  return meetingTerms.some(term=>text.includes(term));
+}
+
+function buildMeetingObservation(article,activeProfile){
+  const text=((article.title||'')+' '+(article.description||'')).toLowerCase();
+  const counterparts=profiles
+    .filter(p=>p.id!==activeProfile.id)
+    .filter(p=>profileMentioned(text,p));
+
+  const meetingType=detectMeetingType(text);
+  const location=extractMeetingLocation(article);
+  const topic=extractMeetingTopic(article);
+  const meetingTime=new Date(article.publishedAt);
+  if(!Number.isFinite(meetingTime.getTime())) return null;
+
+  const participants=[activeProfile,...counterparts];
+  const planetSnapshots=participants.map(p=>({
+    profileId:p.id,
+    leaderName:p.name,
+    assignedPlanet:p.planet||'Sun',
+    ...calculateAssignedPlanetTransit(meetingTime,p)
+  }));
+
+  return {
+    key:[meetingTime.toISOString().slice(0,10),activeProfile.id,article.url||article.title].join('|'),
+    observedAt:new Date().toISOString(),
+    day:meetingTime.toISOString().slice(0,10),
+    meetingTime:meetingTime.toISOString(),
+    timeBasis:'publication-time proxy',
+    activeProfileId:activeProfile.id,
+    activeLeader:activeProfile.name,
+    counterpartProfiles:counterparts.map(p=>({id:p.id,name:p.name,planet:p.planet||'Sun'})),
+    meetingType,
+    location,
+    topic,
+    storyTitle:article.title||'',
+    storyUrl:article.url||'',
+    source:article.source||'',
+    planetSnapshots
+  };
+}
+
+function profileMentioned(text,profile){
+  const name=String(profile.name||'').toLowerCase().trim();
+  if(name&&text.includes(name))return true;
+  const parts=name.split(/\s+/).filter(x=>x.length>2);
+  return parts.length>=2&&parts.filter(x=>text.includes(x)).length>=2;
+}
+
+function detectMeetingType(text){
+  if(['closed-door','closed door','private meeting','private talks','one-on-one','one on one','working dinner','working lunch'].some(x=>text.includes(x))) return 'Private / closed meeting';
+  if(['joint press conference','public meeting','plenary','roundtable','joint remarks','open meeting'].some(x=>text.includes(x))) return 'Open / public meeting';
+  if(text.includes('summit')) return 'Summit';
+  if(text.includes('bilateral')) return 'Bilateral meeting';
+  if(text.includes('state visit')||text.includes('official visit')) return 'Official visit / meeting';
+  return 'Leader meeting / talks';
+}
+
+function extractMeetingLocation(article){
+  const text=(article.title||'')+' '+(article.description||'');
+  const patterns=[
+    /\b(?:in|at)\s+([A-Z][A-Za-z.'’\-]+(?:\s+[A-Z][A-Za-z.'’\-]+){0,3})(?=,|\.|\s(?:on|for|to|where|as|after|before|during)\b|$)/,
+    /\b(?:White House|Oval Office|Kremlin|Downing Street|United Nations|UN headquarters|NATO headquarters)\b/i
+  ];
+  for(const re of patterns){
+    const m=text.match(re);
+    if(m)return (m[1]||m[0]).trim();
   }
-  const rahu=normalize360(meanNodeTropicalLongitude(date)-aya);
-  out.Rahu=transitRecord('Rahu',rahu,profile);
-  out.Ketu=transitRecord('Ketu',normalize360(rahu+180),profile);
-  return out;
+  return 'Location not identified in headline';
 }
 
-function transitRecord(name,lon,profile){
+function extractMeetingTopic(article){
+  const text=((article.title||'')+' '+(article.description||'')).toLowerCase();
+  const topics=[
+    ['Ukraine / Russia',['ukraine','russia','war']],
+    ['Middle East',['iran','israel','gaza','middle east','ceasefire']],
+    ['Trade / Economy',['trade','tariff','economy','investment','sanctions']],
+    ['Defense / Security',['defense','military','security','nato','weapons']],
+    ['Immigration / Border',['immigration','border','migrant']],
+    ['Energy',['energy','oil','gas','nuclear']],
+    ['Technology / AI',['technology','artificial intelligence','ai ','chips','cyber']],
+    ['Climate / Environment',['climate','environment','emissions']],
+    ['Diplomacy / Relations',['relations','diplomatic','cooperation','alliance']]
+  ];
+  const found=topics.filter(([,terms])=>terms.some(t=>text.includes(t))).map(([name])=>name);
+  return found.length?found.slice(0,3).join(' · '):'Topic not identified in headline';
+}
+
+function calculateAssignedPlanetTransit(date,profile){
+  const name=profile.planet||'Sun';
+  const lon=planetSiderealLongitude(name,date);
   const sign=Math.floor(lon/30);
   const degree=lon%30;
-  const house=((sign-profile.asc+12)%12)+1;
-  const aspectsNatalMars=aspectsHouse(name,house,profile.marsHouse);
-  const conjunctNatalMars=house===profile.marsHouse;
-  return {name,lon,sign,degree,house,aspectsNatalMars,conjunctNatalMars};
+  const house=((sign-Number(profile.asc||0)+12)%12)+1;
+  return {planet:name,lon,sign,degree,house};
 }
 
-function renderTransits(profile,transits){
-  document.getElementById('transitGrid').innerHTML=CHANNELS.map(ch=>{
-    const t=transits[ch.key];
-    return '<div class="transit-card"><span class="glyph">'+ch.glyph+'</span><b>'+ch.key+' · H'+t.house+'</b>'+
-      '<span>'+SIGN_GLYPHS[t.sign]+' '+SIGNS[t.sign]+' '+t.degree.toFixed(1)+'°</span>'+
-      '<span>'+(t.conjunctNatalMars?'Activates natal Mars house':t.aspectsNatalMars?'Full aspect to natal Mars house':'No full aspect to natal Mars house')+'</span></div>';
-  }).join('');
+function planetSiderealLongitude(name,date){
+  const aya=lahiriAyanamsa(date);
+  if(name==='Rahu') return normalize360(meanNodeTropicalLongitude(date)-aya);
+  if(name==='Ketu') return normalize360(meanNodeTropicalLongitude(date)-aya+180);
+  if(!A?.Body?.[name]) throw new Error('Unsupported planet '+name);
+  const vec=A.GeoVector(A.Body[name],date,true);
+  const ecl=A.Ecliptic(vec);
+  return normalize360(Number(ecl.elon)-aya);
 }
 
-function renderChannels(profile,transits,classified){
-  if(!transits){
-    document.getElementById('channelGrid').innerHTML='<div class="empty">Transit data unavailable.</div>';return;
+function renderAssignedPlanetTransit(profile,t){
+  document.getElementById('transitGrid').innerHTML=
+    '<div class="transit-card"><span class="glyph">'+(PLANET_GLYPHS[profile.planet]||'')+'</span><b>'+esc(profile.planet||'Sun')+' · H'+t.house+'</b>'+
+    '<span>'+SIGN_GLYPHS[t.sign]+' '+SIGNS[t.sign]+' '+t.degree.toFixed(2)+'°</span>'+
+    '<span>Assigned planet for '+esc(profile.name)+'</span></div>';
+}
+
+function renderMeetingReports(profile,meetings){
+  const grid=document.getElementById('channelGrid');
+  if(!meetings.length){
+    grid.innerHTML='<div class="empty">No same-day leader meeting stories found for this profile.</div>';
+    return;
   }
-  document.getElementById('channelGrid').innerHTML=CHANNELS.map(ch=>{
-    const t=transits[ch.key];
-    const narrative=channelNarrative(ch,t,profile,transits);
-    const matches=classified
-      .map(x=>{
-        const meetingBoost=(x.categories||[]).some(c=>c==='Leader Gatherings / Private Meetings'||c==='Leader Gatherings / Open Meetings')?1.25:0;
-        return {x,score:(x.channelScores[ch.key]||0)+transitCategoryBoost(ch.key,t,x.categories)+meetingBoost};
-      })
-      .filter(r=>r.score>=1.2)
-      .sort((a,b)=>b.score-a.score)
-      .slice(0,4);
-    rememberMatches(profile,ch,t,matches);
-    const memory=memoryText(profile,ch,t);
+  grid.innerHTML=meetings.map(m=>{
+    const active=m.planetSnapshots.find(x=>x.profileId===profile.id)||m.planetSnapshots[0];
+    const counterpartNames=m.counterpartProfiles.length
+      ? m.counterpartProfiles.map(x=>x.name).join(', ')
+      : 'Counterpart not yet matched to a saved profile';
+
     return '<article class="channel-card">'+
-      '<div class="channel-head"><span class="channel-icon">'+ch.glyph+'</span><div><b>'+ch.key+' · '+ch.title+'</b><small>'+ch.subtitle+'</small></div></div>'+
-      '<p>'+esc(narrative)+'</p>'+
-      '<div class="evidence"><span>'+SIGN_GLYPHS[t.sign]+' '+SIGNS[t.sign]+' '+t.degree.toFixed(1)+'°</span><span>Transit H'+t.house+'</span>'+
-      (t.conjunctNatalMars?'<span>Same house as natal Mars</span>':'')+(t.aspectsNatalMars?'<span>Full aspect to natal Mars house</span>':'')+'</div>'+
-      (memory?'<div class="memory"><b>Pattern memory:</b> '+esc(memory)+'</div>':'')+
-      '<div class="story-block"><b>Today · corresponding public stories</b>'+
-      (matches.length?matches.map(m=>storyHtml(m.x.article,m.x.categories[0]||'Breaking news')).join(''):'<span class="empty">No strong same-day story match for this channel yet.</span>')+
-      '</div></article>';
+      '<div class="channel-head"><span class="channel-icon">🤝</span><div><b>'+esc(m.activeLeader)+' ↔ '+esc(counterpartNames)+'</b><small>'+esc(m.meetingType)+' · '+esc(m.location)+'</small></div></div>'+
+      '<p><strong>What about:</strong> '+esc(m.topic)+'</p>'+
+      '<div class="evidence"><span>'+(PLANET_GLYPHS[active.assignedPlanet]||'')+' '+esc(active.assignedPlanet)+'</span><span>'+SIGN_GLYPHS[active.sign]+' '+SIGNS[active.sign]+' '+active.degree.toFixed(2)+'°</span><span>H'+active.house+'</span></div>'+
+      (m.planetSnapshots.length>1?'<div class="evidence">'+m.planetSnapshots.filter(x=>x.profileId!==profile.id).map(x=>'<span>'+esc(x.leaderName)+' · '+(PLANET_GLYPHS[x.assignedPlanet]||'')+' '+esc(x.assignedPlanet)+' · '+SIGN_GLYPHS[x.sign]+' '+SIGNS[x.sign]+' '+x.degree.toFixed(2)+'° · H'+x.house+'</span>').join('')+'</div>':'')+
+      '<div class="story-block"><b>Meeting source</b>'+storyHtml({title:m.storyTitle,url:m.storyUrl,source:m.source,publishedAt:m.meetingTime},m.meetingType)+'</div>'+
+      '</article>';
   }).join('');
 }
 
-function channelNarrative(ch,t,p,all){
-  const house=HOUSE_TOPICS[t.house];
-  const assigned=p.planet?(' The profile is currently categorized as '+p.planet+', so '+p.planet+' themes are treated as an additional symbolic identity lens for this leader.'):'';
-
-  const marsLink=t.conjunctNatalMars?' It occupies the configured natal Mars house, so this channel directly overlaps the profile’s action marker.':t.aspectsNatalMars?' It casts a configured full sign-based aspect to the natal Mars house, linking this channel to the profile’s action marker.':'';
-  if(ch.key==='Mars') return 'Mars is the action channel. In H'+t.house+', today’s symbolic emphasis is on '+house+'. Same-day reporting is checked for concrete actions, interventions, confrontations, implementation, travel, military/police activity, executive moves, or other visible acts.'+marsLink+assigned;
-  if(ch.key==='Sun') return 'The Sun is used for public or stated purpose—not hidden motive. In H'+t.house+', compare official explanations, leadership framing, stated priorities and authority themes with '+house+'.'+marsLink+assigned;
-  if(ch.key==='Moon') return 'The Moon is used as a fast timing and reaction channel—not a claim about private thoughts. In H'+t.house+', watch same-day shifts in response, messaging, scheduling, public mood and immediate decision climate around '+house+'.'+marsLink+assigned;
-  if(ch.key==='Rahu') return 'Rahu is the disruption and amplification channel. In H'+t.house+', flag unusual, controversial, foreign, technological, escalatory or attention-dominating events connected with '+house+'.'+marsLink+assigned;
-  return 'Ketu is the withdrawal and reversal channel. In H'+t.house+', look for severance, cancellation, removal, retreat, reversal, narrowing, technical focus or stripping-away themes connected with '+house+'.'+marsLink+assigned;
-}
-
-function classifyStory(article){
-  const text=((article.title||'')+' '+(article.description||'')).toLowerCase();
-  const categoryRules={
-    'Executive / Government':['president','white house','executive','order','administration','government','cabinet','agency'],
-    'Foreign Affairs / Diplomacy':['foreign','summit','meeting','president of','prime minister','diplomatic','treaty','china','russia','iran','israel','nato','united nations','bilateral','multilateral','leaders meet','world leaders','state visit','official visit','talks','negotiations'],
-    'Leader Gatherings / Private Meetings':['closed-door','closed door','private meeting','private talks','behind closed doors','bilateral meeting','one-on-one','one on one','leader summit','leaders gather','world leaders gather','high-level meeting','high level meeting','delegation meeting','cabinet room','oval office meeting','working dinner','working lunch'],
-    'Leader Gatherings / Open Meetings':['public meeting','open meeting','joint press conference','press conference','joint appearance','summit session','plenary','roundtable','forum','assembly','leaders address','public remarks','joint remarks'],
-    'Military / Conflict':['military','strike','attack','war','troops','weapons','missile','pentagon','defense','cartel'],
-    'Legal / Courts':['court','judge','lawsuit','legal','supreme court','justice department','attorney','indictment','ruling'],
-    'Economy / Trade':['tariff','trade','economy','market','jobs','tax','bank','business','investment','inflation','dollar'],
-    'Immigration / Border':['border','immigration','migrant','deport','visa','asylum','ice '],
-    'Media / Communications':['speech','remarks','interview','post','media','press','statement','announcement','truth social'],
-    'Personnel / Appointments':['appoint','nominate','fire','fired','resign','resignation','staff','secretary','director'],
-    'Technology / Cyber':['technology','cyber','ai ','artificial intelligence','data','internet'],
-    'Travel / Ceremony':['travel','visit','arrival','depart','ceremony','trip','golf']
-  };
-  const channelRules={
-    Mars:[['orders',1.4],['order',1],['strike',1.5],['attack',1.5],['military',1.3],['fire',1.2],['fired',1.3],['action',1],['deploy',1.4],['signs',.8],['launch',1],['summit',.8],['bilateral',.9],['private meeting',.9],['closed-door',.9]],
-    Sun:[['says',.8],['said',.8],['purpose',1],['goal',1],['priority',1],['remarks',1],['speech',1],['statement',1],['policy',.8],['agenda',1],['leadership',1],['summit',1],['joint remarks',1.2],['press conference',1.2],['bilateral meeting',1.1]],
-    Moon:[['react',1.2],['response',1.1],['respond',1.1],['changes',.8],['shift',1],['today',.5],['meeting',.7],['press',.6],['mood',1],['concern',.8],['closed-door',1],['private meeting',1],['working dinner',.9],['working lunch',.9]],
-    Rahu:[['shocking',1.5],['surprise',1.4],['unprecedented',1.5],['controvers',1.2],['escalat',1.2],['foreign',.8],['cyber',1.2],['ai ',1],['record',.7],['dramatic',1],['secret meeting',1.5],['unexpected summit',1.5],['surprise meeting',1.5],['unscheduled meeting',1.4]],
-    Ketu:[['cancel',1.4],['withdraw',1.4],['remove',1.2],['fire',1],['fired',1.3],['resign',1.2],['cut',1],['end ',1],['terminate',1.4],['reverse',1.4],['ban',1],['walked out',1.4],['meeting ended',1.1],['talks collapse',1.5],['summit canceled',1.5]]
-  };
-  const categories=[];
-  for(const [name,terms] of Object.entries(categoryRules)){
-    const hits=terms.filter(term=>text.includes(term)).length;
-    if(hits) categories.push({name,score:hits});
-  }
-  categories.sort((a,b)=>b.score-a.score);
-  const channelScores={};
-  for(const [name,rules] of Object.entries(channelRules)){
-    let score=0;
-    for(const [term,weight] of rules) if(text.includes(term)) score+=weight;
-    channelScores[name]=score;
-  }
-  return {categories:categories.map(x=>x.name),channelScores};
-}
-
-function transitCategoryBoost(channel,t,categories){
-  let boost=0;
-  const set=new Set(categories);
-  if(channel==='Mars'&&(set.has('Military / Conflict')||set.has('Executive / Government')||set.has('Personnel / Appointments')))boost+=.8;
-  if(set.has('Leader Gatherings / Private Meetings')) boost+=channel==='Moon'?1.2:channel==='Sun'?1.0:channel==='Mars'?.9:.7;
-  if(set.has('Leader Gatherings / Open Meetings')) boost+=channel==='Sun'?1.2:channel==='Mars'?.8:.6;
-  if(channel==='Sun'&&(set.has('Executive / Government')||set.has('Media / Communications')))boost+=.7;
-  if(channel==='Moon'&&(set.has('Media / Communications')||set.has('Travel / Ceremony')))boost+=.5;
-  if(channel==='Rahu'&&(set.has('Foreign Affairs / Diplomacy')||set.has('Technology / Cyber')||set.has('Media / Communications')))boost+=.7;
-  if(channel==='Rahu'&&set.has('Leader Gatherings / Private Meetings'))boost+=.8;
-  if(channel==='Ketu'&&(set.has('Personnel / Appointments')||set.has('Legal / Courts')||set.has('Immigration / Border')))boost+=.7;
-  if(channel==='Ketu'&&set.has('Leader Gatherings / Private Meetings'))boost+=.5;
-  if(t.conjunctNatalMars||t.aspectsNatalMars)boost+=.35;
-  return boost;
-}
-
-function summarizeCategories(classified){
+function summarizeMeetingTypes(meetings){
   const counts=new Map();
-  classified.forEach(x=>x.categories.forEach(c=>counts.set(c,(counts.get(c)||0)+1)));
+  meetings.forEach(m=>counts.set(m.meetingType,(counts.get(m.meetingType)||0)+1));
   return [...counts.entries()].sort((a,b)=>b[1]-a[1]).map(([name,count])=>({name,count}));
 }
 
-function renderBreakingSummary(categories,count){
-  document.getElementById('breakingSummary').innerHTML='<b>Today\'s breaking-news categories</b><p>'+
-    (categories.length?categories.slice(0,7).map(c=>esc(c.name)+' ('+c.count+')').join(' · '):'No same-day categorized stories found')+
-    ' · '+count+' total same-day headline'+(count===1?'':'s')+'</p>';
+function renderMeetingSummary(meetings){
+  const tracked=meetings.filter(m=>m.counterpartProfiles.length).length;
+  const types=summarizeMeetingTypes(meetings);
+  document.getElementById('breakingSummary').innerHTML='<b>Today\'s leader meetings</b><p>'+
+    (types.length?types.map(c=>esc(c.name)+' ('+c.count+')').join(' · '):'No same-day leader meetings found')+
+    ' · '+tracked+' linked to another saved leader profile</p>';
 }
 
-function storyHtml(a,category){
-  return '<a class="story" href="'+escAttr(a.url)+'" target="_blank" rel="noopener noreferrer"><strong>'+esc(a.title)+'</strong><span>'+esc(category)+' · '+esc(a.source||'Source')+' · '+storyTime(a.publishedAt)+'</span></a>';
-}
-
-function rememberMatches(profile,ch,t,matches){
-  if(!matches.length)return;
-  try{
-    appendObservationLog(profile,ch,t,matches);
-    const memory=JSON.parse(localStorage.getItem(LS_MEMORY)||'{}');
-    const sig=signature(profile,ch,t);
-    const row=memory[sig]||{count:0,categories:{}};
-    row.count+=matches.length;
-    matches.forEach(m=>(m.x.categories||[]).slice(0,3).forEach(c=>row.categories[c]=(row.categories[c]||0)+1));
-    memory[sig]=row;
-    const trimmed=Object.fromEntries(Object.entries(memory).sort((a,b)=>(b[1].count||0)-(a[1].count||0)).slice(0,300));
-    localStorage.setItem(LS_MEMORY,JSON.stringify(trimmed));
-  }catch{}
-}
-
-function appendObservationLog(profile,ch,t,matches){
+function saveMeetingObservations(meetings){
+  if(!meetings.length)return;
   try{
     const log=JSON.parse(localStorage.getItem(LS_OBSERVATIONS)||'[]');
-    const today=new Date().toISOString().slice(0,10);
-    for(const m of matches){
-      const article=m.x.article;
-      const categories=m.x.categories||[];
-      const key=[today,profile.id,ch.key,article.url||article.title].join('|');
-      if(log.some(x=>x.key===key)) continue;
+    for(const m of meetings){
+      if(log.some(x=>x.key===m.key))continue;
+      const active=m.planetSnapshots.find(x=>x.profileId===m.activeProfileId)||m.planetSnapshots[0];
       log.push({
-        key,
-        observedAt:new Date().toISOString(),
-        day:today,
-        profileId:profile.id,
-        leaderName:profile.name,
-        planetCategory:profile.planet||'Unassigned',
-        channel:ch.key,
-        transitHouse:t.house,
-        transitSign:t.sign,
-        conjunctNatalMars:!!t.conjunctNatalMars,
-        aspectsNatalMars:!!t.aspectsNatalMars,
-        signature:signature(profile,ch,t),
-        storyTitle:article.title||'',
-        storyUrl:article.url||'',
-        source:article.source||'',
-        categories,
-        score:m.score
+        key:m.key,
+        observedAt:m.observedAt,
+        day:m.day,
+        profileId:m.activeProfileId,
+        leaderName:m.activeLeader,
+        planetCategory:active?.assignedPlanet||'Unassigned',
+        channel:active?.assignedPlanet||'Unassigned',
+        transitHouse:active?.house??null,
+        transitSign:active?.sign??null,
+        transitDegree:active?.degree??null,
+        signature:[m.activeProfileId,active?.assignedPlanet,'H'+active?.house,'S'+active?.sign].join('|'),
+        storyTitle:m.storyTitle,
+        storyUrl:m.storyUrl,
+        source:m.source,
+        categories:['Leader Meeting',m.meetingType,m.topic],
+        meetingType:m.meetingType,
+        meetingLocation:m.location,
+        meetingTopic:m.topic,
+        counterpartProfiles:m.counterpartProfiles,
+        planetSnapshots:m.planetSnapshots,
+        score:1
       });
     }
-    const cutoff=Date.now()-120*86400000;
+    const cutoff=Date.now()-180*86400000;
     const trimmed=log.filter(x=>new Date(x.observedAt).getTime()>=cutoff).slice(-5000);
     localStorage.setItem(LS_OBSERVATIONS,JSON.stringify(trimmed));
   }catch{}
 }
 
-function memoryText(profile,ch,t){
-  try{
-    const row=JSON.parse(localStorage.getItem(LS_MEMORY)||'{}')[signature(profile,ch,t)];
-    if(!row||row.count<2)return'';
-    const top=Object.entries(row.categories||{}).sort((a,b)=>b[1]-a[1]).slice(0,3);
-    return 'Across '+row.count+' saved same-day matches for this transit signature, recurring categories are '+top.map(([k,v])=>k+' ('+v+')').join(', ')+'. This is correlation memory, not proof of causation.';
-  }catch{return''}
-}
-
-function signature(profile,ch,t){
-  return [profile.id,ch.key,'H'+t.house,'S'+t.sign,t.conjunctNatalMars?'conjMars':'',t.aspectsNatalMars?'aspMars':''].filter(Boolean).join('|');
-}
-
-function aspectsHouse(name,fromHouse,targetHouse){
-  const offsets=name==='Mars'?[3,6,7]:['Sun','Moon','Rahu','Ketu'].includes(name)?[6]:[];
-  const offset=(targetHouse-fromHouse+12)%12;
-  return offsets.includes(offset);
+function storyHtml(a,category){
+  return '<a class="story" href="'+escAttr(a.url)+'" target="_blank" rel="noopener noreferrer"><strong>'+esc(a.title)+'</strong><span>'+esc(category)+' · '+esc(a.source||'Source')+' · '+storyTime(a.publishedAt)+'</span></a>';
 }
 
 function isToday(value){
