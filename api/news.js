@@ -12,11 +12,15 @@ export default async function handler(req,res){
   res.setHeader('Access-Control-Allow-Origin','*');
   try{
     const area=cleanAreaQuery(req.query?.q);
+    const from=cleanDate(req.query?.from);
+    const to=cleanDate(req.query?.to);
     const feeds=area
       ? [{
           category:'local',
           source:'Google News · '+area,
-          url:'https://news.google.com/rss/search?q='+encodeURIComponent(area+' breaking news when:1d')+'&hl=en-US&gl=US&ceid=US:en'
+          url:'https://news.google.com/rss/search?q='+encodeURIComponent(
+            area+(from&&to?(' after:'+from+' before:'+to):' breaking news when:1d')
+          )+'&hl=en-US&gl=US&ceid=US:en'
         }]
       : FEEDS;
     const settled=await Promise.allSettled(feeds.map(fetchFeed));
@@ -64,4 +68,9 @@ function simpleHash(text){let h=2166136261;for(let i=0;i<text.length;i++){h^=tex
 function cleanAreaQuery(value){
   const q=String(value||'').replace(/[<>]/g,' ').replace(/\s+/g,' ').trim();
   return q.slice(0,90);
+}
+
+function cleanDate(value){
+  const s=String(value||'').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:'';
 }
