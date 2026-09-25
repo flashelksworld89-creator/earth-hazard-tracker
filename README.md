@@ -21,3 +21,12 @@ Compass features:
 - 12 houses
 
 No ephemeris API route, npm astronomy dependency, API key, or new environment variable is required.
+
+
+## v1.17 atmospheric energy
+- NOAA SWPC planetary Kp, real-time solar-wind speed/density, IMF Bz/Bt.
+- NOAA GloTEC proxy endpoint for ionosphere data.
+- Existing atmospheric / space-energy panel retained and upgraded rather than replacing the newer transit-map UI.
+- Five-minute atmospheric refresh.
+- Physical NOAA measurements remain separate from astrology overlays.
+- GLM lightning is represented without generating synthetic strike locations.

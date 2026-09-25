@@ -123,7 +123,10 @@ const state = {
     loading:false,
     kp:null,
     solarWind:null,
+    density:null,
     bz:null,
+    bt:null,
+    interference:'—',
     tecImage:null,
     tecUpdated:null,
     lightningAvailable:false,
@@ -140,6 +143,7 @@ async function init(){
   updateZoomText();
   loadPoliticalLabels();
   loadAtmosphericEnergy();
+  setInterval(loadAtmosphericEnergy, 5 * 60_000);
   resize();
   window.addEventListener('resize', resize);
 
@@ -719,20 +723,27 @@ async function loadAtmosphericEnergy(){
   };
 
   const results=await Promise.allSettled([
-    safeJson('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json'),
-    safeJson('https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json'),
-    safeJson('https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json'),
+    safeJson('/api/space-weather?ts='+Date.now()),
     safeJson('https://services.swpc.noaa.gov/products/animations/glotec/anomaly_urt.json')
   ]);
 
-  const kpData=results[0].status==='fulfilled'?results[0].value:null;
-  const windData=results[1].status==='fulfilled'?results[1].value:null;
-  const magData=results[2].status==='fulfilled'?results[2].value:null;
-  const tecData=results[3].status==='fulfilled'?results[3].value:null;
+  const sw=results[0].status==='fulfilled'?results[0].value:null;
+  const tecData=results[1].status==='fulfilled'?results[1].value:null;
 
-  state.atmosphere.kp=parseLatestKp(kpData);
-  state.atmosphere.solarWind=parseSummaryNumber(windData,['speed','solar wind speed','value']);
-  state.atmosphere.bz=parseSummaryNumber(magData,['bz','b_z','value'],true);
+  state.atmosphere.kp=Number(sw?.kp?.value);
+  state.atmosphere.solarWind=Number(sw?.wind?.speed);
+  state.atmosphere.density=Number(sw?.wind?.density);
+  state.atmosphere.bz=Number(sw?.mag?.bz);
+  state.atmosphere.bt=Number(sw?.mag?.bt);
+
+  const kp=state.atmosphere.kp;
+  const bz=state.atmosphere.bz;
+  const speed=state.atmosphere.solarWind;
+  let score=0;
+  if(Number.isFinite(kp))score+=kp>=7?3:kp>=5?2:kp>=4?1:0;
+  if(Number.isFinite(bz))score+=bz<=-10?2:bz<=-5?1:0;
+  if(Number.isFinite(speed))score+=speed>=700?2:speed>=500?1:0;
+  state.atmosphere.interference=score>=5?'HIGH':score>=3?'ELEVATED':score>=1?'WATCH':'LOW';
 
   const tecUrl=findLatestImageUrl(tecData);
   if(tecUrl){
@@ -753,15 +764,22 @@ async function loadAtmosphericEnergy(){
   state.atmosphere.lightningAvailable=true;
   state.atmosphere.loaded=true;
   state.atmosphere.loading=false;
+
+  const details=[];
+  if(Number.isFinite(state.atmosphere.density))details.push('density '+state.atmosphere.density.toFixed(1)+' p/cm³');
+  if(Number.isFinite(state.atmosphere.bt))details.push('Bt '+state.atmosphere.bt.toFixed(1)+' nT');
+  details.push('interference '+state.atmosphere.interference);
+
   const available=[
     Number.isFinite(state.atmosphere.kp)?'Kp':'',
     Number.isFinite(state.atmosphere.solarWind)?'solar wind':'',
     Number.isFinite(state.atmosphere.bz)?'Bz':'',
     state.atmosphere.tecImage?'GloTEC anomaly':''
   ].filter(Boolean);
+
   updateAtmospherePanel(
     available.length
-      ? 'Live NOAA: '+available.join(' · ')+' · GLM lightning source ready'
+      ? 'Live NOAA: '+available.join(' · ')+' · '+details.join(' · ')+' · GLM lightning source ready'
       : 'Atmospheric feeds unavailable'
   );
   draw();

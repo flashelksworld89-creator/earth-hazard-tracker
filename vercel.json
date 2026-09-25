@@ -5,6 +5,12 @@
     },
     "api/atmospheric-rivers.js": {
       "maxDuration": 30
+    },
+    "api/space-weather.js": {
+      "maxDuration": 10
+    },
+    "api/glotec.js": {
+      "maxDuration": 20
     }
   },
   "headers": [
