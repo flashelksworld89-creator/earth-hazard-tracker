@@ -430,12 +430,13 @@ function refreshAstronomy(){
       try{
         const body=A.Body?.[bodyKey];
         if(body===undefined || body===null) throw new Error('Body not available: '+bodyKey);
-        const vec=A.GeoVector(body,date,false);
+        const vec=A.GeoVector(body,date,true);
         const ecl=A.Ecliptic(vec);
         const lon=Number(ecl?.elon);
         if(!Number.isFinite(lon)) throw new Error('Invalid longitude for '+name);
-        const dec=Math.atan2(Number(vec.z),Math.hypot(Number(vec.x),Number(vec.y)))*180/Math.PI;
-        placements.push({name,glyph,color,lon:normalize360(lon-aya),dec:Number.isFinite(dec)?dec:0,source:'geocentric true ecliptic of date'});
+        const eqd=A.RotateVector(A.Rotation_EQJ_EQD(date),vec);
+        const dec=Math.atan2(Number(eqd.z),Math.hypot(Number(eqd.x),Number(eqd.y)))*180/Math.PI;
+        placements.push({name,glyph,color,lon:normalize360(lon-aya),dec:Number.isFinite(dec)?dec:0,source:'apparent geocentric · true ecliptic/equator of date'});
       }catch(bodyErr){
         console.error('Planet calculation failed:',name,bodyErr);
       }
@@ -1228,7 +1229,12 @@ function drawProjectedPlanets(w,h,earthShiftDeg){
     ctx.shadowBlur=matchesFocus?9:4;
 
     for(const px of visibleXs){
-      ctx.fillText(`${p.glyph} ${degreeInSign(p.lon)} · ${formatDeclination(p.dec)}`,px,y+yOffset);
+      const label=`${p.glyph} ${degreeInSign(p.lon)} · ${formatDeclination(p.dec)}`;
+      const tw=ctx.measureText(label).width;
+      ctx.fillStyle='rgba(2,8,18,.78)';
+      ctx.fillRect(px-tw/2-5,y+yOffset-10,tw+10,20);
+      ctx.fillStyle=p.color;
+      ctx.fillText(label,px,y+yOffset);
     }
     ctx.restore();
   });
