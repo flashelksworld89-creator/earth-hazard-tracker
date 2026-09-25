@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#06111f">
+<title>Global Aviation Incident Agent</title>
+<style>
+:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.15);--text:#eaf4ff;--muted:#91a8bf;--accent:#38bdf8;--warn:#ffd166}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#02070d;color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{background:radial-gradient(circle at 50% 0,#0b1b2c 0,#02070d 38%)}
+header{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;gap:14px;align-items:center;padding:12px 18px;background:rgba(2,7,13,.96);border-bottom:1px solid var(--border)}
+.brand{color:inherit;text-decoration:none;font-weight:850;letter-spacing:.05em}.brand small{display:block;color:var(--muted);font-size:10px;font-weight:500;margin-top:2px}
+nav{display:flex;gap:8px;flex-wrap:wrap}nav a{color:#cbe7fa;text-decoration:none;padding:8px 11px;border:1px solid var(--border);border-radius:999px;font-size:11px;font-weight:700;background:rgba(8,20,32,.7)}nav a.active{border-color:var(--accent);color:#7dd3fc}
+main{width:min(1420px,calc(100% - 24px));margin:auto;padding:22px 0 48px}.hero{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:14px}.eyebrow{color:#67e8f9;font-size:10px;font-weight:850;letter-spacing:.13em}h1{font-size:clamp(26px,4vw,44px);margin:5px 0 7px}.hero p{max-width:900px;color:var(--muted);font-size:12px;line-height:1.55;margin:0}.btn{padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:#0b1b2b;color:var(--text);font-size:10px;font-weight:800;cursor:pointer}
+.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}.metric,.panel{border:1px solid var(--border);border-radius:12px;background:rgba(7,20,32,.86);box-shadow:0 14px 36px rgba(0,0,0,.2)}.metric{padding:10px}.metric small{display:block;color:#7896a8;font-size:8px;text-transform:uppercase;letter-spacing:.05em}.metric b{display:block;margin-top:4px;font-size:15px}.metric span{display:block;margin-top:2px;color:#87a8ba;font-size:8px}
+.panel{padding:12px;margin-bottom:12px}.panel-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:9px}.panel-head strong{font-size:10px;letter-spacing:.07em}.status{color:#7d9aac;font-size:9px}
+.mean-box{display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:center}.mean-degree{font-size:28px;font-weight:900;color:#ffe29a}.mean-note{color:#91a8bf;font-size:9px;line-height:1.5}
+.list{display:grid;gap:8px}.incident{padding:10px;border:1px solid rgba(124,185,255,.1);border-radius:10px;background:#06111f}.incident-head{display:flex;justify-content:space-between;gap:10px}.incident h3{margin:0;font-size:12px;line-height:1.35}.incident a{color:#bde9ff;text-decoration:none}.incident-meta{margin-top:3px;color:#7997a9;font-size:8px}.incident-time{white-space:nowrap;color:#ffd49a;font-size:8px}.astro-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:8px}.astro{padding:7px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}.astro b{display:block;font-size:9px}.astro span{display:block;margin-top:2px;color:#86a5b6;font-size:7.5px;line-height:1.35}.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.tag{padding:3px 6px;border-radius:999px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.08);color:#8fb8ca;font-size:7.5px}.empty{padding:28px;text-align:center;color:#7893a4;font-size:10px;border:1px dashed rgba(124,185,255,.12);border-radius:10px}
+.note{margin-top:9px;padding-top:9px;border-top:1px solid rgba(124,185,255,.08);color:#6e8796;font-size:8px;line-height:1.5}
+@media(max-width:950px){.metrics{grid-template-columns:repeat(2,1fr)}.astro-grid{grid-template-columns:repeat(2,1fr)}.mean-box{grid-template-columns:1fr}}@media(max-width:650px){header,.hero,.incident-head{align-items:stretch;flex-direction:column}.metrics{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<script>
+if(window.top===window.self && location.pathname!=='/dashboard.html'){
+  location.replace('/dashboard.html?page='+encodeURIComponent('/aviation.html'));
+}
+</script>
+<header>
+  <a class="brand" href="/">◎ SIDEREAL TRANSIT MAP<small>Global aviation incident agent</small></a>
+  <nav><a href="/">🌎 Earth Tracker</a><a href="/news.html">◉ Leader Agents</a><a class="active" href="/aviation.html">✈ Aviation Agent</a><a href="/patterns.html">◫ Pattern Lab</a></nav>
+</header>
+<main>
+  <section class="hero">
+    <div><span class="eyebrow">GLOBAL BREAKING-NEWS MONITOR</span><h1>Aircraft crashes & emergency incidents</h1><p>Checks global breaking aviation news every 30 minutes while this page is open, records the reported event time when one can be extracted, calculates Lahiri sidereal Moon/Rahu/Ketu/Uranus/Pluto positions for that event, and maintains a circular mean of the Moon’s zodiac longitude across the recorded incident set.</p></div>
+    <button id="scanBtn" class="btn">Scan now</button>
+  </section>
+  <section class="metrics">
+    <div class="metric"><small>Recorded incidents</small><b id="incidentCount">0</b><span>deduplicated locally</span></div>
+    <div class="metric"><small>Last scan</small><b id="lastScan">—</b><span>30-minute interval</span></div>
+    <div class="metric"><small>Next scan</small><b id="nextScan">—</b><span>while page remains open</span></div>
+    <div class="metric"><small>Exact/reported times</small><b id="exactCount">0</b><span>otherwise publication time fallback</span></div>
+    <div class="metric"><small>Moon mean sample</small><b id="meanSample">0</b><span>circular mean</span></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><strong>MEAN MOON POSITION</strong><span id="meanStatus" class="status">No incident sample yet</span></div>
+    <div class="mean-box"><div id="meanMoon" class="mean-degree">—</div><div class="mean-note">The mean is calculated as a circular mean of sidereal lunar longitude, not a normal arithmetic average. This avoids the 359° + 1° problem, which should average near 0° rather than 180°.</div></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><strong>RECORDED INCIDENTS</strong><span id="scanStatus" class="status">Starting…</span></div>
+    <div id="incidentList" class="list"></div>
+    <div class="note">Incident time extraction is best-effort from the headline/description. When an explicit event time with a recognizable timezone is unavailable, the agent marks the record as a publication-time fallback. The astrology is a pattern-analysis layer and does not establish causation.</div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+<script>
+const A=window.Astronomy;
+const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
+const STORE='aviation-incident-agent-v1';
+const SCAN_MS=30*60*1000;
+const QUERY='aircraft crash OR plane crash OR aviation emergency OR emergency landing OR aircraft incident OR helicopter crash';
+let incidents=loadIncidents();
+let nextScanAt=Date.now()+SCAN_MS;
+let scanning=false;
+render();scan();setInterval(scan,SCAN_MS);setInterval(updateCountdown,1000);
+document.getElementById('scanBtn').onclick=scan;
+function loadIncidents(){try{const v=JSON.parse(localStorage.getItem(STORE)||'[]');return Array.isArray(v)?v:[]}catch{return[]}}
+function saveIncidents(){localStorage.setItem(STORE,JSON.stringify(incidents.slice(0,500)))}
+async function scan(){
+  if(scanning)return;scanning=true;document.getElementById('scanStatus').textContent='Scanning global breaking aviation news…';
+  try{
+    const r=await fetch('/api/news?q='+encodeURIComponent(QUERY),{cache:'no-store'});if(!r.ok)throw new Error('News HTTP '+r.status);
+    const data=await r.json();const articles=(Array.isArray(data.articles)?data.articles:[]).filter(a=>isToday(a.publishedAt));let added=0;
+    for(const article of articles){
+      if(!looksLikeAviationIncident(article))continue;
+      const key=article.url||article.id||article.title;if(incidents.some(x=>x.key===key))continue;
+      const timing=extractIncidentTime(article);const astro=calculateAstro(timing.date);
+      incidents.unshift({key,title:article.title,url:article.url,source:article.source||'Source',publishedAt:article.publishedAt,eventAt:timing.date.toISOString(),timeBasis:timing.basis,timeConfidence:timing.confidence,categories:classifyAviation(article),astro,storedAt:new Date().toISOString()});added++;
+    }
+    saveIncidents();document.getElementById('scanStatus').textContent='Scan complete · '+added+' new incident'+(added===1?'':'s');
+  }catch(e){console.error(e);document.getElementById('scanStatus').textContent='Breaking-news scan unavailable'}
+  finally{scanning=false;nextScanAt=Date.now()+SCAN_MS;render()}
+}
+function looksLikeAviationIncident(a){const t=((a.title||'')+' '+(a.description||'')).toLowerCase();return /(aircraft|airplane|plane|jet|helicopter|flight|aviation)/.test(t)&&/(crash|crashed|collision|emergency|emergency landing|forced landing|mayday|incident|fire|engine failure|runway excursion|ditched|ditch|hard landing)/.test(t)}
+function classifyAviation(a){
+  const t=((a.title||'')+' '+(a.description||'')).toLowerCase();const out=[];const rules={
+    'Crash / Collision':['crash','crashed','collision'],'Emergency Landing':['emergency landing','forced landing','diverted','diversion'],'Mechanical / Engine':['engine failure','mechanical','hydraulic','gear failure','smoke in cockpit'],'Fire / Smoke':['fire','smoke'],'Runway Incident':['runway excursion','runway','hard landing'],'Helicopter':['helicopter'],'Military Aircraft':['military aircraft','fighter jet','air force'],'Commercial Flight':['airline','passenger flight','commercial flight']};
+  for(const [name,terms] of Object.entries(rules))if(terms.some(x=>t.includes(x)))out.push(name);return out.length?out:['Other Aviation Incident'];
+}
+function extractIncidentTime(article){
+  const text=(article.title||'')+' '+(article.description||'');const published=new Date(article.publishedAt);const zoneMap={UTC:0,GMT:0,EDT:-4,EST:-5,CDT:-5,CST:-6,MDT:-6,MST:-7,PDT:-7,PST:-8};
+  const m=text.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\s*(UTC|GMT|EDT|EST|CDT|CST|MDT|MST|PDT|PST)?\b/i);
+  if(m){let hour=Number(m[1]),minute=Number(m[2]||0);const pm=/p/i.test(m[3]);if(hour===12)hour=0;if(pm)hour+=12;const z=(m[4]||'').toUpperCase();
+    if(z&&z in zoneMap){const d=new Date(Date.UTC(published.getUTCFullYear(),published.getUTCMonth(),published.getUTCDate(),hour-zoneMap[z],minute,0));return{date:d,basis:'explicit event time · '+z,confidence:'reported'}}
+    const d=new Date(published);d.setHours(hour,minute,0,0);return{date:d,basis:'reported clock time · timezone inferred from publication context',confidence:'inferred'}
+  }
+  return{date:published,basis:'publication time fallback',confidence:'fallback'};
+}
+function calculateAstro(date){
+  const aya=lahiriAyanamsa(date);const bodyLon=name=>{const v=A.GeoVector(A.Body[name],date,true);const e=A.Ecliptic(v);return norm(Number(e.elon)-aya)};
+  const moon=bodyLon('Moon'),uranus=bodyLon('Uranus'),pluto=bodyLon('Pluto');const rahu=norm(meanNodeTropicalLongitude(date)-aya),ketu=norm(rahu+180);
+  return{Moon:positionRecord(moon),Rahu:relationRecord(moon,rahu),Ketu:relationRecord(moon,ketu),Uranus:relationRecord(moon,uranus),Pluto:relationRecord(moon,pluto)};
+}
+function positionRecord(lon){return{lon,sign:Math.floor(lon/30),degree:lon%30}}
+function relationRecord(moonLon,lon){const sep=Math.abs(norm180(lon-moonLon));return{lon,sign:Math.floor(lon/30),degree:lon%30,separation:sep,aspect:nearestAspect(sep)}}
+function nearestAspect(sep){const aspects=[['conjunction',0],['sextile',60],['square',90],['trine',120],['opposition',180]];let best=null;for(const [name,deg] of aspects){const orb=Math.abs(sep-deg);if(!best||orb<best.orb)best={name,deg,orb}}return best.orb<=8?best.name+' · orb '+best.orb.toFixed(1)+'°':'no major aspect · '+sep.toFixed(1)+'° apart'}
+function render(){
+  document.getElementById('incidentCount').textContent=incidents.length;document.getElementById('lastScan').textContent=incidents.length?new Date(Math.max(...incidents.map(x=>new Date(x.storedAt).getTime()))).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
+}
+function renderMean(){
+  if(!incidents.length){document.getElementById('meanMoon').textContent='—';document.getElementById('meanStatus').textContent='No incident sample yet';return}
+  let x=0,y=0;for(const r of incidents){const rad=r.astro.Moon.lon*Math.PI/180;x+=Math.cos(rad);y+=Math.sin(rad)}
+  let mean=Math.atan2(y,x)*180/Math.PI;if(mean<0)mean+=360;const sign=Math.floor(mean/30),deg=mean%30;document.getElementById('meanMoon').textContent=GLYPHS[sign]+' '+SIGNS[sign]+' '+deg.toFixed(2)+'°';const strength=Math.sqrt(x*x+y*y)/incidents.length;document.getElementById('meanStatus').textContent='Mean longitude '+mean.toFixed(2)+'° · concentration '+strength.toFixed(3);
+}
+function renderList(){
+  const el=document.getElementById('incidentList');if(!incidents.length){el.innerHTML='<div class="empty">No aviation incidents recorded yet.</div>';return}
+  el.innerHTML=incidents.slice(0,100).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span></div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
+}
+function astroBox(name,lon,sign,degree,note){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[sign]+' '+SIGNS[sign]+' '+degree.toFixed(2)+'°</span><span>'+note+'</span></div>'}
+function relationBox(name,r){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[r.sign]+' '+SIGNS[r.sign]+' '+r.degree.toFixed(2)+'°</span><span>Moon: '+esc(r.aspect)+'</span></div>'}
+function updateCountdown(){const ms=Math.max(0,nextScanAt-Date.now()),m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000);document.getElementById('nextScan').textContent=m+':'+String(s).padStart(2,'0')}
+function isToday(v){const d=new Date(v),n=new Date();return Number.isFinite(d.getTime())&&d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()}
+function lahiriAyanamsa(date){const jd=date.getTime()/86400000+2440587.5,T=(jd-2451545.0)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
+function meanNodeTropicalLongitude(date){const jd=date.getTime()/86400000+2440587.5,T=(jd-2451545.0)/36525;return norm(125.04452-1934.136261*T+.0020708*T*T+(T*T*T)/450000)}
+function norm(v){return((v%360)+360)%360}function norm180(v){return((v+180)%360+360)%360-180}
+function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}function escAttr(v){return esc(v).replace(/\x60/g,'&#96;')}
+</script>
+</body></html>
