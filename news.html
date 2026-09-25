@@ -105,6 +105,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
       <label class="field"><span>Role / title</span><input id="profileRole" required></label>
       <label class="field"><span>Country / institution</span><input id="profileInstitution" required></label>
       <label class="field"><span>Same-day news query</span><input id="profileNewsQuery" required></label>
+      <label class="field"><span>Leader planet category</span><select id="profilePlanet"></select></label>
       <label class="field"><span>Sidereal rising sign</span><select id="profileAsc"></select></label>
       <label class="field"><span>Natal Mars sign</span><select id="profileMarsSign"></select></label>
       <label class="field"><span>Natal Mars house</span><select id="profileMarsHouse"></select></label>
@@ -123,6 +124,8 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 const A=window.Astronomy;
 const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
 const SIGN_GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
+const PLANET_CATEGORIES=['Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu','Uranus','Neptune','Pluto'];
+const PLANET_GLYPHS={Sun:'☉',Moon:'☽',Mars:'♂',Mercury:'☿',Jupiter:'♃',Venus:'♀',Saturn:'♄',Rahu:'☊',Ketu:'☋',Uranus:'♅',Neptune:'♆',Pluto:'♇'};
 const CHANNELS=[
   {key:'Mars',glyph:'♂',title:'Actions',subtitle:'Observable actions, interventions, confrontations, implementation and physical initiative'},
   {key:'Sun',glyph:'☉',title:'Stated / Public Purpose',subtitle:'Publicly stated aims, leadership framing, authority, visibility and declared priorities'},
@@ -147,7 +150,8 @@ const DEFAULT_PROFILE={
   marsSign:4,
   marsHouse:1,
   tag:'U.S. executive',
-  notes:'User-defined research profile: Leo rising with Mars in the Ascendant.'
+  notes:'User-defined research profile: Leo rising with Mars in the Ascendant.',
+  planet:'Sun'
 };
 const LS_PROFILES='leader-agent-profiles-v1';
 const LS_ACTIVE='leader-agent-active-v1';
@@ -172,6 +176,7 @@ function fillSelects(){
   const signOptions=SIGNS.map((s,i)=>'<option value="'+i+'">'+SIGN_GLYPHS[i]+' '+s+'</option>').join('');
   document.getElementById('profileAsc').innerHTML=signOptions;
   document.getElementById('profileMarsSign').innerHTML=signOptions;
+  document.getElementById('profilePlanet').innerHTML=PLANET_CATEGORIES.map(p=>'<option value="'+p+'">'+(PLANET_GLYPHS[p]||'')+' '+p+'</option>').join('');
   document.getElementById('profileMarsHouse').innerHTML=Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'">House '+(i+1)+'</option>').join('');
 }
 
@@ -207,7 +212,7 @@ function renderProfileList(){
   document.getElementById('profileCount').textContent=profiles.length;
   document.getElementById('profileList').innerHTML=profiles.map(p=>
     '<button class="profile-btn '+(p.id===activeId?'active':'')+'" data-id="'+escAttr(p.id)+'">'+
-      '<b>'+esc(p.name)+'</b><span>'+esc(p.role)+' · '+esc(p.institution)+'</span></button>'
+      '<b>'+esc(p.name)+'</b><span>'+(PLANET_GLYPHS[p.planet]||'')+' '+esc(p.planet||'Unassigned')+' · '+esc(p.role)+' · '+esc(p.institution)+'</span></button>'
   ).join('');
   document.querySelectorAll('.profile-btn').forEach(b=>b.onclick=()=>activateProfile(b.dataset.id));
 }
@@ -221,6 +226,7 @@ function activateProfile(id){
   document.getElementById('profileMeta').innerHTML=
     '<span class="pill">'+SIGN_GLYPHS[p.asc]+' '+SIGNS[p.asc]+' rising</span>'+
     '<span class="pill">Natal Mars · '+SIGN_GLYPHS[p.marsSign]+' '+SIGNS[p.marsSign]+' · H'+p.marsHouse+'</span>'+
+    '<span class="pill">'+(PLANET_GLYPHS[p.planet]||'')+' '+esc(p.planet||'Unassigned')+'</span>'+
     (p.tag?'<span class="pill">'+esc(p.tag)+'</span>':'');
   renderProfileList();
   refreshActive(false);
@@ -328,12 +334,14 @@ function renderChannels(profile,transits,classified){
 
 function channelNarrative(ch,t,p,all){
   const house=HOUSE_TOPICS[t.house];
+  const assigned=p.planet?(' The profile is currently categorized as '+p.planet+', so '+p.planet+' themes are treated as an additional symbolic identity lens for this leader.'):'';
+
   const marsLink=t.conjunctNatalMars?' It occupies the configured natal Mars house, so this channel directly overlaps the profile’s action marker.':t.aspectsNatalMars?' It casts a configured full sign-based aspect to the natal Mars house, linking this channel to the profile’s action marker.':'';
-  if(ch.key==='Mars') return 'Mars is the action channel. In H'+t.house+', today’s symbolic emphasis is on '+house+'. Same-day reporting is checked for concrete actions, interventions, confrontations, implementation, travel, military/police activity, executive moves, or other visible acts.'+marsLink;
-  if(ch.key==='Sun') return 'The Sun is used for public or stated purpose—not hidden motive. In H'+t.house+', compare official explanations, leadership framing, stated priorities and authority themes with '+house+'.'+marsLink;
-  if(ch.key==='Moon') return 'The Moon is used as a fast timing and reaction channel—not a claim about private thoughts. In H'+t.house+', watch same-day shifts in response, messaging, scheduling, public mood and immediate decision climate around '+house+'.'+marsLink;
-  if(ch.key==='Rahu') return 'Rahu is the disruption and amplification channel. In H'+t.house+', flag unusual, controversial, foreign, technological, escalatory or attention-dominating events connected with '+house+'.'+marsLink;
-  return 'Ketu is the withdrawal and reversal channel. In H'+t.house+', look for severance, cancellation, removal, retreat, reversal, narrowing, technical focus or stripping-away themes connected with '+house+'.'+marsLink;
+  if(ch.key==='Mars') return 'Mars is the action channel. In H'+t.house+', today’s symbolic emphasis is on '+house+'. Same-day reporting is checked for concrete actions, interventions, confrontations, implementation, travel, military/police activity, executive moves, or other visible acts.'+marsLink+assigned;
+  if(ch.key==='Sun') return 'The Sun is used for public or stated purpose—not hidden motive. In H'+t.house+', compare official explanations, leadership framing, stated priorities and authority themes with '+house+'.'+marsLink+assigned;
+  if(ch.key==='Moon') return 'The Moon is used as a fast timing and reaction channel—not a claim about private thoughts. In H'+t.house+', watch same-day shifts in response, messaging, scheduling, public mood and immediate decision climate around '+house+'.'+marsLink+assigned;
+  if(ch.key==='Rahu') return 'Rahu is the disruption and amplification channel. In H'+t.house+', flag unusual, controversial, foreign, technological, escalatory or attention-dominating events connected with '+house+'.'+marsLink+assigned;
+  return 'Ketu is the withdrawal and reversal channel. In H'+t.house+', look for severance, cancellation, removal, retreat, reversal, narrowing, technical focus or stripping-away themes connected with '+house+'.'+marsLink+assigned;
 }
 
 function classifyStory(article){
@@ -446,13 +454,14 @@ function isToday(value){
 
 function openProfileDialog(profile){
   const editing=!!profile;
-  const p=profile||{id:'',name:'',role:'',institution:'',newsQuery:'',asc:0,marsSign:0,marsHouse:1,tag:'',notes:''};
+  const p=profile||{id:'',name:'',role:'',institution:'',newsQuery:'',planet:'Sun',asc:0,marsSign:0,marsHouse:1,tag:'',notes:''};
   document.getElementById('dialogTitle').textContent=editing?'Edit leader profile':'Add leader profile';
   document.getElementById('profileId').value=p.id||'';
   document.getElementById('profileName').value=p.name||'';
   document.getElementById('profileRole').value=p.role||'';
   document.getElementById('profileInstitution').value=p.institution||'';
   document.getElementById('profileNewsQuery').value=p.newsQuery||'';
+  document.getElementById('profilePlanet').value=p.planet||'Sun';
   document.getElementById('profileAsc').value=String(p.asc??0);
   document.getElementById('profileMarsSign').value=String(p.marsSign??0);
   document.getElementById('profileMarsHouse').value=String(p.marsHouse??1);
@@ -474,6 +483,7 @@ function saveProfile(e){
     role:document.getElementById('profileRole').value.trim(),
     institution:document.getElementById('profileInstitution').value.trim(),
     newsQuery:document.getElementById('profileNewsQuery').value.trim(),
+    planet:document.getElementById('profilePlanet').value,
     asc:Number(document.getElementById('profileAsc').value),
     marsSign:Number(document.getElementById('profileMarsSign').value),
     marsHouse:Number(document.getElementById('profileMarsHouse').value),
