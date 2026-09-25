@@ -6,5 +6,8 @@
   "description": "Interactive global weather and natural hazard tracker",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.1"
   }
 }
