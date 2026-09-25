@@ -79,6 +79,24 @@
         <label><input id="showPlaceLabels" type="checkbox" checked /> Place labels</label>
       </div>
 
+      <div class="focus-box atmosphere-box">
+        <div class="focus-head">
+          <strong>ATMOSPHERIC / SPACE ENERGY</strong>
+          <button id="refreshAtmosBtn" type="button">Refresh</button>
+        </div>
+        <div class="row">
+          <label><input id="showTecAnomaly" type="checkbox" /> TEC anomaly</label>
+          <label><input id="showGeomagnetic" type="checkbox" /> Geomagnetic</label>
+          <label><input id="showLightning" type="checkbox" /> Lightning / GLM</label>
+        </div>
+        <div class="rising-readout atmosphere-readout">
+          <div><small>PLANETARY Kp</small><strong id="kpText">—</strong></div>
+          <div><small>SOLAR WIND</small><strong id="solarWindText">—</strong></div>
+          <div><small>IMF Bz</small><strong id="bzText">—</strong></div>
+        </div>
+        <div id="atmosStatus" class="focus-summary">Atmospheric feeds not loaded yet.</div>
+      </div>
+
       <div class="focus-box">
         <div class="focus-head">
           <strong>HIGHLIGHT ZONE</strong>
@@ -207,10 +225,10 @@
       </div>
     </aside>
 
-    <div class="prototype-badge">FLAT MAP PROTOTYPE · BUILD 2026-09-25F</div>
+    <div class="prototype-badge">FLAT MAP PROTOTYPE · BUILD 2026-09-25G</div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
-  <script type="module" src="/app.js?build=20260925f"></script>
+  <script type="module" src="/app.js?build=20260925g"></script>
 </body>
 </html>
