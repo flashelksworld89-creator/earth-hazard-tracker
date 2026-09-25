@@ -37,7 +37,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 </header>
 <main>
   <section class="hero">
-    <div><span class="eyebrow">GLOBAL BREAKING-NEWS MONITOR · BUILD 2026-09-24C</span><h1>Aircraft crashes & emergency incidents</h1><p>Checks global breaking aviation news every 30 minutes while this page is open, records the reported event time when one can be extracted, calculates Lahiri sidereal Moon/Rahu/Ketu/Uranus/Pluto positions for that event, and ranks Moon zodiac signs and nakshatras by incident frequency across the recorded dataset.</p></div>
+    <div><span class="eyebrow">GLOBAL BREAKING-NEWS MONITOR · BUILD 2026-09-25A</span><h1>Aircraft crashes & emergency incidents</h1><p>Checks global breaking aviation news every 30 minutes while this page is open, records the reported event time when one can be extracted, calculates Lahiri sidereal planetary positions for that event, including Jyotish Mars→Moon and Rahu→Moon drishti plus Moon aspects to Uranus and Pluto, and ranks Moon zodiac signs and nakshatras by incident frequency across the recorded dataset.</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="scanBtn" class="btn">Scan now</button><button id="backfillBtn" class="btn">Backfill Jan 1–Sep 24</button></div>
   </section>
   <section class="metrics">
@@ -90,9 +90,9 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
       <select id="filterConfidence"><option value="all">All timing confidence</option><option value="reported">reported</option><option value="inferred">inferred</option><option value="fallback">fallback</option></select>
     </div>
     <div class="table-wrap"><table class="dataset"><thead><tr>
-      <th data-sort="eventAt">Date/time</th><th data-sort="severity">Severity</th><th data-sort="aircraftType">Aircraft type</th><th data-sort="region">Region</th><th>Location</th><th data-sort="asc">Ascendant</th><th data-sort="moon">Moon</th><th>Moon nakshatra</th><th data-sort="mercury">Mercury</th><th>Mercury nakshatra</th><th data-sort="timeConfidence">Time quality</th><th>Incident</th>
+      <th data-sort="eventAt">Date/time</th><th data-sort="severity">Severity</th><th data-sort="aircraftType">Aircraft type</th><th data-sort="region">Region</th><th>Location</th><th data-sort="asc">Ascendant</th><th data-sort="moon">Moon</th><th>Moon nakshatra</th><th>Moon ↔ Mars</th><th>Moon ↔ Rahu</th><th data-sort="mercury">Mercury</th><th>Mercury nakshatra</th><th data-sort="timeConfidence">Time quality</th><th>Incident</th>
     </tr></thead><tbody id="datasetBody"></tbody></table></div>
-    <div class="note">Severity and aircraft type are headline/description classifications. They should be treated as provisional until verified against an authoritative accident report.</div>
+    <div class="note">Severity and aircraft type are headline/description classifications. Mars→Moon uses Jyotish 4th/7th/8th drishti; Rahu→Moon uses the 5th/7th/9th node-drishthi convention, both with an 8° orb. Uranus/Pluto remain on the existing Western major-aspect model. These astrology fields are for pattern analysis, not causal claims.</div>
   </section>
   <section class="panel">
     <div class="panel-head"><strong>RECORDED INCIDENTS</strong><span id="scanStatus" class="status">Starting…</span></div>
@@ -230,7 +230,7 @@ function enrichIncident(r){
   const text=((r.title||'')+' '+(r.description||'')).toLowerCase();
   if(!r.severity)r.severity=classifySeverity(text);
   if(!r.aircraftType)r.aircraftType=classifyAircraftType(text,r.categories||[]);
-  if(r.eventAt&&(!r.astro||!r.astro.Mercury||!r.astro.Moon?.nakshatraName||!r.astro.Mercury?.nakshatraName||!Array.isArray(r.astro.MoonAspects)||!Array.isArray(r.astro.MercuryAspects)||!r.astro.MoonUranus||!r.astro.MoonPluto)){
+  if(r.eventAt&&(!r.astro||!r.astro.Mercury||!r.astro.Moon?.nakshatraName||!r.astro.Mercury?.nakshatraName||!Array.isArray(r.astro.MoonAspects)||!Array.isArray(r.astro.MercuryAspects)||!r.astro.MoonUranus||!r.astro.MoonPluto||!r.astro.MoonMars||!r.astro.MoonRahu)){
     try{r.astro=calculateAstro(new Date(r.eventAt))}catch{}
   }
   if(r.eventAt&&!r.tithi){
@@ -316,6 +316,40 @@ function worldRegion(lat,lon,countryCode){
   return 'Other / Remote';
 }
 
+function vedicDrishtiRecord(planet,planetLon,targetLon,aspects){
+  const forward=norm(targetLon-planetLon);
+  let best=null;
+  for(const a of aspects){
+    const orb=Math.abs(norm180(forward-a.deg));
+    if(!best||orb<best.orb)best={...a,orb};
+  }
+  const hit=best&&best.orb<=8;
+  return{
+    planet,
+    system:'Jyotish drishti',
+    separation:forward,
+    major:!!hit,
+    aspect:hit?best.name:'none',
+    houseAspect:hit?best.house:null,
+    exactAngle:hit?best.deg:null,
+    orb:hit?best.orb:null
+  };
+}
+function marsMoonDrishti(marsLon,moonLon){
+  return vedicDrishtiRecord('Mars',marsLon,moonLon,[
+    {name:'4th-house aspect',house:4,deg:90},
+    {name:'7th-house aspect',house:7,deg:180},
+    {name:'8th-house aspect',house:8,deg:210}
+  ]);
+}
+function rahuMoonDrishti(rahuLon,moonLon){
+  return vedicDrishtiRecord('Rahu',rahuLon,moonLon,[
+    {name:'5th-house aspect',house:5,deg:120},
+    {name:'7th-house aspect',house:7,deg:180},
+    {name:'9th-house aspect',house:9,deg:240}
+  ]);
+}
+
 function calculateAstro(date){
   const aya=lahiriAyanamsa(date);
   const bodyLon=name=>{const v=A.GeoVector(A.Body[name],date,true);const e=A.Ecliptic(v);return norm(Number(e.elon)-aya)};
@@ -332,8 +366,11 @@ function calculateAstro(date){
   return{
     Moon:positionRecord(lon.Moon),
     Mercury:{...positionRecord(lon.Mercury),moonRelation:relationRecord(lon.Moon,lon.Mercury)},
+    Mars:relationRecord(lon.Moon,lon.Mars),
     Rahu:relationRecord(lon.Moon,lon.Rahu),Ketu:relationRecord(lon.Moon,lon.Ketu),
     Uranus:relationRecord(lon.Moon,lon.Uranus),Neptune:relationRecord(lon.Moon,lon.Neptune),Pluto:relationRecord(lon.Moon,lon.Pluto),
+    MoonMars:marsMoonDrishti(lon.Mars,lon.Moon),
+    MoonRahu:rahuMoonDrishti(lon.Rahu,lon.Moon),
     MoonUranus:aspectRecord('Uranus',lon.Uranus,lon.Moon),
     MoonPluto:aspectRecord('Pluto',lon.Pluto,lon.Moon),
     MoonAspects:moonAspects,MercuryAspects:mercuryAspects
@@ -379,6 +416,8 @@ function renderPatternSummary(){
   const topMercuryNak=topFrequency(incidents.map(r=>r.astro?.Mercury?.nakshatraName).filter(Boolean));
   const moonAspectStats=topAspectSignature('MoonAspects');
   const mercuryAspectStats=topAspectSignature('MercuryAspects');
+  const moonMarsStats=vedicAspectFrequency('MoonMars','Mars');
+  const moonRahuStats=vedicAspectFrequency('MoonRahu','Rahu');
   const moonUranusStats=aspectFrequencyForPlanet('MoonAspects','Uranus');
   const moonPlutoStats=aspectFrequencyForPlanet('MoonAspects','Pluto');
   el.innerHTML=
@@ -389,6 +428,8 @@ function renderPatternSummary(){
     patternCard('Most frequent Mercury sign',topMercurySign?topMercurySign.value:'—',topMercurySign?topMercurySign.count+' of '+topMercurySign.total+' · '+topMercurySign.rate.toFixed(1)+'%':'No sample')+
     patternCard('Most frequent Mercury nakshatra',topMercuryNak?topMercuryNak.value:'—',topMercuryNak?topMercuryNak.count+' of '+topMercuryNak.total+' · '+topMercuryNak.rate.toFixed(1)+'%':'No sample')+
     patternCard('Most common aspect to Moon',moonAspectStats?moonAspectStats.label:'No major aspect pattern',moonAspectStats?moonAspectStats.count+' occurrences · '+moonAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
+    patternCard('Mars → Moon · Jyotish drishti',moonMarsStats?moonMarsStats.label:'No Mars drishti within 8° orb',moonMarsStats?moonMarsStats.count+' occurrences · '+moonMarsStats.rate.toFixed(1)+'% of incidents':'No sample')+
+    patternCard('Rahu → Moon · Jyotish drishti',moonRahuStats?moonRahuStats.label:'No Rahu drishti within 8° orb',moonRahuStats?moonRahuStats.count+' occurrences · '+moonRahuStats.rate.toFixed(1)+'% of incidents':'No sample')+
     patternCard('Moon ↔ Uranus',moonUranusStats?moonUranusStats.label:'No major Uranus aspect',moonUranusStats?moonUranusStats.count+' occurrences · '+moonUranusStats.rate.toFixed(1)+'% of incidents':'No sample')+
     patternCard('Moon ↔ Pluto',moonPlutoStats?moonPlutoStats.label:'No major Pluto aspect',moonPlutoStats?moonPlutoStats.count+' occurrences · '+moonPlutoStats.rate.toFixed(1)+'% of incidents':'No sample')+
     patternCard('Most common aspect to Mercury',mercuryAspectStats?mercuryAspectStats.label:'No major aspect pattern',mercuryAspectStats?mercuryAspectStats.count+' occurrences · '+mercuryAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
@@ -416,6 +457,15 @@ function aspectFrequencyForPlanet(field,planet){
   incidents.forEach(r=>(r.astro?.[field]||[]).forEach(a=>{
     if(a?.major&&a.planet===planet)counts.set(a.aspect,(counts.get(a.aspect)||0)+1);
   }));
+  const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
+  return top?{label:planet+' '+top[0]+' Moon',count:top[1],rate:(top[1]/Math.max(1,incidents.length))*100}:null;
+}
+function vedicAspectFrequency(field,planet){
+  const counts=new Map();
+  incidents.forEach(r=>{
+    const a=r.astro?.[field];
+    if(a?.major)counts.set(a.aspect,(counts.get(a.aspect)||0)+1);
+  });
   const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
   return top?{label:planet+' '+top[0]+' Moon',count:top[1],rate:(top[1]/Math.max(1,incidents.length))*100}:null;
 }
@@ -563,6 +613,8 @@ function renderDataset(){
     '<td>'+(r.ascendant?esc(SIGNS[r.ascendant.sign]+' '+r.ascendant.degree.toFixed(1)+'°'):'—')+'</td>'+
     '<td>'+(r.astro?.Moon?esc(SIGNS[r.astro.Moon.sign]+' '+r.astro.Moon.degree.toFixed(1)+'°'):'—')+'</td>'+
     '<td>'+esc(r.astro?.Moon?.nakshatraName||'—')+'</td>'+
+    '<td>'+esc(formatVedicAspect(r.astro?.MoonMars))+'</td>'+
+    '<td>'+esc(formatVedicAspect(r.astro?.MoonRahu))+'</td>'+
     '<td>'+(r.astro?.Mercury?esc(SIGNS[r.astro.Mercury.sign]+' '+r.astro.Mercury.degree.toFixed(1)+'°'):'—')+'</td>'+
     '<td>'+esc(r.astro?.Mercury?.nakshatraName||'—')+'</td>'+
     '<td>'+esc(r.timeConfidence||'—')+'</td>'+
@@ -642,8 +694,15 @@ function renderRankBars(id,rows){
 function renderList(){
   const el=document.getElementById('incidentList');if(!incidents.length){el.innerHTML='<div class="empty">No aviation incidents recorded yet.</div>';return}
   el.innerHTML=incidents.slice(0,250).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+(r.geo?.found?' · '+esc(r.geo.displayName||r.locationText||''):'')+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span><span class="tag">severity: '+esc(r.severity||'—')+'</span><span class="tag">'+esc(r.aircraftType||'—')+'</span>'+(r.region?'<span class="tag">'+esc(r.region)+'</span>':'')+(r.ascendant?'<span class="tag">ASC '+esc(SIGNS[r.ascendant.sign])+' '+r.ascendant.degree.toFixed(1)+'°</span>':'')+
+      '<span class="tag">Mars → Moon: '+esc(formatVedicAspect(r.astro?.MoonMars))+'</span>'+
+      '<span class="tag">Rahu → Moon: '+esc(formatVedicAspect(r.astro?.MoonRahu))+'</span>'+
       '<span class="tag">Moon aspects: '+esc(aspectList(r.astro?.MoonAspects))+'</span>'+
-      '<span class="tag">Mercury aspects: '+esc(aspectList(r.astro?.MercuryAspects))+'</span></div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+astroBox('☿ Mercury',r.astro.Mercury.lon,r.astro.Mercury.sign,r.astro.Mercury.degree,'Moon: '+r.astro.Mercury.moonRelation.aspect)+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
+      '<span class="tag">Mercury aspects: '+esc(aspectList(r.astro?.MercuryAspects))+'</span></div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+astroBox('☿ Mercury',r.astro.Mercury.lon,r.astro.Mercury.sign,r.astro.Mercury.degree,'Moon: '+r.astro.Mercury.moonRelation.aspect)+relationBox('♂ Mars',r.astro.Mars)+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
+}
+function formatVedicAspect(a){
+  if(!a)return '—';
+  if(a.major)return a.aspect+' · orb '+a.orb.toFixed(1)+'°';
+  return 'no Jyotish drishti · '+a.separation.toFixed(1)+'° forward';
 }
 function aspectList(arr){
   return Array.isArray(arr)&&arr.length?arr.map(a=>a.planet+' '+a.aspect+' ('+a.orb.toFixed(1)+'°)').join(', '):'none within 8° orb';
