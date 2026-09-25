@@ -204,7 +204,7 @@ function enrichIncident(r){
   const text=((r.title||'')+' '+(r.description||'')).toLowerCase();
   if(!r.severity)r.severity=classifySeverity(text);
   if(!r.aircraftType)r.aircraftType=classifyAircraftType(text,r.categories||[]);
-  if(r.eventAt&&(!r.astro||!r.astro.Mercury)){
+  if(r.eventAt&&(!r.astro||!r.astro.Mercury||!Array.isArray(r.astro.MoonAspects)||!Array.isArray(r.astro.MercuryAspects))){
     try{r.astro=calculateAstro(new Date(r.eventAt))}catch{}
   }
   return r;
@@ -288,13 +288,39 @@ function worldRegion(lat,lon,countryCode){
 }
 
 function calculateAstro(date){
-  const aya=lahiriAyanamsa(date);const bodyLon=name=>{const v=A.GeoVector(A.Body[name],date,true);const e=A.Ecliptic(v);return norm(Number(e.elon)-aya)};
-  const moon=bodyLon('Moon'),mercury=bodyLon('Mercury'),uranus=bodyLon('Uranus'),pluto=bodyLon('Pluto');const rahu=norm(meanNodeTropicalLongitude(date)-aya),ketu=norm(rahu+180);
-  return{Moon:positionRecord(moon),Mercury:{...positionRecord(mercury),moonRelation:relationRecord(moon,mercury)},Rahu:relationRecord(moon,rahu),Ketu:relationRecord(moon,ketu),Uranus:relationRecord(moon,uranus),Pluto:relationRecord(moon,pluto)};
+  const aya=lahiriAyanamsa(date);
+  const bodyLon=name=>{const v=A.GeoVector(A.Body[name],date,true);const e=A.Ecliptic(v);return norm(Number(e.elon)-aya)};
+  const lon={
+    Sun:bodyLon('Sun'),Moon:bodyLon('Moon'),Mercury:bodyLon('Mercury'),Venus:bodyLon('Venus'),
+    Mars:bodyLon('Mars'),Jupiter:bodyLon('Jupiter'),Saturn:bodyLon('Saturn'),
+    Uranus:bodyLon('Uranus'),Neptune:bodyLon('Neptune'),Pluto:bodyLon('Pluto')
+  };
+  lon.Rahu=norm(meanNodeTropicalLongitude(date)-aya);lon.Ketu=norm(lon.Rahu+180);
+  const aspectBodies=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Rahu','Ketu','Uranus','Neptune','Pluto'];
+  const mercuryBodies=['Sun','Moon','Venus','Mars','Jupiter','Saturn','Rahu','Ketu','Uranus','Neptune','Pluto'];
+  const moonAspects=aspectBodies.map(p=>aspectRecord(p,lon[p],lon.Moon)).filter(x=>x.major);
+  const mercuryAspects=mercuryBodies.map(p=>aspectRecord(p,lon[p],lon.Mercury)).filter(x=>x.major);
+  return{
+    Moon:positionRecord(lon.Moon),
+    Mercury:{...positionRecord(lon.Mercury),moonRelation:relationRecord(lon.Moon,lon.Mercury)},
+    Rahu:relationRecord(lon.Moon,lon.Rahu),Ketu:relationRecord(lon.Moon,lon.Ketu),
+    Uranus:relationRecord(lon.Moon,lon.Uranus),Neptune:relationRecord(lon.Moon,lon.Neptune),Pluto:relationRecord(lon.Moon,lon.Pluto),
+    MoonAspects:moonAspects,MercuryAspects:mercuryAspects
+  };
 }
 function positionRecord(lon){return{lon,sign:Math.floor(lon/30),degree:lon%30}}
-function relationRecord(moonLon,lon){const sep=Math.abs(norm180(lon-moonLon));return{lon,sign:Math.floor(lon/30),degree:lon%30,separation:sep,aspect:nearestAspect(sep)}}
-function nearestAspect(sep){const aspects=[['conjunction',0],['sextile',60],['square',90],['trine',120],['opposition',180]];let best=null;for(const [name,deg] of aspects){const orb=Math.abs(sep-deg);if(!best||orb<best.orb)best={name,deg,orb}}return best.orb<=8?best.name+' · orb '+best.orb.toFixed(1)+'°':'no major aspect · '+sep.toFixed(1)+'° apart'}
+function relationRecord(baseLon,lon){const sep=Math.abs(norm180(lon-baseLon));return{lon,sign:Math.floor(lon/30),degree:lon%30,separation:sep,aspect:nearestAspect(sep)}}
+function aspectRecord(planet,planetLon,targetLon){
+  const sep=Math.abs(norm180(planetLon-targetLon));
+  const a=majorAspect(sep);
+  return{planet,separation:sep,major:!!a,aspect:a?a.name:'none',orb:a?a.orb:null};
+}
+function majorAspect(sep){
+  const aspects=[['conjunction',0],['sextile',60],['square',90],['trine',120],['opposition',180]];
+  let best=null;for(const [name,deg] of aspects){const orb=Math.abs(sep-deg);if(!best||orb<best.orb)best={name,deg,orb}}
+  return best&&best.orb<=8?best:null;
+}
+function nearestAspect(sep){const a=majorAspect(sep);return a?a.name+' · orb '+a.orb.toFixed(1)+'°':'no major aspect · '+sep.toFixed(1)+'° apart'}
 function render(){
   document.getElementById('incidentCount').textContent=incidents.length;renderPatternSummary();renderDatasetFilters();renderDataset();document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
 }
@@ -321,13 +347,27 @@ function renderPatternSummary(){
     const m=new Map();incidents.forEach(r=>{const s=SIGNS[r.astro?.Moon?.sign];if(s)m.set(s,(m.get(s)||0)+1)});
     return [...m.entries()].sort((a,b)=>b[1]-a[1])[0];
   })();
+  const moonAspectStats=topAspectSignature('MoonAspects');
+  const mercuryAspectStats=topAspectSignature('MercuryAspects');
   el.innerHTML=
     patternCard('Majority region',topRegion?topRegion[0]:'Insufficient geocoded data',topRegion?topRegion[1]+' of '+geoN+' geocoded incidents':'0 geocoded incidents')+
     patternCard('Most frequent Ascendant',topAsc?topAsc[0]:'Insufficient timed/geocoded data',topAsc?topAsc[1]+' of '+ascN+' usable local charts':'0 usable local charts')+
     patternCard('Most frequent Moon sign',topMoon?topMoon[0]:'—',topMoon?topMoon[1]+' of '+incidents.length+' recorded incidents':'No sample')+
     patternCard('Most frequent Mercury sign',topMercury?topMercury[0]:'—',topMercury?topMercury[1]+' of '+incidents.length+' recorded incidents':'No sample')+
+    patternCard('Most common aspect to Moon',moonAspectStats?moonAspectStats.label:'No major aspect pattern',moonAspectStats?moonAspectStats.count+' occurrences · '+moonAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
+    patternCard('Most common aspect to Mercury',mercuryAspectStats?mercuryAspectStats.label:'No major aspect pattern',mercuryAspectStats?mercuryAspectStats.count+' occurrences · '+mercuryAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
     patternCard('Most incident-prone aircraft type',topAircraft?topAircraft[0]:'—',topAircraft?topAircraft[1]+' of '+incidents.length+' classified records':'No sample')+
     patternCard('Most common severity',topSeverity?topSeverity[0]:'—',topSeverity?topSeverity[1]+' of '+incidents.length+' records':'No sample');
+}
+function topAspectSignature(field){
+  const counts=new Map();
+  incidents.forEach(r=>(r.astro?.[field]||[]).forEach(a=>{
+    if(!a?.major)return;
+    const key=a.planet+' '+a.aspect;
+    counts.set(key,(counts.get(key)||0)+1);
+  }));
+  const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
+  return top?{label:top[0],count:top[1],rate:(top[1]/Math.max(1,incidents.length))*100}:null;
 }
 function patternCard(label,value,note){return '<div class="focus-card"><small>'+esc(label)+'</small><b>'+esc(value)+'</b><p>'+esc(note)+'</p></div>'}
 
@@ -421,7 +461,12 @@ function formatZodiacMean(mean){
 }
 function renderList(){
   const el=document.getElementById('incidentList');if(!incidents.length){el.innerHTML='<div class="empty">No aviation incidents recorded yet.</div>';return}
-  el.innerHTML=incidents.slice(0,250).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+(r.geo?.found?' · '+esc(r.geo.displayName||r.locationText||''):'')+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span><span class="tag">severity: '+esc(r.severity||'—')+'</span><span class="tag">'+esc(r.aircraftType||'—')+'</span>'+(r.region?'<span class="tag">'+esc(r.region)+'</span>':'')+(r.ascendant?'<span class="tag">ASC '+esc(SIGNS[r.ascendant.sign])+' '+r.ascendant.degree.toFixed(1)+'°</span>':'')+'</div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+astroBox('☿ Mercury',r.astro.Mercury.lon,r.astro.Mercury.sign,r.astro.Mercury.degree,'Moon: '+r.astro.Mercury.moonRelation.aspect)+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
+  el.innerHTML=incidents.slice(0,250).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+(r.geo?.found?' · '+esc(r.geo.displayName||r.locationText||''):'')+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span><span class="tag">severity: '+esc(r.severity||'—')+'</span><span class="tag">'+esc(r.aircraftType||'—')+'</span>'+(r.region?'<span class="tag">'+esc(r.region)+'</span>':'')+(r.ascendant?'<span class="tag">ASC '+esc(SIGNS[r.ascendant.sign])+' '+r.ascendant.degree.toFixed(1)+'°</span>':'')+
+      '<span class="tag">Moon aspects: '+esc(aspectList(r.astro?.MoonAspects))+'</span>'+
+      '<span class="tag">Mercury aspects: '+esc(aspectList(r.astro?.MercuryAspects))+'</span></div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+astroBox('☿ Mercury',r.astro.Mercury.lon,r.astro.Mercury.sign,r.astro.Mercury.degree,'Moon: '+r.astro.Mercury.moonRelation.aspect)+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
+}
+function aspectList(arr){
+  return Array.isArray(arr)&&arr.length?arr.map(a=>a.planet+' '+a.aspect+' ('+a.orb.toFixed(1)+'°)').join(', '):'none within 8° orb';
 }
 function astroBox(name,lon,sign,degree,note){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[sign]+' '+SIGNS[sign]+' '+degree.toFixed(2)+'°</span><span>'+note+'</span></div>'}
 function relationBox(name,r){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[r.sign]+' '+SIGNS[r.sign]+' '+r.degree.toFixed(2)+'°</span><span>Moon: '+esc(r.aspect)+'</span></div>'}
