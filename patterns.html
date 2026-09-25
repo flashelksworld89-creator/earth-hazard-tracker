@@ -75,7 +75,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 <div class="panel"><h2>Moon nakshatra experiment</h2><div class="sub">Observed earthquake timestamps versus an expected Moon-nakshatra distribution sampled uniformly across the same time window.</div><div id="nakGrid" class="nak-grid"><div class="loading">Loading astronomy…</div></div><div id="astroNote" class="note">This is an exploratory correlation screen. It does not show that lunar position causes earthquakes.</div></div>
 <div class="panel"><h2>Regional seismic activity</h2><div class="sub">Broad geographic regions for comparing where the selected seismic activity is concentrated.</div><div id="regionBars" class="bars"><div class="loading">Loading regions…</div></div></div>
 <div class="panel"><h2>Monthly seismic–nakshatra report</h2><div class="sub">Current calendar month. Ranks nakshatras by observed-versus-expected activity and shows where the events were concentrated.</div><div id="monthlyReport"><div class="loading">Building monthly report…</div></div></div>
-<div class="panel"><h2>Leader astrology ↔ news pattern analysis</h2><div class="sub">Weekly and monthly summaries of dated matches recorded by Leader Agents. Shows recurring transit channels, news categories, leader gatherings and repeated transit signatures.</div>
+<div class="panel"><h2>Leader meeting ↔ assigned-planet pattern analysis</h2><div class="sub">Weekly and monthly summaries of leader-to-leader meetings recorded by Leader Agents. Compares meeting type, place, topic, counterpart pair and each leader’s assigned-planet transit position.</div>
 <div class="leader-analysis-controls">
 <label>Analysis window<select id="leaderWindow"><option value="7">Weekly · 7 days</option><option value="30" selected>Monthly · 30 days</option></select></label>
 <label>Leader profile<select id="leaderProfile"><option value="all">All leaders</option></select></label>
@@ -177,37 +177,43 @@ function renderLeaderAnalysis(){
  const rows=all.filter(r=>new Date(r.observedAt).getTime()>=cutoff&&(profile==='all'||r.profileId===profile));
 
  if(!rows.length){
-  target.innerHTML='<div class="loading">No saved leader/news observations for this '+(days===7?'weekly':'monthly')+' window yet. The Leader Agent will populate this as same-day matches accumulate.</div>';
+  target.innerHTML='<div class="loading">No saved leader-meeting observations for this '+(days===7?'weekly':'monthly')+' window yet. The Leader Agent will populate this as meetings are recorded.</div>';
   return;
  }
 
- const uniqueStories=new Set(rows.map(r=>r.storyUrl||r.storyTitle)).size;
+ const uniqueMeetings=new Set(rows.map(r=>r.storyUrl||r.storyTitle)).size;
  const leaders=new Set(rows.map(r=>r.profileId)).size;
- const channels=countBy(rows,r=>r.channel);
- const planetCategories=countBy(rows,r=>r.planetCategory||'Unassigned');
- const categories=countMany(rows,r=>r.categories||[]);
+ const planets=countBy(rows,r=>r.planetCategory||'Unassigned');
+ const meetingTypes=countBy(rows,r=>r.meetingType||'Leader Meeting');
+ const locations=countBy(rows,r=>r.meetingLocation||'Unknown location');
+ const topics=countBy(rows,r=>r.meetingTopic||'Unknown topic');
+ const houses=countBy(rows,r=>r.transitHouse?('H'+r.transitHouse):'Unknown house');
+ const signs=countBy(rows,r=>Number.isFinite(r.transitSign)?['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'][r.transitSign]:'Unknown sign');
  const signatures=countBy(rows,r=>r.signature);
- const meetings=rows.filter(r=>(r.categories||[]).some(c=>c==='Leader Gatherings / Private Meetings'||c==='Leader Gatherings / Open Meetings'));
- const privateMeetings=meetings.filter(r=>(r.categories||[]).includes('Leader Gatherings / Private Meetings')).length;
- const openMeetings=meetings.filter(r=>(r.categories||[]).includes('Leader Gatherings / Open Meetings')).length;
+ const pairs=countMany(rows,r=>(r.counterpartProfiles||[]).map(cp=>(r.leaderName||r.profileId)+' ↔ '+(cp.name||cp.id)));
 
- const topChannel=channels[0]?.[0]||'—';
- const topCategory=categories[0]?.[0]||'—';
- const topPlanet=planetCategories[0]?.[0]||'—';
+ const topPlanet=planets[0]?.[0]||'—';
+ const topType=meetingTypes[0]?.[0]||'—';
+ const topTopic=topics[0]?.[0]||'—';
+ const topLocation=locations[0]?.[0]||'—';
 
  target.innerHTML=
   '<div class="analysis-cards">'+
-    analysisCard('Saved matches',rows.length,uniqueStories+' unique stories · '+leaders+' leader'+(leaders===1?'':'s'))+
-    analysisCard('Most active transit channel',topChannel,(channels[0]?.[1]||0)+' recorded matches')+
-    analysisCard('Most common news category',topCategory,(categories[0]?.[1]||0)+' occurrences')+
-    analysisCard('Leader planet category',topPlanet,(planetCategories[0]?.[1]||0)+' observations')+
-    analysisCard('Leader gatherings',meetings.length,privateMeetings+' private · '+openMeetings+' open/public')+
-    analysisCard('Repeated signatures',signatures.filter(x=>x[1]>=2).length,'Transit signatures appearing at least twice')+
+    analysisCard('Recorded meetings',uniqueMeetings,rows.length+' leader-side observations · '+leaders+' tracked leader'+(leaders===1?'':'s'))+
+    analysisCard('Most common assigned planet',topPlanet,(planets[0]?.[1]||0)+' observations')+
+    analysisCard('Most common meeting type',topType,(meetingTypes[0]?.[1]||0)+' observations')+
+    analysisCard('Most common meeting topic',topTopic,(topics[0]?.[1]||0)+' observations')+
+    analysisCard('Most common meeting place',topLocation,(locations[0]?.[1]||0)+' observations')+
+    analysisCard('Repeated planet signatures',signatures.filter(x=>x[1]>=2).length,'Assigned-planet sign/house signatures appearing at least twice')+
   '</div>'+
-  analysisList('Top news categories',categories.slice(0,8))+
-  analysisList('Transit channels',channels.slice(0,8))+
-  analysisList('Most repeated astrology signatures',signatures.slice(0,8));
-
+  analysisList('Assigned planets',planets.slice(0,8))+
+  analysisList('Meeting types',meetingTypes.slice(0,8))+
+  analysisList('Meeting topics',topics.slice(0,8))+
+  analysisList('Meeting locations',locations.slice(0,8))+
+  analysisList('Assigned-planet houses',houses.slice(0,12))+
+  analysisList('Assigned-planet signs',signs.slice(0,12))+
+  analysisList('Leader pairs',pairs.slice(0,10))+
+  analysisList('Most repeated assigned-planet signatures',signatures.slice(0,10));
 }
 function analysisCard(label,value,note){
  return '<div class="analysis-card"><b>'+escapePattern(label)+' · '+escapePattern(String(value))+'</b><span>'+escapePattern(note)+'</span></div>';
