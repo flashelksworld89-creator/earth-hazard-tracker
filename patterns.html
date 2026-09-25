@@ -96,7 +96,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
 <script>
 const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
-const state={eq:[],haz:[]};
+const state={eq:[],haz:[],dbLeader:[],dbWorld:[]};
 document.getElementById('refresh').addEventListener('click',load);
 document.getElementById('days').addEventListener('change',render);
 document.getElementById('mag').addEventListener('change',render);
@@ -108,6 +108,7 @@ document.getElementById('worldFocusPlanet').addEventListener('change',renderWorl
 document.getElementById('worldFocusDays').addEventListener('change',renderWorldFocusAnalysis);
 populateLeaderProfileFilter();
 load();
+loadPersistentPatternData();
 
 async function load(){
  document.getElementById('status').textContent='Loading current datasets…';
@@ -162,11 +163,32 @@ function renderRegions(a){
  document.getElementById('regionBars').innerHTML=rows.length?rows.map(([name,v])=>'<div class="barrow"><span>'+name+'</span><div class="track"><div class="fill" style="width:'+(v/max*100).toFixed(1)+'%"></div></div><span class="value">'+v+'</span></div>').join(''):'<div class="loading">No events in this filter.</div>';
 }
 
+async function loadPersistentPatternData(){
+  try{
+    const [leaders,world]=await Promise.allSettled([
+      fetch('/api/observations?type=leader_meeting&days=730&limit=5000',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject(new Error('leader db '+r.status))),
+      fetch('/api/observations?type=world_focus&days=730&limit=1000',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject(new Error('world db '+r.status)))
+    ]);
+    if(leaders.status==='fulfilled') state.dbLeader=(leaders.value.observations||[]).map(x=>x.payload).filter(Boolean);
+    if(world.status==='fulfilled') state.dbWorld=(world.value.observations||[]).map(x=>x.payload).filter(Boolean);
+    populateLeaderProfileFilter();
+    renderLeaderAnalysis();
+    renderWorldFocusAnalysis();
+  }catch(e){console.warn('Persistent pattern data unavailable',e)}
+}
+function mergeByKey(localRows,dbRows,keyFn){
+  const m=new Map();
+  for(const row of [...localRows,...dbRows]){
+    const k=keyFn(row);
+    if(k)m.set(k,row);
+  }
+  return [...m.values()];
+}
+
 function loadWorldFocusHistory(){
- try{
-  const rows=JSON.parse(localStorage.getItem('planetary-world-focus-v1')||'[]');
-  return Array.isArray(rows)?rows:[];
- }catch{return[]}
+ let local=[];
+ try{const rows=JSON.parse(localStorage.getItem('planetary-world-focus-v1')||'[]');local=Array.isArray(rows)?rows:[]}catch{}
+ return mergeByKey(local,state.dbWorld||[],r=>r.day||r.createdAt);
 }
 function renderWorldFocusAnalysis(){
  const target=document.getElementById('worldFocusAnalysis');if(!target)return;
@@ -209,10 +231,9 @@ function renderWorldFocusAnalysis(){
 }
 
 function loadLeaderObservations(){
- try{
-  const rows=JSON.parse(localStorage.getItem('leader-agent-observations-v1')||'[]');
-  return Array.isArray(rows)?rows:[];
- }catch{return[]}
+ let local=[];
+ try{const rows=JSON.parse(localStorage.getItem('leader-agent-observations-v1')||'[]');local=Array.isArray(rows)?rows:[]}catch{}
+ return mergeByKey(local,state.dbLeader||[],r=>r.key||r.storyUrl||r.storyTitle);
 }
 function populateLeaderProfileFilter(){
  const select=document.getElementById('leaderProfile');
