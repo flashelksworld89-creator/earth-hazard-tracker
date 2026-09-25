@@ -18,6 +18,7 @@ main{width:min(1420px,calc(100% - 24px));margin:auto;padding:22px 0 48px}.hero{d
 .mean-box{display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:center}.mean-degree{font-size:28px;font-weight:900;color:#ffe29a}.mean-note{color:#91a8bf;font-size:9px;line-height:1.5}
 .list{display:grid;gap:8px}.incident{padding:10px;border:1px solid rgba(124,185,255,.1);border-radius:10px;background:#06111f}.incident-head{display:flex;justify-content:space-between;gap:10px}.incident h3{margin:0;font-size:12px;line-height:1.35}.incident a{color:#bde9ff;text-decoration:none}.incident-meta{margin-top:3px;color:#7997a9;font-size:8px}.incident-time{white-space:nowrap;color:#ffd49a;font-size:8px}.astro-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:8px}.astro{padding:7px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}.astro b{display:block;font-size:9px}.astro span{display:block;margin-top:2px;color:#86a5b6;font-size:7.5px;line-height:1.35}.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.tag{padding:3px 6px;border-radius:999px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.08);color:#8fb8ca;font-size:7.5px}.empty{padding:28px;text-align:center;color:#7893a4;font-size:10px;border:1px dashed rgba(124,185,255,.12);border-radius:10px}
 .focus-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.focus-card{padding:10px;border:1px solid rgba(124,185,255,.1);border-radius:10px;background:#06111f}.focus-card small{display:block;color:#7896a8;font-size:8px;text-transform:uppercase}.focus-card b{display:block;margin-top:4px;font-size:13px}.focus-card p{margin:4px 0 0;color:#88a6b7;font-size:8px;line-height:1.4}
+.dataset-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px}.dataset-controls select{padding:7px 8px;background:#06111f;color:var(--text);border:1px solid var(--border);border-radius:7px;font-size:9px}.table-wrap{overflow:auto;border:1px solid rgba(124,185,255,.08);border-radius:9px}.dataset{width:100%;border-collapse:collapse;min-width:1120px;font-size:8px}.dataset th,.dataset td{padding:7px 8px;border-bottom:1px solid rgba(124,185,255,.07);text-align:left;vertical-align:top}.dataset th{position:sticky;top:0;background:#081724;color:#b9d7e6;cursor:pointer;white-space:nowrap}.dataset td{color:#8faebe}.dataset tr:hover td{background:rgba(56,189,248,.025)}.sev-critical{color:#ff9a9a!important}.sev-high{color:#ffd08a!important}.sev-moderate{color:#ffe9a8!important}.sev-low{color:#a9ddbf!important}
 .note{margin-top:9px;padding-top:9px;border-top:1px solid rgba(124,185,255,.08);color:#6e8796;font-size:8px;line-height:1.5}
 @media(max-width:950px){.metrics{grid-template-columns:repeat(2,1fr)}.astro-grid{grid-template-columns:repeat(2,1fr)}.mean-box{grid-template-columns:1fr}.focus-grid{grid-template-columns:1fr}}@media(max-width:650px){header,.hero,.incident-head{align-items:stretch;flex-direction:column}.metrics{grid-template-columns:1fr}}
 </style>
@@ -54,6 +55,21 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     <div class="note">Ascendant statistics only use incidents with both a geocoded event location and a usable event timestamp. Incidents lacking enough evidence are excluded from that ranking rather than guessed.</div>
   </section>
   <section class="panel">
+    <div class="panel-head"><strong>AVIATION DATASET</strong><span id="datasetCount" class="status">0 records</span></div>
+    <div class="dataset-controls">
+      <select id="filterSeverity"><option value="all">All severities</option><option>Critical</option><option>High</option><option>Moderate</option><option>Low</option></select>
+      <select id="filterAircraft"><option value="all">All aircraft types</option></select>
+      <select id="filterRegion"><option value="all">All regions</option></select>
+      <select id="filterAsc"><option value="all">All Ascendants</option></select>
+      <select id="filterMoon"><option value="all">All Moon signs</option></select>
+      <select id="filterConfidence"><option value="all">All timing confidence</option><option value="reported">reported</option><option value="inferred">inferred</option><option value="fallback">fallback</option></select>
+    </div>
+    <div class="table-wrap"><table class="dataset"><thead><tr>
+      <th data-sort="eventAt">Date/time</th><th data-sort="severity">Severity</th><th data-sort="aircraftType">Aircraft type</th><th data-sort="region">Region</th><th>Location</th><th data-sort="asc">Ascendant</th><th data-sort="moon">Moon</th><th data-sort="timeConfidence">Time quality</th><th>Incident</th>
+    </tr></thead><tbody id="datasetBody"></tbody></table></div>
+    <div class="note">Severity and aircraft type are headline/description classifications. They should be treated as provisional until verified against an authoritative accident report.</div>
+  </section>
+  <section class="panel">
     <div class="panel-head"><strong>RECORDED INCIDENTS</strong><span id="scanStatus" class="status">Starting…</span></div>
     <div id="incidentList" class="list"></div>
     <div class="note">Incident time extraction is best-effort from the headline/description. When an explicit event time with a recognizable timezone is unavailable, the agent marks the record as a publication-time fallback. The astrology is a pattern-analysis layer and does not establish causation.</div>
@@ -74,11 +90,18 @@ let incidents=loadIncidents();
 let lastScanAt=Number(localStorage.getItem('aviation-agent-last-scan')||0);
 let nextScanAt=Date.now()+SCAN_MS;
 let scanning=false;
+let datasetSort={key:'eventAt',dir:'desc'};
 render();scan();setInterval(scan,SCAN_MS);setInterval(updateCountdown,1000);
 document.getElementById('scanBtn').onclick=scan;
 document.getElementById('backfillBtn').onclick=()=>backfillHistorical(true);
+['filterSeverity','filterAircraft','filterRegion','filterAsc','filterMoon','filterConfidence'].forEach(id=>document.getElementById(id).addEventListener('change',renderDataset));
+document.querySelectorAll('.dataset th[data-sort]').forEach(th=>th.onclick=()=>{
+  const key=th.dataset.sort;
+  datasetSort={key,dir:datasetSort.key===key&&datasetSort.dir==='asc'?'desc':'asc'};
+  renderDataset();
+});
 if(localStorage.getItem(BACKFILL_MARK)!=='done')setTimeout(()=>backfillHistorical(false),1200);
-function loadIncidents(){try{const v=JSON.parse(localStorage.getItem(STORE)||'[]');return Array.isArray(v)?v:[]}catch{return[]}}
+function loadIncidents(){try{const v=JSON.parse(localStorage.getItem(STORE)||'[]');return Array.isArray(v)?v.map(enrichIncident):[]}catch{return[]}}
 function saveIncidents(){localStorage.setItem(STORE,JSON.stringify(incidents.slice(0,1000)))}
 async function scan(){
   if(scanning)return;scanning=true;document.getElementById('scanStatus').textContent='Scanning global breaking aviation news…';
@@ -94,7 +117,7 @@ async function scan(){
       const astro=calculateAstro(timing.date);
       const ascendant=geo?.found?calculateLocalAscendant(timing.date,geo.lat,geo.lon):null;
       const region=geo?.found?worldRegion(geo.lat,geo.lon,geo.countryCode):'Unknown';
-      const record={key,title:article.title,url:article.url,source:article.source||'Source',publishedAt:article.publishedAt,eventAt:timing.date.toISOString(),timeBasis:timing.basis,timeConfidence:timing.confidence,categories:classifyAviation(article),astro,locationText,geo,region,ascendant,storedAt:new Date().toISOString()};
+      const record=enrichIncident({key,title:article.title,url:article.url,source:article.source||'Source',description:article.description||'',publishedAt:article.publishedAt,eventAt:timing.date.toISOString(),timeBasis:timing.basis,timeConfidence:timing.confidence,categories:classifyAviation(article),astro,locationText,geo,region,ascendant,storedAt:new Date().toISOString()});
       incidents.unshift(record);
       persistObservation('aviation_incident',key,record.eventAt,record.eventAt.slice(0,10),record);
       added++;
@@ -134,13 +157,13 @@ async function backfillHistorical(manual){
         const astro=calculateAstro(timing.date);
         const ascendant=geo?.found?calculateLocalAscendant(timing.date,geo.lat,geo.lon):null;
         const region=geo?.found?worldRegion(geo.lat,geo.lon,geo.countryCode):'Unknown';
-        const record={
-          key,title:article.title,url:article.url,source:article.source||'Source',
+        const record=enrichIncident({
+          key,title:article.title,url:article.url,source:article.source||'Source',description:article.description||'',
           publishedAt:article.publishedAt,eventAt:timing.date.toISOString(),
           timeBasis:timing.basis,timeConfidence:timing.confidence,
           categories:classifyAviation(article),astro,locationText,geo,region,ascendant,
           historicalBackfill:true,backfillDay:day,storedAt:new Date().toISOString()
-        };
+        });
         incidents.push(record);
         persistObservation('aviation_incident',key,record.eventAt,record.eventAt.slice(0,10),record);
         added++;
@@ -172,6 +195,29 @@ function classifyAviation(a){
     'Crash / Collision':['crash','crashed','collision'],'Emergency Landing':['emergency landing','forced landing','diverted','diversion'],'Mechanical / Engine':['engine failure','mechanical','hydraulic','gear failure','smoke in cockpit'],'Fire / Smoke':['fire','smoke'],'Runway Incident':['runway excursion','runway','hard landing'],'Helicopter':['helicopter'],'Military Aircraft':['military aircraft','fighter jet','air force'],'Commercial Flight':['airline','passenger flight','commercial flight']};
   for(const [name,terms] of Object.entries(rules))if(terms.some(x=>t.includes(x)))out.push(name);return out.length?out:['Other Aviation Incident'];
 }
+function enrichIncident(r){
+  const text=((r.title||'')+' '+(r.description||'')).toLowerCase();
+  if(!r.severity)r.severity=classifySeverity(text);
+  if(!r.aircraftType)r.aircraftType=classifyAircraftType(text,r.categories||[]);
+  return r;
+}
+function classifySeverity(text){
+  if(/\b(?:all aboard|no survivors|fatal crash|dead|died|killed|fatalities|multiple fatalities|midair collision|exploded|destroyed)\b/.test(text))return 'Critical';
+  if(/\b(?:crash|crashed|collision|ditched|hard landing|major damage|serious injuries|injured|fire)\b/.test(text))return 'High';
+  if(/\b(?:emergency landing|forced landing|engine failure|smoke|hydraulic|gear failure|runway excursion|mayday)\b/.test(text))return 'Moderate';
+  return 'Low';
+}
+function classifyAircraftType(text,categories){
+  if(/\b(?:helicopter|chopper|rotorcraft)\b/.test(text)||categories.includes('Helicopter'))return 'Helicopter';
+  if(/\b(?:fighter jet|military jet|air force|military aircraft|bomber|trainer aircraft)\b/.test(text)||categories.includes('Military Aircraft'))return 'Military aircraft';
+  if(/\b(?:cargo plane|cargo aircraft|freighter)\b/.test(text))return 'Cargo aircraft';
+  if(/\b(?:private jet|business jet|corporate jet)\b/.test(text))return 'Business / private jet';
+  if(/\b(?:small plane|light aircraft|single-engine|single engine|cessna|piper|beechcraft)\b/.test(text))return 'Light / general aviation';
+  if(/\b(?:airliner|airline|passenger plane|passenger jet|commercial flight|boeing|airbus)\b/.test(text)||categories.includes('Commercial Flight'))return 'Commercial airliner';
+  if(/\b(?:seaplane|floatplane)\b/.test(text))return 'Seaplane';
+  return 'Unspecified aircraft';
+}
+
 function extractIncidentTime(article){
   const text=(article.title||'')+' '+(article.description||'');const published=new Date(article.publishedAt);const zoneMap={UTC:0,GMT:0,EDT:-4,EST:-5,CDT:-5,CST:-6,MDT:-6,MST:-7,PDT:-7,PST:-8};
   const m=text.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\s*(UTC|GMT|EDT|EST|CDT|CST|MDT|MST|PDT|PST)?\b/i);
@@ -242,19 +288,23 @@ function positionRecord(lon){return{lon,sign:Math.floor(lon/30),degree:lon%30}}
 function relationRecord(moonLon,lon){const sep=Math.abs(norm180(lon-moonLon));return{lon,sign:Math.floor(lon/30),degree:lon%30,separation:sep,aspect:nearestAspect(sep)}}
 function nearestAspect(sep){const aspects=[['conjunction',0],['sextile',60],['square',90],['trine',120],['opposition',180]];let best=null;for(const [name,deg] of aspects){const orb=Math.abs(sep-deg);if(!best||orb<best.orb)best={name,deg,orb}}return best.orb<=8?best.name+' · orb '+best.orb.toFixed(1)+'°':'no major aspect · '+sep.toFixed(1)+'° apart'}
 function render(){
-  document.getElementById('incidentCount').textContent=incidents.length;renderPatternSummary();document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
+  document.getElementById('incidentCount').textContent=incidents.length;renderPatternSummary();renderDatasetFilters();renderDataset();document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
 }
 function renderPatternSummary(){
   const el=document.getElementById('patternSummary');if(!el)return;
   if(!incidents.length){el.innerHTML='<div class="focus-card"><small>Geography</small><b>—</b><p>No incidents recorded yet.</p></div>';return}
-  const regions=new Map(),asc=new Map();
+  const regions=new Map(),asc=new Map(),aircraft=new Map(),severity=new Map();
   let geoN=0,ascN=0;
   incidents.forEach(r=>{
     if(r.region&&r.region!=='Unknown'){regions.set(r.region,(regions.get(r.region)||0)+1);geoN++}
     if(r.ascendant&&Number.isFinite(r.ascendant.sign)){const s=SIGNS[r.ascendant.sign];asc.set(s,(asc.get(s)||0)+1);ascN++}
+    const at=r.aircraftType||'Unspecified aircraft';aircraft.set(at,(aircraft.get(at)||0)+1);
+    const sv=r.severity||'Low';severity.set(sv,(severity.get(sv)||0)+1);
   });
   const topRegion=[...regions.entries()].sort((a,b)=>b[1]-a[1])[0];
   const topAsc=[...asc.entries()].sort((a,b)=>b[1]-a[1])[0];
+  const topAircraft=[...aircraft.entries()].sort((a,b)=>b[1]-a[1])[0];
+  const topSeverity=[...severity.entries()].sort((a,b)=>b[1]-a[1])[0];
   const topMoon=(()=>{
     const m=new Map();incidents.forEach(r=>{const s=SIGNS[r.astro?.Moon?.sign];if(s)m.set(s,(m.get(s)||0)+1)});
     return [...m.entries()].sort((a,b)=>b[1]-a[1])[0];
@@ -262,9 +312,53 @@ function renderPatternSummary(){
   el.innerHTML=
     patternCard('Majority region',topRegion?topRegion[0]:'Insufficient geocoded data',topRegion?topRegion[1]+' of '+geoN+' geocoded incidents':'0 geocoded incidents')+
     patternCard('Most frequent Ascendant',topAsc?topAsc[0]:'Insufficient timed/geocoded data',topAsc?topAsc[1]+' of '+ascN+' usable local charts':'0 usable local charts')+
-    patternCard('Most frequent Moon sign',topMoon?topMoon[0]:'—',topMoon?topMoon[1]+' of '+incidents.length+' recorded incidents':'No sample');
+    patternCard('Most frequent Moon sign',topMoon?topMoon[0]:'—',topMoon?topMoon[1]+' of '+incidents.length+' recorded incidents':'No sample')+
+    patternCard('Most incident-prone aircraft type',topAircraft?topAircraft[0]:'—',topAircraft?topAircraft[1]+' of '+incidents.length+' classified records':'No sample')+
+    patternCard('Most common severity',topSeverity?topSeverity[0]:'—',topSeverity?topSeverity[1]+' of '+incidents.length+' records':'No sample');
 }
 function patternCard(label,value,note){return '<div class="focus-card"><small>'+esc(label)+'</small><b>'+esc(value)+'</b><p>'+esc(note)+'</p></div>'}
+
+function renderDatasetFilters(){
+  const setOptions=(id,values,label)=>{
+    const el=document.getElementById(id);if(!el)return;
+    const current=el.value||'all';
+    el.innerHTML='<option value="all">'+label+'</option>'+[...new Set(values.filter(Boolean))].sort().map(v=>'<option value="'+escAttr(v)+'">'+esc(v)+'</option>').join('');
+    if([...el.options].some(o=>o.value===current))el.value=current;
+  };
+  setOptions('filterAircraft',incidents.map(r=>r.aircraftType),'All aircraft types');
+  setOptions('filterRegion',incidents.map(r=>r.region),'All regions');
+  setOptions('filterAsc',incidents.map(r=>r.ascendant?SIGNS[r.ascendant.sign]:''),'All Ascendants');
+  setOptions('filterMoon',incidents.map(r=>r.astro?.Moon?SIGNS[r.astro.Moon.sign]:''),'All Moon signs');
+}
+function filteredDataset(){
+  const sev=document.getElementById('filterSeverity').value,air=document.getElementById('filterAircraft').value,region=document.getElementById('filterRegion').value,asc=document.getElementById('filterAsc').value,moon=document.getElementById('filterMoon').value,conf=document.getElementById('filterConfidence').value;
+  return incidents.filter(r=>(sev==='all'||r.severity===sev)&&(air==='all'||r.aircraftType===air)&&(region==='all'||r.region===region)&&(asc==='all'||(r.ascendant&&SIGNS[r.ascendant.sign]===asc))&&(moon==='all'||(r.astro?.Moon&&SIGNS[r.astro.Moon.sign]===moon))&&(conf==='all'||r.timeConfidence===conf));
+}
+function renderDataset(){
+  const body=document.getElementById('datasetBody');if(!body)return;
+  let rows=filteredDataset().slice();
+  const {key,dir}=datasetSort;
+  rows.sort((a,b)=>{
+    let av,bv;
+    if(key==='asc'){av=a.ascendant?SIGNS[a.ascendant.sign]:'';bv=b.ascendant?SIGNS[b.ascendant.sign]:''}
+    else if(key==='moon'){av=a.astro?.Moon?SIGNS[a.astro.Moon.sign]:'';bv=b.astro?.Moon?SIGNS[b.astro.Moon.sign]:''}
+    else{av=a[key]??'';bv=b[key]??''}
+    if(key==='eventAt'){av=new Date(av).getTime()||0;bv=new Date(bv).getTime()||0}
+    return (av>bv?1:av<bv?-1:0)*(dir==='asc'?1:-1);
+  });
+  document.getElementById('datasetCount').textContent=rows.length+' of '+incidents.length+' records';
+  body.innerHTML=rows.slice(0,500).map(r=>'<tr>'+
+    '<td>'+esc(new Date(r.eventAt).toLocaleString())+'</td>'+
+    '<td class="sev-'+String(r.severity||'low').toLowerCase()+'">'+esc(r.severity||'—')+'</td>'+
+    '<td>'+esc(r.aircraftType||'—')+'</td>'+
+    '<td>'+esc(r.region||'Unknown')+'</td>'+
+    '<td>'+esc(r.geo?.displayName||r.locationText||'Unknown')+'</td>'+
+    '<td>'+(r.ascendant?esc(SIGNS[r.ascendant.sign]+' '+r.ascendant.degree.toFixed(1)+'°'):'—')+'</td>'+
+    '<td>'+(r.astro?.Moon?esc(SIGNS[r.astro.Moon.sign]+' '+r.astro.Moon.degree.toFixed(1)+'°'):'—')+'</td>'+
+    '<td>'+esc(r.timeConfidence||'—')+'</td>'+
+    '<td><a href="'+escAttr(r.url||'')+'" target="_blank" rel="noopener noreferrer">'+esc(r.title||'Incident')+'</a></td>'+
+  '</tr>').join('');
+}
 
 function renderMean(){
   if(!incidents.length){document.getElementById('meanMoon').textContent='—';document.getElementById('meanStatus').textContent='No incident sample yet';return}
@@ -273,7 +367,7 @@ function renderMean(){
 }
 function renderList(){
   const el=document.getElementById('incidentList');if(!incidents.length){el.innerHTML='<div class="empty">No aviation incidents recorded yet.</div>';return}
-  el.innerHTML=incidents.slice(0,250).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+(r.geo?.found?' · '+esc(r.geo.displayName||r.locationText||''):'')+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span>'+(r.region?'<span class="tag">'+esc(r.region)+'</span>':'')+(r.ascendant?'<span class="tag">ASC '+esc(SIGNS[r.ascendant.sign])+' '+r.ascendant.degree.toFixed(1)+'°</span>':'')+'</div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
+  el.innerHTML=incidents.slice(0,250).map(r=>{const m=r.astro.Moon;return '<article class="incident"><div class="incident-head"><div><h3><a href="'+escAttr(r.url)+'" target="_blank" rel="noopener noreferrer">'+esc(r.title)+'</a></h3><div class="incident-meta">'+esc(r.source)+' · '+esc(r.timeBasis)+(r.geo?.found?' · '+esc(r.geo.displayName||r.locationText||''):'')+'</div></div><div class="incident-time">'+new Date(r.eventAt).toLocaleString()+'</div></div><div class="tags">'+r.categories.map(c=>'<span class="tag">'+esc(c)+'</span>').join('')+'<span class="tag">time: '+esc(r.timeConfidence)+'</span><span class="tag">severity: '+esc(r.severity||'—')+'</span><span class="tag">'+esc(r.aircraftType||'—')+'</span>'+(r.region?'<span class="tag">'+esc(r.region)+'</span>':'')+(r.ascendant?'<span class="tag">ASC '+esc(SIGNS[r.ascendant.sign])+' '+r.ascendant.degree.toFixed(1)+'°</span>':'')+'</div><div class="astro-grid">'+astroBox('☽ Moon',m.lon,m.sign,m.degree,'event lunar position')+relationBox('☊ Rahu',r.astro.Rahu)+relationBox('☋ Ketu',r.astro.Ketu)+relationBox('♅ Uranus',r.astro.Uranus)+relationBox('♇ Pluto',r.astro.Pluto)+'</div></article>'}).join('');
 }
 function astroBox(name,lon,sign,degree,note){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[sign]+' '+SIGNS[sign]+' '+degree.toFixed(2)+'°</span><span>'+note+'</span></div>'}
 function relationBox(name,r){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[r.sign]+' '+SIGNS[r.sign]+' '+r.degree.toFixed(2)+'°</span><span>Moon: '+esc(r.aspect)+'</span></div>'}
