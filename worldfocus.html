@@ -158,6 +158,17 @@ function saveTodayProfile(){
  const i=history.findIndex(x=>x.day===day);
  if(i>=0)history[i]=profile;else history.push(profile);
  localStorage.setItem(STORE,JSON.stringify(history.slice(-730)));
+ persistObservation('world_focus',day,profile.createdAt,day,profile);
+}
+
+async function persistObservation(type,eventKey,eventTime,day,payload){
+ try{
+  await fetch('/api/observations',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({type,eventKey,eventTime,day,payload})
+  });
+ }catch{}
 }
 function loadHistory(){try{const x=JSON.parse(localStorage.getItem(STORE)||'[]');return Array.isArray(x)?x:[]}catch{return[]}}
 function render(){
