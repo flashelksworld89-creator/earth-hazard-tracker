@@ -78,7 +78,10 @@ async function scan(){
       if(!looksLikeAviationIncident(article))continue;
       const key=article.url||article.id||article.title;if(incidents.some(x=>x.key===key))continue;
       const timing=extractIncidentTime(article);const astro=calculateAstro(timing.date);
-      incidents.unshift({key,title:article.title,url:article.url,source:article.source||'Source',publishedAt:article.publishedAt,eventAt:timing.date.toISOString(),timeBasis:timing.basis,timeConfidence:timing.confidence,categories:classifyAviation(article),astro,storedAt:new Date().toISOString()});added++;
+      const record={key,title:article.title,url:article.url,source:article.source||'Source',publishedAt:article.publishedAt,eventAt:timing.date.toISOString(),timeBasis:timing.basis,timeConfidence:timing.confidence,categories:classifyAviation(article),astro,storedAt:new Date().toISOString()};
+      incidents.unshift(record);
+      persistObservation('aviation_incident',key,record.eventAt,record.eventAt.slice(0,10),record);
+      added++;
     }
     saveIncidents();document.getElementById('scanStatus').textContent='Scan complete · '+added+' new incident'+(added===1?'':'s');
   }catch(e){console.error(e);document.getElementById('scanStatus').textContent='Breaking-news scan unavailable'}
@@ -121,6 +124,15 @@ function renderList(){
 }
 function astroBox(name,lon,sign,degree,note){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[sign]+' '+SIGNS[sign]+' '+degree.toFixed(2)+'°</span><span>'+note+'</span></div>'}
 function relationBox(name,r){return '<div class="astro"><b>'+name+'</b><span>'+GLYPHS[r.sign]+' '+SIGNS[r.sign]+' '+r.degree.toFixed(2)+'°</span><span>Moon: '+esc(r.aspect)+'</span></div>'}
+async function persistObservation(type,eventKey,eventTime,day,payload){
+  try{
+    await fetch('/api/observations',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type,eventKey,eventTime,day,payload})
+    });
+  }catch{}
+}
 function updateCountdown(){const ms=Math.max(0,nextScanAt-Date.now()),m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000);document.getElementById('nextScan').textContent=m+':'+String(s).padStart(2,'0')}
 function isToday(v){const d=new Date(v),n=new Date();return Number.isFinite(d.getTime())&&d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()}
 function lahiriAyanamsa(date){const jd=date.getTime()/86400000+2440587.5,T=(jd-2451545.0)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
