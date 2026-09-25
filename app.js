@@ -434,8 +434,7 @@ function refreshAstronomy(){
         const ecl=A.Ecliptic(vec);
         const lon=Number(ecl?.elon);
         if(!Number.isFinite(lon)) throw new Error('Invalid longitude for '+name);
-        const eq=A.Equator(body,date,null,true,true);
-        const dec=Number(eq?.dec);
+        const dec=Math.atan2(Number(vec.z),Math.hypot(Number(vec.x),Number(vec.y)))*180/Math.PI;
         placements.push({name,glyph,color,lon:normalize360(lon-aya),dec:Number.isFinite(dec)?dec:0});
       }catch(bodyErr){
         console.error('Planet calculation failed:',name,bodyErr);
