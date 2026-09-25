@@ -117,7 +117,18 @@ const state = {
   newsSeq: 0,
   zoom: 1,
   viewOffsetX: 0,
-  viewOffsetY: 0
+  viewOffsetY: 0,
+  atmosphere: {
+    loaded:false,
+    loading:false,
+    kp:null,
+    solarWind:null,
+    bz:null,
+    tecImage:null,
+    tecUpdated:null,
+    lightningAvailable:false,
+    status:'Atmospheric feeds not loaded yet.'
+  }
 };
 
 init();
@@ -128,6 +139,7 @@ async function init(){
   bindControls();
   updateZoomText();
   loadPoliticalLabels();
+  loadAtmosphericEnergy();
   resize();
   window.addEventListener('resize', resize);
 
@@ -220,8 +232,9 @@ function bindControls(){
     }
   });
 
-  ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showGrid','showPlaceLabels']
+  ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showGrid','showPlaceLabels','showTecAnomaly','showGeomagnetic','showLightning']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
+  document.getElementById('refreshAtmosBtn').addEventListener('click',loadAtmosphericEnergy);
 
   document.getElementById('focusSignSelect').addEventListener('change',e=>{
     state.focusSign=e.target.value===''?null:Number(e.target.value);
@@ -486,6 +499,8 @@ function draw(){
   if(document.getElementById('showGrid').checked) drawGrid(w,h,earthShiftDeg);
   if(state.mapReady) drawLand(w,h,earthShiftDeg);
 
+  drawAtmosphericLayers(w,h,earthShiftDeg);
+
   if(state.astro){
     if(document.getElementById('showDayNight').checked){
       drawDayNight(w,h,earthShiftDeg);
@@ -690,6 +705,189 @@ function drawAdmin1Boundaries(w,h,shiftDeg){
   }
 
   ctx.restore();
+}
+
+async function loadAtmosphericEnergy(){
+  if(state.atmosphere.loading)return;
+  state.atmosphere.loading=true;
+  updateAtmospherePanel('Loading NOAA atmospheric feeds…');
+
+  const safeJson=async url=>{
+    const r=await fetch(url,{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return await r.json();
+  };
+
+  const results=await Promise.allSettled([
+    safeJson('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json'),
+    safeJson('https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json'),
+    safeJson('https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json'),
+    safeJson('https://services.swpc.noaa.gov/products/animations/glotec/anomaly_urt.json')
+  ]);
+
+  const kpData=results[0].status==='fulfilled'?results[0].value:null;
+  const windData=results[1].status==='fulfilled'?results[1].value:null;
+  const magData=results[2].status==='fulfilled'?results[2].value:null;
+  const tecData=results[3].status==='fulfilled'?results[3].value:null;
+
+  state.atmosphere.kp=parseLatestKp(kpData);
+  state.atmosphere.solarWind=parseSummaryNumber(windData,['speed','solar wind speed','value']);
+  state.atmosphere.bz=parseSummaryNumber(magData,['bz','b_z','value'],true);
+
+  const tecUrl=findLatestImageUrl(tecData);
+  if(tecUrl){
+    try{
+      const img=new Image();
+      img.crossOrigin='anonymous';
+      await new Promise((resolve,reject)=>{
+        img.onload=resolve;img.onerror=reject;img.src=normalizeNoaaImageUrl(tecUrl);
+      });
+      state.atmosphere.tecImage=img;
+      state.atmosphere.tecUpdated=new Date();
+    }catch(e){
+      console.warn('TEC image unavailable',e);
+      state.atmosphere.tecImage=null;
+    }
+  }
+
+  state.atmosphere.lightningAvailable=true;
+  state.atmosphere.loaded=true;
+  state.atmosphere.loading=false;
+  const available=[
+    Number.isFinite(state.atmosphere.kp)?'Kp':'',
+    Number.isFinite(state.atmosphere.solarWind)?'solar wind':'',
+    Number.isFinite(state.atmosphere.bz)?'Bz':'',
+    state.atmosphere.tecImage?'GloTEC anomaly':''
+  ].filter(Boolean);
+  updateAtmospherePanel(
+    available.length
+      ? 'Live NOAA: '+available.join(' · ')+' · GLM lightning source ready'
+      : 'Atmospheric feeds unavailable'
+  );
+  draw();
+}
+
+function parseLatestKp(data){
+  if(!Array.isArray(data)||!data.length)return null;
+  if(Array.isArray(data[0])){
+    const header=data[0].map(x=>String(x).toLowerCase());
+    const kpI=header.findIndex(x=>x==='kp'||x.includes('kp'));
+    for(let i=data.length-1;i>=1;i--){
+      const v=Number(data[i]?.[kpI>=0?kpI:1]);
+      if(Number.isFinite(v))return v;
+    }
+  }
+  for(let i=data.length-1;i>=0;i--){
+    const r=data[i]||{};
+    const v=Number(r.kp??r.Kp??r.k_index??r.value);
+    if(Number.isFinite(v))return v;
+  }
+  return null;
+}
+
+function parseSummaryNumber(data,keys,preferBz=false){
+  const scan=obj=>{
+    if(obj==null)return null;
+    if(typeof obj==='number'&&Number.isFinite(obj))return obj;
+    if(typeof obj==='string'){
+      const m=obj.match(/-?\d+(?:\.\d+)?/);
+      return m?Number(m[0]):null;
+    }
+    if(Array.isArray(obj)){
+      for(let i=obj.length-1;i>=0;i--){const v=scan(obj[i]);if(Number.isFinite(v))return v}
+      return null;
+    }
+    if(typeof obj==='object'){
+      const entries=Object.entries(obj);
+      const ordered=preferBz
+        ? [...entries].sort(([a],[b])=>(/bz/i.test(a)?-1:0)-(/bz/i.test(b)?-1:0))
+        : entries;
+      for(const [k,v] of ordered){
+        if(keys.some(key=>k.toLowerCase().includes(key.toLowerCase()))){
+          const n=scan(v);if(Number.isFinite(n))return n;
+        }
+      }
+      for(const [,v] of entries){const n=scan(v);if(Number.isFinite(n))return n}
+    }
+    return null;
+  };
+  return scan(data);
+}
+
+function findLatestImageUrl(data){
+  const found=[];
+  const walk=v=>{
+    if(typeof v==='string'){
+      if(/\.(?:png|jpe?g|webp)(?:\?|$)/i.test(v))found.push(v);
+    }else if(Array.isArray(v))v.forEach(walk);
+    else if(v&&typeof v==='object')Object.values(v).forEach(walk);
+  };
+  walk(data);
+  return found.length?found[found.length-1]:null;
+}
+
+function normalizeNoaaImageUrl(url){
+  if(/^https?:\/\//i.test(url))return url;
+  if(url.startsWith('/'))return 'https://services.swpc.noaa.gov'+url;
+  if(url.startsWith('images/'))return 'https://services.swpc.noaa.gov/'+url;
+  return 'https://services.swpc.noaa.gov/images/animations/glotec/'+url.replace(/^\.\//,'');
+}
+
+function updateAtmospherePanel(message){
+  state.atmosphere.status=message;
+  const kp=document.getElementById('kpText');
+  const sw=document.getElementById('solarWindText');
+  const bz=document.getElementById('bzText');
+  const status=document.getElementById('atmosStatus');
+  if(kp)kp.textContent=Number.isFinite(state.atmosphere.kp)?state.atmosphere.kp.toFixed(1):'—';
+  if(sw)sw.textContent=Number.isFinite(state.atmosphere.solarWind)?Math.round(state.atmosphere.solarWind)+' km/s':'—';
+  if(bz)bz.textContent=Number.isFinite(state.atmosphere.bz)?state.atmosphere.bz.toFixed(1)+' nT':'—';
+  if(status)status.textContent=message;
+}
+
+function drawAtmosphericLayers(w,h,earthShiftDeg){
+  const a=state.atmosphere;
+  const tec=document.getElementById('showTecAnomaly')?.checked;
+  const geomag=document.getElementById('showGeomagnetic')?.checked;
+  const lightning=document.getElementById('showLightning')?.checked;
+
+  if(tec&&a.tecImage){
+    ctx.save();
+    ctx.globalAlpha=.32;
+    ctx.globalCompositeOperation='screen';
+    for(const copy of [-1,0,1]){
+      ctx.drawImage(a.tecImage,earthShiftDeg/360*w+copy*w,0,w,h);
+    }
+    ctx.restore();
+  }
+
+  if(geomag&&Number.isFinite(a.kp)){
+    const strength=Math.max(0,Math.min(1,a.kp/9));
+    if(strength>0){
+      ctx.save();
+      const north=ctx.createLinearGradient(0,0,0,h*.40);
+      north.addColorStop(0,`rgba(72,202,228,${.08+.30*strength})`);
+      north.addColorStop(1,'rgba(72,202,228,0)');
+      ctx.fillStyle=north;ctx.fillRect(0,0,w,h*.42);
+
+      const south=ctx.createLinearGradient(0,h*.60,0,h);
+      south.addColorStop(0,'rgba(157,78,221,0)');
+      south.addColorStop(1,`rgba(157,78,221,${.08+.30*strength})`);
+      ctx.fillStyle=south;ctx.fillRect(0,h*.58,w,h*.42);
+      ctx.restore();
+    }
+  }
+
+  if(lightning){
+    ctx.save();
+    ctx.font='700 9px system-ui,sans-serif';
+    ctx.textAlign='right';
+    ctx.fillStyle='rgba(255,214,102,.92)';
+    ctx.shadowColor='rgba(0,0,0,.85)';
+    ctx.shadowBlur=4;
+    ctx.fillText('GLM LIGHTNING · NOAA satellite coverage',w-12,h-18);
+    ctx.restore();
+  }
 }
 
 function drawDayNight(w,h,earthShiftDeg){
