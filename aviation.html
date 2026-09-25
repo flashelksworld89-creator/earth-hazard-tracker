@@ -230,7 +230,7 @@ function enrichIncident(r){
   const text=((r.title||'')+' '+(r.description||'')).toLowerCase();
   if(!r.severity)r.severity=classifySeverity(text);
   if(!r.aircraftType)r.aircraftType=classifyAircraftType(text,r.categories||[]);
-  if(r.eventAt&&(!r.astro||!r.astro.Mercury||!r.astro.Moon?.nakshatraName||!r.astro.Mercury?.nakshatraName||!Array.isArray(r.astro.MoonAspects)||!Array.isArray(r.astro.MercuryAspects))){
+  if(r.eventAt&&(!r.astro||!r.astro.Mercury||!r.astro.Moon?.nakshatraName||!r.astro.Mercury?.nakshatraName||!Array.isArray(r.astro.MoonAspects)||!Array.isArray(r.astro.MercuryAspects)||!r.astro.MoonUranus||!r.astro.MoonPluto)){
     try{r.astro=calculateAstro(new Date(r.eventAt))}catch{}
   }
   if(r.eventAt&&!r.tithi){
@@ -334,6 +334,8 @@ function calculateAstro(date){
     Mercury:{...positionRecord(lon.Mercury),moonRelation:relationRecord(lon.Moon,lon.Mercury)},
     Rahu:relationRecord(lon.Moon,lon.Rahu),Ketu:relationRecord(lon.Moon,lon.Ketu),
     Uranus:relationRecord(lon.Moon,lon.Uranus),Neptune:relationRecord(lon.Moon,lon.Neptune),Pluto:relationRecord(lon.Moon,lon.Pluto),
+    MoonUranus:aspectRecord('Uranus',lon.Uranus,lon.Moon),
+    MoonPluto:aspectRecord('Pluto',lon.Pluto,lon.Moon),
     MoonAspects:moonAspects,MercuryAspects:mercuryAspects
   };
 }
@@ -377,6 +379,8 @@ function renderPatternSummary(){
   const topMercuryNak=topFrequency(incidents.map(r=>r.astro?.Mercury?.nakshatraName).filter(Boolean));
   const moonAspectStats=topAspectSignature('MoonAspects');
   const mercuryAspectStats=topAspectSignature('MercuryAspects');
+  const moonUranusStats=aspectFrequencyForPlanet('MoonAspects','Uranus');
+  const moonPlutoStats=aspectFrequencyForPlanet('MoonAspects','Pluto');
   el.innerHTML=
     patternCard('Majority region',topRegion?topRegion[0]:'Insufficient geocoded data',topRegion?topRegion[1]+' of '+geoN+' geocoded incidents':'0 geocoded incidents')+
     patternCard('Most frequent Ascendant',topAsc?topAsc[0]:'Insufficient timed/geocoded data',topAsc?topAsc[1]+' of '+ascN+' usable local charts':'0 usable local charts')+
@@ -385,6 +389,8 @@ function renderPatternSummary(){
     patternCard('Most frequent Mercury sign',topMercurySign?topMercurySign.value:'—',topMercurySign?topMercurySign.count+' of '+topMercurySign.total+' · '+topMercurySign.rate.toFixed(1)+'%':'No sample')+
     patternCard('Most frequent Mercury nakshatra',topMercuryNak?topMercuryNak.value:'—',topMercuryNak?topMercuryNak.count+' of '+topMercuryNak.total+' · '+topMercuryNak.rate.toFixed(1)+'%':'No sample')+
     patternCard('Most common aspect to Moon',moonAspectStats?moonAspectStats.label:'No major aspect pattern',moonAspectStats?moonAspectStats.count+' occurrences · '+moonAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
+    patternCard('Moon ↔ Uranus',moonUranusStats?moonUranusStats.label:'No major Uranus aspect',moonUranusStats?moonUranusStats.count+' occurrences · '+moonUranusStats.rate.toFixed(1)+'% of incidents':'No sample')+
+    patternCard('Moon ↔ Pluto',moonPlutoStats?moonPlutoStats.label:'No major Pluto aspect',moonPlutoStats?moonPlutoStats.count+' occurrences · '+moonPlutoStats.rate.toFixed(1)+'% of incidents':'No sample')+
     patternCard('Most common aspect to Mercury',mercuryAspectStats?mercuryAspectStats.label:'No major aspect pattern',mercuryAspectStats?mercuryAspectStats.count+' occurrences · '+mercuryAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
     patternCard('Most incident-prone aircraft type',topAircraft?topAircraft[0]:'—',topAircraft?topAircraft[1]+' of '+incidents.length+' classified records':'No sample')+
     patternCard('Most common severity',topSeverity?topSeverity[0]:'—',topSeverity?topSeverity[1]+' of '+incidents.length+' records':'No sample');
@@ -404,6 +410,14 @@ function topAspectSignature(field){
   }));
   const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
   return top?{label:top[0],count:top[1],rate:(top[1]/Math.max(1,incidents.length))*100}:null;
+}
+function aspectFrequencyForPlanet(field,planet){
+  const counts=new Map();
+  incidents.forEach(r=>(r.astro?.[field]||[]).forEach(a=>{
+    if(a?.major&&a.planet===planet)counts.set(a.aspect,(counts.get(a.aspect)||0)+1);
+  }));
+  const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
+  return top?{label:planet+' '+top[0]+' Moon',count:top[1],rate:(top[1]/Math.max(1,incidents.length))*100}:null;
 }
 function patternCard(label,value,note){return '<div class="focus-card"><small>'+esc(label)+'</small><b>'+esc(value)+'</b><p>'+esc(note)+'</p></div>'}
 
