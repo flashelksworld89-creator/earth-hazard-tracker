@@ -148,12 +148,47 @@ async function init(){
 }
 
 function bindControls(){
+  syncDateTimeInputs(currentDate());
   document.querySelectorAll('[data-minutes]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       freezePlayback();
       state.offsetMs += Number(btn.dataset.minutes)*60000;
       refreshAstronomy();
+      syncDateTimeInputs(currentDate());
     });
+  });
+
+  document.querySelectorAll('[data-years]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      freezePlayback();
+      const d=currentDate();
+      const years=Number(btn.dataset.years)||0;
+      const target=new Date(d.getTime());
+      target.setUTCFullYear(target.getUTCFullYear()+years);
+      setCompassDate(target);
+    });
+  });
+
+  document.getElementById('applyDateTimeBtn').addEventListener('click',()=>{
+    const dateValue=document.getElementById('dateInput').value;
+    const timeValue=document.getElementById('timeInput').value||'00:00';
+    const status=document.getElementById('dateEntryStatus');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)||!/^\d{2}:\d{2}$/.test(timeValue)){
+      status.textContent='Enter a valid UTC date and time';
+      return;
+    }
+    const [y,m,d]=dateValue.split('-').map(Number);
+    const [hh,mm]=timeValue.split(':').map(Number);
+    if(y<1900||y>2100){
+      status.textContent='Supported entry range: 1900–2100 UTC';
+      return;
+    }
+    const target=new Date(Date.UTC(y,m-1,d,hh,mm,0,0));
+    if(!Number.isFinite(target.getTime())){
+      status.textContent='Invalid UTC date/time';
+      return;
+    }
+    setCompassDate(target);
   });
 
   document.getElementById('resetBtn').addEventListener('click',()=>{
@@ -161,6 +196,7 @@ function bindControls(){
     state.offsetMs=0;
     document.getElementById('playBtn').textContent='▶ Play';
     refreshAstronomy();
+    syncDateTimeInputs(currentDate());
   });
 
   document.getElementById('playBtn').addEventListener('click',()=>{
@@ -332,6 +368,30 @@ function freezePlayback(){
   document.getElementById('playBtn').textContent='▶ Play';
 }
 
+function setCompassDate(target){
+  const min=Date.UTC(1900,0,1,0,0,0,0),max=Date.UTC(2100,11,31,23,59,59,999);
+  const t=Math.min(max,Math.max(min,target.getTime()));
+  state.playing=false;
+  state.offsetMs=t-Date.now();
+  state.epochAstro=t;
+  state.epochReal=performance.now();
+  const play=document.getElementById('playBtn');
+  if(play)play.textContent='▶ Play';
+  refreshAstronomy();
+  syncDateTimeInputs(new Date(t));
+}
+function syncDateTimeInputs(date){
+  const dateInput=document.getElementById('dateInput');
+  const timeInput=document.getElementById('timeInput');
+  const status=document.getElementById('dateEntryStatus');
+  if(!dateInput||!timeInput)return;
+  const y=date.getUTCFullYear(),m=String(date.getUTCMonth()+1).padStart(2,'0'),d=String(date.getUTCDate()).padStart(2,'0');
+  const hh=String(date.getUTCHours()).padStart(2,'0'),mm=String(date.getUTCMinutes()).padStart(2,'0');
+  dateInput.value=y+'-'+m+'-'+d;
+  timeInput.value=hh+':'+mm;
+  if(status)status.textContent='UTC · '+y+'-'+m+'-'+d+' '+hh+':'+mm;
+}
+
 function currentDate(){
   if(state.playing){
     return new Date(state.epochAstro+(performance.now()-state.epochReal)*state.speed);
@@ -359,6 +419,7 @@ function refreshAstronomy(){
   }
 
   try{
+    syncDateTimeInputs(date);
     const aya=lahiriAyanamsa(date);
     const eps=meanObliquityFromDate(date);
     const gmst=greenwichSiderealDegrees(date);
