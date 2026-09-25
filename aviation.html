@@ -54,12 +54,14 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
       <div class="focus-card"><small>Least incidents · Moon zodiac</small><b id="meanMercury">—</b><p id="meanMercuryNote">Among Moon signs with at least one incident.</p></div>
       <div class="focus-card"><small>Most incidents · Moon nakshatra</small><b id="meanMoonMercury">—</b><p id="meanMoonMercuryNote">Across all recorded months.</p></div>
       <div class="focus-card"><small>Least incidents · Moon nakshatra</small><b id="leastMoonNak">—</b><p id="leastMoonNakNote">Among nakshatras with at least one incident.</p></div>
+      <div class="focus-card"><small>Mars aspect · highest-incident Moon sign</small><b id="highMarsAspect">—</b><p id="highMarsAspectNote">Most common Mars→Moon Jyotish drishti in the highest-frequency Moon-sign group.</p></div>
+      <div class="focus-card"><small>Mars aspect · lowest-incident Moon sign</small><b id="lowMarsAspect">—</b><p id="lowMarsAspectNote">Most common Mars→Moon Jyotish drishti in the lowest-frequency Moon-sign group.</p></div>
     </div>
     <div class="rank-charts">
       <div class="rank-chart"><h3>MOON ZODIAC RANKING · LOWEST → HIGHEST</h3><div id="moonSignRankChart" class="rank-bars"></div></div>
       <div class="rank-chart"><h3>MOON NAKSHATRA RANKING · LOWEST → HIGHEST</h3><div id="moonNakRankChart" class="rank-bars"></div></div>
     </div>
-    <div class="note">Frequency counts use the entire recorded aviation dataset across all available months. The graphs include zero-count categories so the complete zodiac and nakshatra ranking is visible from lowest to highest.</div>
+    <div class="note">Frequency counts use the entire recorded aviation dataset across all available months. The Mars cards compare the incidents belonging to the highest- and lowest-frequency Moon-sign groups and report the most common Mars→Moon Jyotish drishti (4th, 7th, or 8th) within an 8° orb. The graphs include zero-count categories so the complete zodiac and nakshatra ranking is visible from lowest to highest.</div>
   </section>
   <section class="panel">
     <div class="panel-head"><strong>GEOGRAPHIC + ASCENDANT PATTERN SUMMARY</strong><span class="status">recorded incident sample</span></div>
@@ -631,6 +633,10 @@ function renderMean(){
     document.getElementById('meanMercury').textContent='—';
     document.getElementById('meanMoonMercury').textContent='—';
     document.getElementById('leastMoonNak').textContent='—';
+    document.getElementById('highMarsAspect').textContent='—';
+    document.getElementById('lowMarsAspect').textContent='—';
+    document.getElementById('highMarsAspectNote').textContent='No sample';
+    document.getElementById('lowMarsAspectNote').textContent='No sample';
     document.getElementById('meanStatus').textContent='No Moon-placement sample yet';
     renderMoonRankCharts(new Map(),new Map());
     return;
@@ -650,6 +656,11 @@ function renderMean(){
   const mostNak=rankCount(nakCounts,'max');
   const leastNak=rankCount(nakCounts,'min');
 
+  const highSignRecords=mostSign?valid.filter(r=>SIGNS[r.astro.Moon.sign]===mostSign.value):[];
+  const lowSignRecords=leastSign?valid.filter(r=>SIGNS[r.astro.Moon.sign]===leastSign.value):[];
+  const highMars=mostCommonMarsMoonAspect(highSignRecords);
+  const lowMars=mostCommonMarsMoonAspect(lowSignRecords);
+
   document.getElementById('meanMoon').textContent=mostSign?mostSign.value:'—';
   document.getElementById('meanMercury').textContent=leastSign?leastSign.value:'—';
   document.getElementById('meanMoonMercury').textContent=mostNak?mostNak.value:'—';
@@ -659,6 +670,15 @@ function renderMean(){
   document.getElementById('meanMercuryNote').textContent=leastSign?leastSign.count+' incidents · '+leastSign.rate.toFixed(1)+'% of Moon-sign sample':'—';
   document.getElementById('meanMoonMercuryNote').textContent=mostNak?mostNak.count+' incidents · '+mostNak.rate.toFixed(1)+'% of nakshatra sample':'—';
   document.getElementById('leastMoonNakNote').textContent=leastNak?leastNak.count+' incidents · '+leastNak.rate.toFixed(1)+'% of nakshatra sample':'—';
+
+  document.getElementById('highMarsAspect').textContent=highMars?highMars.label:'No major Mars drishti';
+  document.getElementById('lowMarsAspect').textContent=lowMars?lowMars.label:'No major Mars drishti';
+  document.getElementById('highMarsAspectNote').textContent=highMars
+    ? highMars.count+' of '+highSignRecords.length+' incidents in '+mostSign.value+' · '+highMars.rate.toFixed(1)+'%'
+    : (mostSign?mostSign.value+' · '+highSignRecords.length+' incidents · no major Mars→Moon drishti within 8° orb':'No sample');
+  document.getElementById('lowMarsAspectNote').textContent=lowMars
+    ? lowMars.count+' of '+lowSignRecords.length+' incidents in '+leastSign.value+' · '+lowMars.rate.toFixed(1)+'%'
+    : (leastSign?leastSign.value+' · '+lowSignRecords.length+' incidents · no major Mars→Moon drishti within 8° orb':'No sample');
 
   const months=new Set(valid.map(r=>{
     const d=new Date(r.eventAt);
@@ -670,6 +690,18 @@ function renderMean(){
   renderMoonRankCharts(signCounts,nakCounts);
 }
 
+
+function mostCommonMarsMoonAspect(records){
+  const counts=new Map();
+  for(const r of records){
+    const a=r.astro?.MoonMars;
+    if(!a?.major)continue;
+    const key=a.aspect;
+    counts.set(key,(counts.get(key)||0)+1);
+  }
+  const top=[...counts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0];
+  return top?{label:top[0],count:top[1],rate:(top[1]/Math.max(1,records.length))*100}:null;
+}
 
 function renderMoonRankCharts(signCounts,nakCounts){
   const signRows=SIGNS.map((name,i)=>({label:GLYPHS[i]+' '+name,count:signCounts.get(name)||0}));
