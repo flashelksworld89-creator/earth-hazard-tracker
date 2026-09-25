@@ -46,13 +46,13 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     <div class="metric"><small>Moon mean sample</small><b id="meanSample">0</b><span>circular mean</span></div>
   </section>
   <section class="panel">
-    <div class="panel-head"><strong>MEAN MOON + MERCURY POSITIONS</strong><span id="meanStatus" class="status">No incident sample yet</span></div>
+    <div class="panel-head"><strong>SECONDARY CIRCULAR-MEAN STATISTICS</strong><span id="meanStatus" class="status">supplementary only</span></div>
     <div class="focus-grid">
-      <div class="focus-card"><small>Mean Moon</small><b id="meanMoon">—</b><p>Circular mean of sidereal lunar longitude.</p></div>
-      <div class="focus-card"><small>Mean Mercury</small><b id="meanMercury">—</b><p>Circular mean of sidereal Mercury longitude.</p></div>
-      <div class="focus-card"><small>Mean Moon–Mercury separation</small><b id="meanMoonMercury">—</b><p>Circular mean of the Moon-to-Mercury angular difference.</p></div>
+      <div class="focus-card"><small>Mean Moon</small><b id="meanMoon">—</b><p>Supplementary center-of-concentration statistic.</p></div>
+      <div class="focus-card"><small>Mean Mercury</small><b id="meanMercury">—</b><p>Supplementary center-of-concentration statistic.</p></div>
+      <div class="focus-card"><small>Mean Moon–Mercury separation</small><b id="meanMoonMercury">—</b><p>Supplementary angular-center statistic.</p></div>
     </div>
-    <div class="note">Circular means are used because zodiac longitude wraps at 360°. This avoids incorrect averages near the Aries/Pisces boundary.</div>
+    <div class="note">Primary analysis is based on frequency distributions by sign, nakshatra, aspect, severity, aircraft type, and geography. Means are retained only as secondary context.</div>
   </section>
   <section class="panel">
     <div class="panel-head"><strong>GEOGRAPHIC + ASCENDANT PATTERN SUMMARY</strong><span class="status">recorded incident sample</span></div>
@@ -70,7 +70,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
       <select id="filterConfidence"><option value="all">All timing confidence</option><option value="reported">reported</option><option value="inferred">inferred</option><option value="fallback">fallback</option></select>
     </div>
     <div class="table-wrap"><table class="dataset"><thead><tr>
-      <th data-sort="eventAt">Date/time</th><th data-sort="severity">Severity</th><th data-sort="aircraftType">Aircraft type</th><th data-sort="region">Region</th><th>Location</th><th data-sort="asc">Ascendant</th><th data-sort="moon">Moon</th><th data-sort="mercury">Mercury</th><th data-sort="timeConfidence">Time quality</th><th>Incident</th>
+      <th data-sort="eventAt">Date/time</th><th data-sort="severity">Severity</th><th data-sort="aircraftType">Aircraft type</th><th data-sort="region">Region</th><th>Location</th><th data-sort="asc">Ascendant</th><th data-sort="moon">Moon</th><th>Moon nakshatra</th><th data-sort="mercury">Mercury</th><th>Mercury nakshatra</th><th data-sort="timeConfidence">Time quality</th><th>Incident</th>
     </tr></thead><tbody id="datasetBody"></tbody></table></div>
     <div class="note">Severity and aircraft type are headline/description classifications. They should be treated as provisional until verified against an authoritative accident report.</div>
   </section>
@@ -85,6 +85,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 const A=window.Astronomy;
 const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
 const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
+const NAKSHATRAS=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
 const STORE='aviation-incident-agent-v1';
 const SCAN_MS=30*60*1000;
 const QUERY='aircraft crash OR plane crash OR aviation emergency OR emergency landing OR aircraft incident OR helicopter crash';
@@ -204,7 +205,7 @@ function enrichIncident(r){
   const text=((r.title||'')+' '+(r.description||'')).toLowerCase();
   if(!r.severity)r.severity=classifySeverity(text);
   if(!r.aircraftType)r.aircraftType=classifyAircraftType(text,r.categories||[]);
-  if(r.eventAt&&(!r.astro||!r.astro.Mercury||!Array.isArray(r.astro.MoonAspects)||!Array.isArray(r.astro.MercuryAspects))){
+  if(r.eventAt&&(!r.astro||!r.astro.Mercury||!r.astro.Moon?.nakshatraName||!r.astro.Mercury?.nakshatraName||!Array.isArray(r.astro.MoonAspects)||!Array.isArray(r.astro.MercuryAspects))){
     try{r.astro=calculateAstro(new Date(r.eventAt))}catch{}
   }
   return r;
@@ -308,7 +309,10 @@ function calculateAstro(date){
     MoonAspects:moonAspects,MercuryAspects:mercuryAspects
   };
 }
-function positionRecord(lon){return{lon,sign:Math.floor(lon/30),degree:lon%30}}
+function positionRecord(lon){
+  const nak=Math.floor(norm(lon)/(360/27));
+  return{lon,sign:Math.floor(lon/30),degree:lon%30,nakshatra:nak,nakshatraName:NAKSHATRAS[nak],nakshatraDegree:norm(lon)%(360/27)};
+}
 function relationRecord(baseLon,lon){const sep=Math.abs(norm180(lon-baseLon));return{lon,sign:Math.floor(lon/30),degree:lon%30,separation:sep,aspect:nearestAspect(sep)}}
 function aspectRecord(planet,planetLon,targetLon){
   const sep=Math.abs(norm180(planetLon-targetLon));
@@ -339,25 +343,29 @@ function renderPatternSummary(){
   const topAsc=[...asc.entries()].sort((a,b)=>b[1]-a[1])[0];
   const topAircraft=[...aircraft.entries()].sort((a,b)=>b[1]-a[1])[0];
   const topSeverity=[...severity.entries()].sort((a,b)=>b[1]-a[1])[0];
-  const topMercury=(()=>{
-    const m=new Map();incidents.forEach(r=>{const s=SIGNS[r.astro?.Mercury?.sign];if(s)m.set(s,(m.get(s)||0)+1)});
-    return [...m.entries()].sort((a,b)=>b[1]-a[1])[0];
-  })();
-  const topMoon=(()=>{
-    const m=new Map();incidents.forEach(r=>{const s=SIGNS[r.astro?.Moon?.sign];if(s)m.set(s,(m.get(s)||0)+1)});
-    return [...m.entries()].sort((a,b)=>b[1]-a[1])[0];
-  })();
+  const topMoon=topFrequency(incidents.map(r=>r.astro?.Moon?.sign).filter(Number.isFinite).map(i=>SIGNS[i]));
+  const topMercurySign=topFrequency(incidents.map(r=>r.astro?.Mercury?.sign).filter(Number.isFinite).map(i=>SIGNS[i]));
+  const topMoonNak=topFrequency(incidents.map(r=>r.astro?.Moon?.nakshatraName).filter(Boolean));
+  const topMercuryNak=topFrequency(incidents.map(r=>r.astro?.Mercury?.nakshatraName).filter(Boolean));
   const moonAspectStats=topAspectSignature('MoonAspects');
   const mercuryAspectStats=topAspectSignature('MercuryAspects');
   el.innerHTML=
     patternCard('Majority region',topRegion?topRegion[0]:'Insufficient geocoded data',topRegion?topRegion[1]+' of '+geoN+' geocoded incidents':'0 geocoded incidents')+
     patternCard('Most frequent Ascendant',topAsc?topAsc[0]:'Insufficient timed/geocoded data',topAsc?topAsc[1]+' of '+ascN+' usable local charts':'0 usable local charts')+
-    patternCard('Most frequent Moon sign',topMoon?topMoon[0]:'—',topMoon?topMoon[1]+' of '+incidents.length+' recorded incidents':'No sample')+
-    patternCard('Most frequent Mercury sign',topMercury?topMercury[0]:'—',topMercury?topMercury[1]+' of '+incidents.length+' recorded incidents':'No sample')+
+    patternCard('Most frequent Moon sign',topMoon?topMoon.value:'—',topMoon?topMoon.count+' of '+topMoon.total+' · '+topMoon.rate.toFixed(1)+'%':'No sample')+
+    patternCard('Most frequent Moon nakshatra',topMoonNak?topMoonNak.value:'—',topMoonNak?topMoonNak.count+' of '+topMoonNak.total+' · '+topMoonNak.rate.toFixed(1)+'%':'No sample')+
+    patternCard('Most frequent Mercury sign',topMercurySign?topMercurySign.value:'—',topMercurySign?topMercurySign.count+' of '+topMercurySign.total+' · '+topMercurySign.rate.toFixed(1)+'%':'No sample')+
+    patternCard('Most frequent Mercury nakshatra',topMercuryNak?topMercuryNak.value:'—',topMercuryNak?topMercuryNak.count+' of '+topMercuryNak.total+' · '+topMercuryNak.rate.toFixed(1)+'%':'No sample')+
     patternCard('Most common aspect to Moon',moonAspectStats?moonAspectStats.label:'No major aspect pattern',moonAspectStats?moonAspectStats.count+' occurrences · '+moonAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
     patternCard('Most common aspect to Mercury',mercuryAspectStats?mercuryAspectStats.label:'No major aspect pattern',mercuryAspectStats?mercuryAspectStats.count+' occurrences · '+mercuryAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
     patternCard('Most incident-prone aircraft type',topAircraft?topAircraft[0]:'—',topAircraft?topAircraft[1]+' of '+incidents.length+' classified records':'No sample')+
     patternCard('Most common severity',topSeverity?topSeverity[0]:'—',topSeverity?topSeverity[1]+' of '+incidents.length+' records':'No sample');
+}
+function topFrequency(values){
+  if(!values.length)return null;
+  const counts=new Map();values.forEach(v=>counts.set(v,(counts.get(v)||0)+1));
+  const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
+  return{value:top[0],count:top[1],total:values.length,rate:(top[1]/values.length)*100};
 }
 function topAspectSignature(field){
   const counts=new Map();
@@ -409,7 +417,9 @@ function renderDataset(){
     '<td>'+esc(r.geo?.displayName||r.locationText||'Unknown')+'</td>'+
     '<td>'+(r.ascendant?esc(SIGNS[r.ascendant.sign]+' '+r.ascendant.degree.toFixed(1)+'°'):'—')+'</td>'+
     '<td>'+(r.astro?.Moon?esc(SIGNS[r.astro.Moon.sign]+' '+r.astro.Moon.degree.toFixed(1)+'°'):'—')+'</td>'+
+    '<td>'+esc(r.astro?.Moon?.nakshatraName||'—')+'</td>'+
     '<td>'+(r.astro?.Mercury?esc(SIGNS[r.astro.Mercury.sign]+' '+r.astro.Mercury.degree.toFixed(1)+'°'):'—')+'</td>'+
+    '<td>'+esc(r.astro?.Mercury?.nakshatraName||'—')+'</td>'+
     '<td>'+esc(r.timeConfidence||'—')+'</td>'+
     '<td><a href="'+escAttr(r.url||'')+'" target="_blank" rel="noopener noreferrer">'+esc(r.title||'Incident')+'</a></td>'+
   '</tr>').join('');
