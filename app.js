@@ -220,7 +220,7 @@ function bindControls(){
     }
   });
 
-  ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showDeclination','showGrid','showPlaceLabels']
+  ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showGrid','showPlaceLabels']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
 
   document.getElementById('focusSignSelect').addEventListener('change',e=>{
@@ -439,9 +439,7 @@ function refreshAstronomy(){
         const ecl=A.Ecliptic(vec);
         const lon=Number(ecl?.elon);
         if(!Number.isFinite(lon)) throw new Error('Invalid longitude for '+name);
-        const eqd=A.RotateVector(A.Rotation_EQJ_EQD(date),vec);
-        const dec=Math.atan2(Number(eqd.z),Math.hypot(Number(eqd.x),Number(eqd.y)))*180/Math.PI;
-        placements.push({name,glyph,color,lon:normalize360(lon-aya),dec:Number.isFinite(dec)?dec:0,source:'apparent geocentric · true ecliptic/equator of date'});
+        placements.push({name,glyph,color,lon:normalize360(lon-aya),source:'apparent geocentric · true ecliptic of date'});
       }catch(bodyErr){
         console.error('Planet calculation failed:',name,bodyErr);
       }
@@ -449,8 +447,8 @@ function refreshAstronomy(){
 
     const rahu=normalize360(meanNodeTropicalLongitude(date)-aya);
     placements.push(
-      {name:'Rahu',glyph:'☊',color:'#06d6a0',lon:rahu,dec:eclipticLongitudeToDeclination(rahu,eps),source:'mean lunar node'},
-      {name:'Ketu',glyph:'☋',color:'#ef476f',lon:normalize360(rahu+180),dec:eclipticLongitudeToDeclination(normalize360(rahu+180),eps),source:'mean lunar node'}
+      {name:'Rahu',glyph:'☊',color:'#06d6a0',lon:rahu,source:'mean lunar node'},
+      {name:'Ketu',glyph:'☋',color:'#ef476f',lon:normalize360(rahu+180),source:'mean lunar node'}
     );
 
     state.astro={date,aya,eps,gmst,sun,placements,realStamp:performance.now()};
@@ -499,9 +497,7 @@ function draw(){
       drawPoliticalLabels(w,h,earthShiftDeg);
     }
 
-    if(document.getElementById('showDeclination').checked){
-      drawDeclinationGrid(w,h);
-    }
+    drawZodiacDegreeGrid(w,h);
 
     if(document.getElementById('showPlanets').checked){
       drawProjectedPlanets(w,h,earthShiftDeg);
@@ -1088,29 +1084,29 @@ function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
   if(!state.risingSignGrid || !state.risingNakGrid) return;
 
   if(showZodiac){
-    [0.18,0.52,0.84].forEach(yFrac=>{
-      const row=Math.max(0,Math.min(rh-1,Math.floor(yFrac*rh)));
-      drawCenteredRuns(
-        state.risingSignGrid,row,12,w,h*yFrac,
-        index=>`${SIGNS[index][1]} ${SIGNS[index][0]}`,
-        index=>SIGNS[index][2],
-        13,30
-      );
-    });
+    const yFrac=.055;
+    const row=Math.max(0,Math.min(rh-1,Math.floor(.12*rh)));
+    const seen=new Set();
+    drawCenteredRuns(
+      state.risingSignGrid,row,12,w,h*yFrac,
+      index=>`${SIGNS[index][1]} ${SIGNS[index][0]}`,
+      index=>SIGNS[index][2],
+      13,26,seen
+    );
   }
 
-  if(showNak && w>720){
-    const yFrac=.69;
-    const row=Math.max(0,Math.min(rh-1,Math.floor(yFrac*rh)));
+  if(showNak && w>900){
+    const yFrac=.105;
+    const row=Math.max(0,Math.min(rh-1,Math.floor(.16*rh)));
     drawCenteredRuns(
       state.risingNakGrid,row,27,w,h*yFrac,
       index=>NAKSHATRAS[index],
       index=>nakColorCss(index),
-      9,18
+      8,16,null
     );
   }
 
-  function drawCenteredRuns(grid,row,count,screenW,y,labelFor,colorFor,size,minScreenWidth){
+  function drawCenteredRuns(grid,row,count,screenW,y,labelFor,colorFor,size,minScreenWidth,seen){
     let start=0;
     let current=grid[row*rw];
 
@@ -1118,12 +1114,13 @@ function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
       const next=x<rw?grid[row*rw+x]:255;
       if(next!==current){
         const runWidth=(x-start)/rw*screenW;
-        if(current<count && runWidth>=minScreenWidth){
+        if(current<count && runWidth>=minScreenWidth && (!seen || !seen.has(current))){
           const center=(start+x)/2/rw*screenW + earthShiftDeg/360*screenW;
-          for(const cx of [center-screenW,center,center+screenW]){
-            if(cx>-80 && cx<screenW+80){
-              drawFieldLabel(labelFor(current),colorFor(current),cx,y,size);
-            }
+          const candidates=[center-screenW,center,center+screenW].filter(cx=>cx>-80&&cx<screenW+80);
+          if(candidates.length){
+            const cx=candidates.sort((a,b)=>Math.abs(a-screenW/2)-Math.abs(b-screenW/2))[0];
+            drawFieldLabel(labelFor(current),colorFor(current),cx,y,size);
+            if(seen)seen.add(current);
           }
         }
         start=x;
@@ -1152,66 +1149,66 @@ function drawFieldLabel(text,color,x,y,size){
   ctx.restore();
 }
 
-function declinationToY(dec,h){
-  const max=30;
-  const clamped=Math.max(-max,Math.min(max,Number(dec)||0));
-  return h*.5-(clamped/max)*(h*.42);
+function degreeLineY(degree,h){
+  const d=Math.max(0,Math.min(29,Number(degree)||0));
+  const top=h*.15;
+  const bottom=h*.93;
+  return top+(d/29)*(bottom-top);
 }
-function formatDeclination(dec){
-  const v=Number(dec)||0;
-  return (v>=0?'+':'')+v.toFixed(1)+'°';
-}
-function eclipticLongitudeToDeclination(lon,eps){
-  const l=lon*Math.PI/180,e=eps*Math.PI/180;
-  return Math.asin(Math.sin(e)*Math.sin(l))*180/Math.PI;
-}
-function drawDeclinationGrid(w,h){
-  const minor=state.zoom>=3;
-  const step=minor?1:5;
+
+function drawZodiacDegreeGrid(w,h){
   ctx.save();
-  ctx.font=(Math.max(7,9/Math.sqrt(state.zoom)))+'px system-ui,sans-serif';
   ctx.textAlign='left';
   ctx.textBaseline='middle';
+  const scale=Math.max(1,Math.sqrt(state.zoom));
+  ctx.font=(8/scale)+'px system-ui,sans-serif';
 
-  for(let dec=-30;dec<=30;dec+=step){
-    const y=declinationToY(dec,h);
-    const major=dec%5===0;
-    const equator=dec===0;
-    if(minor&&!major){
-      ctx.strokeStyle='rgba(170,205,225,.055)';
-      ctx.lineWidth=.45/Math.max(1,Math.sqrt(state.zoom));
-    }else{
-      ctx.strokeStyle=equator?'rgba(255,224,138,.42)':'rgba(137,193,221,.18)';
-      ctx.lineWidth=(equator?1.4:.8)/Math.max(1,Math.sqrt(state.zoom));
-    }
-    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
+  for(let d=0;d<30;d++){
+    const y=degreeLineY(d,h);
+    const major=d%5===0;
+    ctx.strokeStyle=major?'rgba(165,205,226,.23)':'rgba(165,205,226,.10)';
+    ctx.lineWidth=(major?.8:.45)/scale;
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    ctx.lineTo(w,y);
+    ctx.stroke();
 
-    if(major||equator){
-      ctx.fillStyle=equator?'rgba(255,224,138,.78)':'rgba(164,201,220,.62)';
-      ctx.fillText((dec>0?'+':'')+dec+'°',6,y-7/Math.max(1,state.zoom));
-    }
+    ctx.fillStyle=major?'rgba(190,220,236,.78)':'rgba(154,188,207,.46)';
+    ctx.fillText(d+'°',6,y);
   }
   ctx.restore();
 }
 
 function drawProjectedPlanets(w,h,earthShiftDeg){
   if(!state.astro?.placements?.length) return;
-  if(!state.risingSignGrid || !state.risingNakGrid) return;
+  if(!state.risingSignGrid) return;
 
   const occupied=new Map();
 
   state.astro.placements.forEach(p=>{
-    const projected=projectPlanetIntoSiderealField(p,w,h,earthShiftDeg);
-    if(!projected) return;
+    const lon=normalize360(p.lon);
+    const signIndex=Math.floor(lon/30);
+    const degree=lon%30;
+    const y=degreeLineY(degree,h);
+    const row=Math.max(0,Math.min(risingCanvas.height-1,Math.floor(y/h*risingCanvas.height)));
+    const run=findCircularFieldRun(state.risingSignGrid,row,risingCanvas.width,signIndex);
 
-    const {visibleXs,y,targetNak,signIndex}=projected;
-    const x=visibleXs[0];
-    const bucket=Math.round(x/70);
-    const rowKey=bucket+':'+Math.round(y/18);
-    const slot=occupied.get(rowKey)||0;
-    occupied.set(rowKey,slot+1);
-    const yOffset=slot*15;
+    let fieldX;
+    if(run){
+      fieldX=((run.start+run.length/2)%risingCanvas.width)/risingCanvas.width*w;
+    }else{
+      const fallbackRow=Math.max(0,Math.min(risingCanvas.height-1,Math.floor(.12*risingCanvas.height)));
+      const fallbackRun=findCircularFieldRun(state.risingSignGrid,fallbackRow,risingCanvas.width,signIndex);
+      fieldX=fallbackRun
+        ? ((fallbackRun.start+fallbackRun.length/2)%risingCanvas.width)/risingCanvas.width*w
+        : lon/360*w;
+    }
 
+    const xBase=fieldX+earthShiftDeg/360*w;
+    const visibleXs=[xBase-w,xBase,xBase+w].filter(x=>x>-100&&x<w+100);
+    if(!visibleXs.length)return;
+
+    const targetNak=Math.min(26,Math.floor(lon/NAK_SIZE));
     const matchesFocus=
       state.focusSign===null && state.focusNak===null
         ? true
@@ -1219,57 +1216,30 @@ function drawProjectedPlanets(w,h,earthShiftDeg){
           ? signIndex===state.focusSign
           : targetNak===state.focusNak;
 
+    const bucket=Math.round(visibleXs[0]/60);
+    const slotKey=bucket+':'+Math.round(y/12);
+    const slot=occupied.get(slotKey)||0;
+    occupied.set(slotKey,slot+1);
+    const yOffset=slot*13;
+
     ctx.save();
     ctx.globalAlpha=matchesFocus?1:.20;
     ctx.font=`${matchesFocus?'900':'700'} ${matchesFocus?18:15}px system-ui,Segoe UI Symbol,sans-serif`;
     ctx.textAlign='center';
     ctx.textBaseline='middle';
     ctx.shadowColor='rgba(0,0,0,.98)';
-    ctx.shadowBlur=matchesFocus?9:4;
+    ctx.shadowBlur=matchesFocus?8:3;
 
     for(const px of visibleXs){
-      const label=`${p.glyph} ${degreeInSign(p.lon)} · ${formatDeclination(p.dec)}`;
+      const label=`${p.glyph} ${degreeInSign(p.lon)}`;
       const tw=ctx.measureText(label).width;
-      ctx.fillStyle='rgba(2,8,18,.82)';
+      ctx.fillStyle='rgba(2,8,18,.84)';
       ctx.fillRect(px-tw/2-5,y+yOffset-10,tw+10,20);
       ctx.fillStyle=p.color;
       ctx.fillText(label,px,y+yOffset);
     }
     ctx.restore();
   });
-}
-
-function projectPlanetIntoSiderealField(p,w,h,earthShiftDeg){
-  const rw=risingCanvas.width;
-  const rh=risingCanvas.height;
-  const y=declinationToY(p.dec,h);
-  const row=Math.max(0,Math.min(rh-1,Math.floor(y/h*rh)));
-  const lon=normalize360(p.lon);
-  const signIndex=Math.floor(lon/30);
-  const targetNak=Math.min(26,Math.floor(lon/NAK_SIZE));
-
-  let run=findCircularFieldRun(state.risingNakGrid,row,rw,targetNak);
-  let fraction=(lon-targetNak*NAK_SIZE)/NAK_SIZE;
-
-  if(!run){
-    run=findCircularFieldRun(state.risingSignGrid,row,rw,signIndex);
-    fraction=(lon-signIndex*30)/30;
-  }
-
-  let fieldX;
-  if(run){
-    const cellX=run.start+Math.max(0,Math.min(1,fraction))*Math.max(1,run.length-1);
-    fieldX=(cellX%rw)/rw*w;
-  }else{
-    // Last-resort fallback keeps the planet visible even if a polar row
-    // does not contain the requested rising zone.
-    fieldX=lon/360*w;
-  }
-
-  const xBase=fieldX+earthShiftDeg/360*w;
-  const visibleXs=[xBase-w,xBase,xBase+w].filter(x=>x>-120&&x<w+120);
-  if(!visibleXs.length)return null;
-  return{visibleXs,y,targetNak,signIndex};
 }
 
 function findCircularFieldRun(grid,row,width,target){
@@ -2468,7 +2438,7 @@ function updateText(){
   updateFocusSummary();
   document.getElementById('planetList').innerHTML=placements.map(p=>{
     const ni=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
-    return `<div><span style="color:${p.color}">${p.glyph}</span><b>${p.name}</b><span>${fullZodiac(p.lon)} · ${NAKSHATRAS[ni]} · ${formatDeclination(p.dec)}</span></div>`;
+    return `<div><span style="color:${p.color}">${p.glyph}</span><b>${p.name}</b><span>${fullZodiac(p.lon)} · ${NAKSHATRAS[ni]}</span></div>`;
   }).join('');
 }
 
