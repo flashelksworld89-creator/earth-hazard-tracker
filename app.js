@@ -1191,18 +1191,15 @@ function drawDeclinationGrid(w,h){
 
 function drawProjectedPlanets(w,h,earthShiftDeg){
   if(!state.astro?.placements?.length) return;
+  if(!state.risingSignGrid || !state.risingNakGrid) return;
 
   const occupied=new Map();
 
   state.astro.placements.forEach(p=>{
-    // Direct sidereal-longitude projection: 0° Aries begins at the left edge,
-    // increases eastward through 360°, then follows the rotating Earth layer.
-    const zodiacX=normalize360(p.lon)/360*w;
-    const xBase=zodiacX + earthShiftDeg/360*w;
-    const visibleXs=[xBase-w,xBase,xBase+w].filter(x=>x>-120&&x<w+120);
-    if(!visibleXs.length) return;
+    const projected=projectPlanetIntoSiderealField(p,w,h,earthShiftDeg);
+    if(!projected) return;
 
-    const y=declinationToY(p.dec,h);
+    const {visibleXs,y,targetNak,signIndex}=projected;
     const x=visibleXs[0];
     const bucket=Math.round(x/70);
     const rowKey=bucket+':'+Math.round(y/18);
@@ -1210,8 +1207,6 @@ function drawProjectedPlanets(w,h,earthShiftDeg){
     occupied.set(rowKey,slot+1);
     const yOffset=slot*15;
 
-    const signIndex=Math.floor(normalize360(p.lon)/30);
-    const targetNak=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
     const matchesFocus=
       state.focusSign===null && state.focusNak===null
         ? true
@@ -1224,20 +1219,73 @@ function drawProjectedPlanets(w,h,earthShiftDeg){
     ctx.font=`${matchesFocus?'900':'700'} ${matchesFocus?18:15}px system-ui,Segoe UI Symbol,sans-serif`;
     ctx.textAlign='center';
     ctx.textBaseline='middle';
-    ctx.fillStyle=p.color;
     ctx.shadowColor='rgba(0,0,0,.98)';
     ctx.shadowBlur=matchesFocus?9:4;
 
     for(const px of visibleXs){
       const label=`${p.glyph} ${degreeInSign(p.lon)} · ${formatDeclination(p.dec)}`;
       const tw=ctx.measureText(label).width;
-      ctx.fillStyle='rgba(2,8,18,.78)';
+      ctx.fillStyle='rgba(2,8,18,.82)';
       ctx.fillRect(px-tw/2-5,y+yOffset-10,tw+10,20);
       ctx.fillStyle=p.color;
       ctx.fillText(label,px,y+yOffset);
     }
     ctx.restore();
   });
+}
+
+function projectPlanetIntoSiderealField(p,w,h,earthShiftDeg){
+  const rw=risingCanvas.width;
+  const rh=risingCanvas.height;
+  const y=declinationToY(p.dec,h);
+  const row=Math.max(0,Math.min(rh-1,Math.floor(y/h*rh)));
+  const lon=normalize360(p.lon);
+  const signIndex=Math.floor(lon/30);
+  const targetNak=Math.min(26,Math.floor(lon/NAK_SIZE));
+
+  let run=findCircularFieldRun(state.risingNakGrid,row,rw,targetNak);
+  let fraction=(lon-targetNak*NAK_SIZE)/NAK_SIZE;
+
+  if(!run){
+    run=findCircularFieldRun(state.risingSignGrid,row,rw,signIndex);
+    fraction=(lon-signIndex*30)/30;
+  }
+
+  let fieldX;
+  if(run){
+    const cellX=run.start+Math.max(0,Math.min(1,fraction))*Math.max(1,run.length-1);
+    fieldX=(cellX%rw)/rw*w;
+  }else{
+    // Last-resort fallback keeps the planet visible even if a polar row
+    // does not contain the requested rising zone.
+    fieldX=lon/360*w;
+  }
+
+  const xBase=fieldX+earthShiftDeg/360*w;
+  const visibleXs=[xBase-w,xBase,xBase+w].filter(x=>x>-120&&x<w+120);
+  if(!visibleXs.length)return null;
+  return{visibleXs,y,targetNak,signIndex};
+}
+
+function findCircularFieldRun(grid,row,width,target){
+  if(!grid)return null;
+  let best=null,start=null,length=0;
+
+  for(let i=0;i<width*2;i++){
+    const x=i%width;
+    const match=grid[row*width+x]===target;
+    if(match){
+      if(start===null)start=i;
+      length++;
+      if(length>width)length=width;
+      if(!best||length>best.length)best={start,length};
+    }else{
+      start=null;length=0;
+    }
+  }
+
+  if(!best)return null;
+  return{start:best.start%width,length:Math.min(best.length,width)};
 }
 
 function applyObserver(lat,lng){
