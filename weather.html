@@ -30,7 +30,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
 
 <section class="panel"><div class="panel-head"><strong>MONTHLY REPORT</strong><span class="status">event-time astrology, same pattern-report concept as Aviation</span></div><div class="controls"><select id="year"></select><select id="monthType"><option value="all">All storm types</option><option value="Tropical Cyclone">Cyclones</option><option value="Heavy Rain">Heavy rain</option></select></div><div id="months" class="months"></div></section>
 
-<section class="panel"><div class="panel-head"><strong>WEATHER DATASET</strong><span id="datasetCount" class="status">0 records</span></div><div class="controls"><select id="type"><option value="all">All storm types</option><option value="Tropical Cyclone">Cyclones</option><option value="Heavy Rain">Heavy rain</option></select><select id="moon"><option value="all">All Moon signs</option></select><select id="phaseFilter"><option value="all">All Moon phases</option></select><select id="venusFilter"><option value="all">All Venus aspects</option></select></div><div class="table-wrap"><table><thead><tr><th>Date/time</th><th>Type</th><th>Storm/location</th><th>Intensity</th><th>Moon phase</th><th>Moon zodiac</th><th>Moon nakshatra</th><th>Venus → Moon</th><th>Source</th></tr></thead><tbody id="body"></tbody></table></div><div class="note">Storm Events can lag the present; current Stage IV QPE status is shown above so recent measured-rain coverage is visible rather than silently omitted. Astrology fields are exploratory pattern variables and do not establish weather causation.</div></section>
+<section class="panel"><div class="panel-head"><strong>WEATHER DATASET</strong><span id="datasetCount" class="status">0 records</span></div><div class="controls"><select id="type"><option value="all">All storm types</option><option value="Tropical Cyclone">Cyclones</option><option value="Heavy Rain">Heavy rain</option></select><select id="moon"><option value="all">All Moon signs</option></select><select id="phaseFilter"><option value="all">All Moon phases</option></select><select id="venusFilter"><option value="all">All Venus aspects</option></select></div><div class="table-wrap"><table><thead><tr><th>Date/time</th><th>Type</th><th>Storm/location</th><th>Intensity</th><th>Moon phase</th><th>Moon zodiac</th><th>Moon nakshatra</th><th>Venus → Moon</th><th>Source</th></tr></thead><tbody id="body"></tbody></table></div><div class="note">The status line above reports each NOAA source separately. A source error no longer prevents the other datasets from rendering. Storm Events can lag the present; Stage IV status is shown separately. Astrology fields are exploratory pattern variables and do not establish weather causation.</div></section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script><script>
 const A=window.Astronomy,SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'],NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];let events=[];const baselineMonthCache=new Map();
@@ -47,81 +47,34 @@ function addAstro(e){const at=e.peakAt||e.eventAt||e.startAt;e.eventAt=at;e.astr
 function label(e){return e.type==='Tropical Cyclone'?e.name:[e.area,e.state].filter(Boolean).join(', ')||'Heavy rain'}
 function rainValue(e){return Number.isFinite(e.rainfallInches)?e.rainfallInches:null}
 function intensity(e){return e.type==='Tropical Cyclone'?(e.maxWindKt+' kt · '+e.category):(Number.isFinite(e.rainfallInches)?e.rainfallInches.toFixed(2)+' in reported':'rainfall total not measured')}
+async function fetchJsonSafe(url,label){
+  try{
+    const r=await fetch(url,{cache:'no-store'});
+    const text=await r.text();
+    let data=null;try{data=JSON.parse(text)}catch{}
+    if(!r.ok)return{ok:false,label,error:(data&&data.error)||('HTTP '+r.status),events:[]};
+    if(!data)return{ok:false,label,error:'Invalid JSON response',events:[]};
+    return{...data,label};
+  }catch(error){return{ok:false,label,error:String(error?.message||error),events:[]}}
+}
 async function load(){
-  document.getElementById('status').textContent='Loading NOAA history…';
+  document.getElementById('status').textContent='Loading NOAA sources…';
   const end=new Date().toISOString().slice(0,10),years=[];for(let y=2025;y<=new Date().getUTCFullYear();y++)years.push(y);
-  const all=await Promise.all([fetch('/api/weather-cyclones?start=2025-01-01&end='+end).then(r=>r.json()),...years.map(y=>fetch('/api/weather-rain?year='+y).then(r=>r.json()).catch(()=>({events:[]}))),fetch('/api/weather-qpe').then(r=>r.json()).catch(()=>({ok:false}))]);
-  const c=all[0],q=all[all.length-1],rain=all.slice(1,-1).flatMap(x=>x.events||[]);
+  const cyclonePromise=fetchJsonSafe('/api/weather-cyclones?start=2025-01-01&end='+end,'Cyclones');
+  const rainPromises=years.map(y=>fetchJsonSafe('/api/weather-rain?year='+y,'Rain '+y));
+  const qpePromise=fetchJsonSafe('/api/weather-qpe','Stage IV');
+  const [c,...rest]=await Promise.all([cyclonePromise,...rainPromises,qpePromise]);
+  const q=rest[rest.length-1],rainResults=rest.slice(0,-1),rain=rainResults.flatMap(x=>x.events||[]);
   events=[...(c.events||[]),...rain].map(addAstro).sort((a,b)=>new Date(b.eventAt)-new Date(a.eventAt));
-  document.getElementById('qpe').textContent=q.ok?'ONLINE':'UNAVAILABLE';document.getElementById('qpeNote').textContent=q.lastModified?('updated '+new Date(q.lastModified).toLocaleString()):'latest 24h NOAA Stage IV';
+  document.getElementById('qpe').textContent=q.ok?'ONLINE':'UNAVAILABLE';
+  document.getElementById('qpeNote').textContent=q.ok&&q.lastModified?('updated '+new Date(q.lastModified).toLocaleString()):(q.error||'latest 24h NOAA Stage IV');
+  const sourceBits=[c.ok?('Cyclones '+(c.count||0)):('Cyclones ERROR: '+c.error),...rainResults.map(x=>x.ok?(x.label+' '+(x.count||0)):(x.label+' ERROR: '+x.error))];
+  document.getElementById('status').textContent=sourceBits.join(' · ');
   render();
-}
-function monthKey(v){const d=v instanceof Date?v:new Date(v);return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')}
-function baselineMonth(key){
-  if(baselineMonthCache.has(key))return baselineMonthCache.get(key);
-  const [y,m]=key.split('-').map(Number),start=new Date(Date.UTC(y,m-1,1,0,0,0)),end=new Date(Date.UTC(y,m,1,0,0,0)),now=new Date(),min=new Date('2025-01-01T00:00:00Z');
-  const rows=[];
-  for(let d=new Date(start);d<end&&d<=now;d=new Date(d.getTime()+6*3600000)){
-    if(d<min)continue;
-    try{rows.push(astro(d))}catch{}
-  }
-  baselineMonthCache.set(key,rows);return rows;
-}
-function expectedDistribution(records,getter,categories){
-  const monthCounts=counts(records.map(r=>monthKey(r.eventAt))),weighted=new Map(categories.map(c=>[c,0])),totalWeight=records.length;
-  if(!totalWeight)return weighted;
-  for(const [mk,n] of monthCounts){
-    const rows=baselineMonth(mk);if(!rows.length)continue;
-    const dist=counts(rows.map(getter));
-    for(const c of categories)weighted.set(c,(weighted.get(c)||0)+n*((dist.get(c)||0)/rows.length));
-  }
-  return weighted;
-}
-function patternRows(records,getter,categories){
-  const obs=counts(records.map(r=>getter(r.astro))),exp=expectedDistribution(records,getter,categories),n=records.length;
-  return categories.map(c=>{
-    const observed=obs.get(c)||0,expected=exp.get(c)||0,p=n?expected/n:0;
-    const lift=expected>0?observed/expected:null;
-    const denom=Math.sqrt(Math.max(.000001,n*p*(1-p)));
-    const z=expected>0?(observed-expected)/denom:null;
-    return{category:c,observed,expected,lift,z};
-  });
-}
-function standout(rows,dir){
-  const eligible=rows.filter(r=>r.expected>=1&&r.observed>=0&&Number.isFinite(r.z));
-  if(!eligible.length)return null;
-  return [...eligible].sort((a,b)=>dir==='up'?b.z-a.z:a.z-b.z)[0];
-}
-function fmtPattern(r,dir){
-  if(!r)return'<span class="pattern-warn">insufficient sample</span>';
-  const cls=dir==='up'?'pattern-up':'pattern-down',word=dir==='up'?'over':'under';
-  return '<span class="'+cls+'"><b>'+esc(r.category)+'</b> · '+word+'represented</span><br>Observed '+r.observed+' · expected '+r.expected.toFixed(1)+' · lift '+(r.lift===null?'—':r.lift.toFixed(2)+'×')+' · z '+(r.z===null?'—':r.z.toFixed(2));
-}
-function variablePattern(records,label,getter,categories){
-  const rows=patternRows(records,getter,categories),up=standout(rows,'up'),down=standout(rows,'down');
-  return '<div class="pattern-line"><b>'+esc(label)+'</b><br>'+fmtPattern(up,'up')+'<br>'+fmtPattern(down,'down')+'</div>';
-}
-function renderPatternCard(id,title,records){
-  const el=document.getElementById(id);if(!el)return;
-  if(records.length<8){el.innerHTML='<h3>'+esc(title)+'</h3><div class="pattern-line"><span class="pattern-warn">Only '+records.length+' events. More data is needed before treating differences as stable patterns.</span></div>';return}
-  const phases=['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Last Quarter','Waning Crescent'];
-  const venusCats=['conjunction','sextile','square','trine','opposition','no major aspect'];
-  el.innerHTML='<h3>'+esc(title)+' · '+records.length+' events</h3>'+
-    variablePattern(records,'Moon zodiac',a=>SIGNS[a.moonSign],SIGNS)+
-    variablePattern(records,'Moon nakshatra',a=>a.nakshatra,NAK)+
-    variablePattern(records,'Moon phase',a=>a.phase,phases)+
-    variablePattern(records,'Venus → Moon',a=>a.venusAspect,venusCats);
-}
-function renderAdjustedPatterns(){
-  const cyclones=events.filter(e=>e.type==='Tropical Cyclone'),rain=events.filter(e=>e.type==='Heavy Rain');
-  document.getElementById('patternStatus').textContent='seasonality-adjusted · 6-hour baseline';
-  renderPatternCard('patternAll','All weather events',events);
-  renderPatternCard('patternCyclone','Hurricanes / cyclones',cyclones);
-  renderPatternCard('patternRain','Heavy rain',rain);
 }
 function render(){
   const cyclone=events.filter(e=>e.type==='Tropical Cyclone'),rainEvents=events.filter(e=>e.type==='Heavy Rain'),measured=rainEvents.filter(e=>Number.isFinite(rainValue(e)));
-  document.getElementById('total').textContent=events.length;document.getElementById('cyclones').textContent=cyclone.length;document.getElementById('rain').textContent=rainEvents.length;document.getElementById('measured').textContent=measured.length;document.getElementById('measuredNote').textContent=rainEvents.filter(e=>Number.isFinite(e.rainfallInches)).length+' NOAA events with reported totals';document.getElementById('status').textContent=events.length+' historical events loaded';
+  document.getElementById('total').textContent=events.length;document.getElementById('cyclones').textContent=cyclone.length;document.getElementById('rain').textContent=rainEvents.length;document.getElementById('measured').textContent=measured.length;document.getElementById('measuredNote').textContent=rainEvents.filter(e=>Number.isFinite(e.rainfallInches)).length+' NOAA events with reported totals';
   const sm=counts(events.map(e=>SIGNS[e.astro.moonSign])),nm=counts(events.map(e=>e.astro.nakshatra)),pm=counts(events.map(e=>e.astro.phase)),vm=counts(events.map(e=>e.astro.venusAspect)),ms=top(sm),ls=top(sm,'min'),mn=top(nm),ln=top(nm,'min'),ph=top(pm),ve=top(vm);
   document.getElementById('mostSign').textContent=ms?.[0]||'—';document.getElementById('leastSign').textContent=ls?.[0]||'—';document.getElementById('mostNak').textContent=mn?.[0]||'—';document.getElementById('leastNak').textContent=ln?.[0]||'—';document.getElementById('phase').textContent=ph?.[0]||'—';document.getElementById('venus').textContent=ve?.[0]||'—';
   document.getElementById('mostSignNote').textContent=ms?ms[1]+' events':'—';document.getElementById('leastSignNote').textContent=ls?ls[1]+' events':'—';document.getElementById('mostNakNote').textContent=mn?mn[1]+' events':'—';document.getElementById('leastNakNote').textContent=ln?ln[1]+' events':'—';document.getElementById('phaseNote').textContent=ph?ph[1]+' events':'—';document.getElementById('venusNote').textContent=ve?ve[1]+' events':'—';
