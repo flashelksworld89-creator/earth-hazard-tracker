@@ -11,6 +11,15 @@
     },
     "api/glotec.js": {
       "maxDuration": 20
+    },
+    "api/weather-cyclones.js": {
+      "maxDuration": 30
+    },
+    "api/weather-rain.js": {
+      "maxDuration": 60
+    },
+    "api/weather-qpe.js": {
+      "maxDuration": 10
     }
   },
   "headers": [
