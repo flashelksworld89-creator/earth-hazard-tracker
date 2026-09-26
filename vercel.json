@@ -16,13 +16,10 @@
       "maxDuration": 30
     },
     "api/weather-rain.js": {
-      "maxDuration": 60
+      "maxDuration": 30
     },
     "api/weather-qpe.js": {
       "maxDuration": 10
-    },
-    "api/weather-qpe-point.js": {
-      "maxDuration": 30
     }
   },
   "headers": [
