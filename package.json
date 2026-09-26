@@ -1,6 +1,6 @@
 {
   "name": "earth-hazard-tracker",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "private": true,
   "type": "module",
   "description": "Interactive global weather and natural hazard tracker",
@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.0.1"
+    "@neondatabase/serverless": "^1.0.1",
+    "csv-parse": "^6.1.0"
   }
 }
