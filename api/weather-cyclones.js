@@ -1,25 +1,26 @@
-function parseCsvLine(line){
-  const out=[];let cur='',quoted=false;
-  for(let i=0;i<line.length;i++){
-    const ch=line[i];
-    if(ch==='"'){
-      if(quoted&&line[i+1]==='"'){cur+='"';i++}else quoted=!quoted;
-    }else if(ch===','&&!quoted){out.push(cur);cur=''}else cur+=ch;
-  }
-  out.push(cur);return out;
-}
 function csvRows(text){
-  const lines=String(text||'').replace(/\r/g,'').split('\n').filter(Boolean);
-  if(!lines.length)return [];
-  const headers=parseCsvLine(lines[0]);
-  const rows=[];
-  for(let i=1;i<lines.length;i++){
-    const vals=parseCsvLine(lines[i]);if(vals.length<2)continue;
-    const row={};headers.forEach((h,j)=>row[h]=vals[j]??'');rows.push(row);
+  const rows=[];let row=[],field='',quoted=false;
+  const pushField=()=>{row.push(field);field=''};
+  const pushRow=()=>{if(row.length||field){pushField();rows.push(row)}row=[]};
+  const s=String(text||'');
+  for(let i=0;i<s.length;i++){
+    const ch=s[i];
+    if(ch==='"'){
+      if(quoted&&s[i+1]==='"'){field+='"';i++}else quoted=!quoted;
+    }else if(ch===','&&!quoted){
+      pushField();
+    }else if((ch==='\n'||ch==='\r')&&!quoted){
+      if(ch==='\r'&&s[i+1]==='\n')i++;
+      pushRow();
+    }else field+=ch;
   }
-  return rows;
+  if(field||row.length)pushRow();
+  if(!rows.length)return [];
+  const headers=rows.shift().map(h=>String(h||'').replace(/^\uFEFF/,''));
+  return rows.filter(r=>r.some(v=>String(v||'').trim()!=='')).map(vals=>{
+    const out={};headers.forEach((h,j)=>out[h]=vals[j]??'');return out;
+  });
 }
-
 const SOURCE='https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/csv/ibtracs.last3years.list.v04r01.csv';
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
 function firstNum(row,keys){for(const k of keys){const n=num(row[k]);if(n!==null&&n>=0)return n}return null}
