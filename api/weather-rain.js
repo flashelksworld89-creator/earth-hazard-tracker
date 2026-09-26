@@ -1,26 +1,27 @@
 import { gunzipSync } from 'node:zlib';
-function parseCsvLine(line){
-  const out=[];let cur='',quoted=false;
-  for(let i=0;i<line.length;i++){
-    const ch=line[i];
-    if(ch==='"'){
-      if(quoted&&line[i+1]==='"'){cur+='"';i++}else quoted=!quoted;
-    }else if(ch===','&&!quoted){out.push(cur);cur=''}else cur+=ch;
-  }
-  out.push(cur);return out;
-}
 function csvRows(text){
-  const lines=String(text||'').replace(/\r/g,'').split('\n').filter(Boolean);
-  if(!lines.length)return [];
-  const headers=parseCsvLine(lines[0]);
-  const rows=[];
-  for(let i=1;i<lines.length;i++){
-    const vals=parseCsvLine(lines[i]);if(vals.length<2)continue;
-    const row={};headers.forEach((h,j)=>row[h]=vals[j]??'');rows.push(row);
+  const rows=[];let row=[],field='',quoted=false;
+  const pushField=()=>{row.push(field);field=''};
+  const pushRow=()=>{if(row.length||field){pushField();rows.push(row)}row=[]};
+  const s=String(text||'');
+  for(let i=0;i<s.length;i++){
+    const ch=s[i];
+    if(ch==='"'){
+      if(quoted&&s[i+1]==='"'){field+='"';i++}else quoted=!quoted;
+    }else if(ch===','&&!quoted){
+      pushField();
+    }else if((ch==='\n'||ch==='\r')&&!quoted){
+      if(ch==='\r'&&s[i+1]==='\n')i++;
+      pushRow();
+    }else field+=ch;
   }
-  return rows;
+  if(field||row.length)pushRow();
+  if(!rows.length)return [];
+  const headers=rows.shift().map(h=>String(h||'').replace(/^\uFEFF/,''));
+  return rows.filter(r=>r.some(v=>String(v||'').trim()!=='')).map(vals=>{
+    const out={};headers.forEach((h,j)=>out[h]=vals[j]??'');return out;
+  });
 }
-
 const INDEX='https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/';
 function eventIso(row){
   const ym=String(row.BEGIN_YEARMONTH||''),day=Number(row.BEGIN_DAY),hhmm=String(row.BEGIN_TIME||'0').padStart(4,'0');if(!/^\d{6}$/.test(ym)||!day)return null;
