@@ -1,5 +1,25 @@
-import { parse } from 'csv-parse';
-import { Readable } from 'node:stream';
+function parseCsvLine(line){
+  const out=[];let cur='',quoted=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){
+      if(quoted&&line[i+1]==='"'){cur+='"';i++}else quoted=!quoted;
+    }else if(ch===','&&!quoted){out.push(cur);cur=''}else cur+=ch;
+  }
+  out.push(cur);return out;
+}
+function csvRows(text){
+  const lines=String(text||'').replace(/\r/g,'').split('\n').filter(Boolean);
+  if(!lines.length)return [];
+  const headers=parseCsvLine(lines[0]);
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const vals=parseCsvLine(lines[i]);if(vals.length<2)continue;
+    const row={};headers.forEach((h,j)=>row[h]=vals[j]??'');rows.push(row);
+  }
+  return rows;
+}
+
 const SOURCE='https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/csv/ibtracs.last3years.list.v04r01.csv';
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
 function firstNum(row,keys){for(const k of keys){const n=num(row[k]);if(n!==null&&n>=0)return n}return null}
@@ -12,12 +32,11 @@ export default async function handler(req,res){
   try{
     const r=await fetch(SOURCE,{cache:'no-store',headers:{'User-Agent':'Earth-Hazard-Tracker/Weather-Agent'}});
     if(!r.ok)throw new Error('IBTrACS HTTP '+r.status);
-    const stream=Readable.fromWeb(r.body).pipe(parse({columns:true,relax_column_count:true,skip_empty_lines:true,bom:true}));
-    const storms=new Map();
-    for await(const row of stream){
-      const iso=String(row.ISO_TIME||'').trim(); if(!/^\d{4}-\d{2}-\d{2}/.test(iso))continue;
-      const day=iso.slice(0,10); if(day<start||day>end)continue;
-      const sid=String(row.SID||'').trim(); if(!sid)continue;
+    const rows=csvRows(await r.text()),storms=new Map();
+    for(const row of rows){
+      const iso=String(row.ISO_TIME||'').trim();if(!/^\d{4}-\d{2}-\d{2}/.test(iso))continue;
+      const day=iso.slice(0,10);if(day<start||day>end)continue;
+      const sid=String(row.SID||'').trim();if(!sid)continue;
       const w=wind(row),p=pressure(row),ts=iso.replace(' ','T')+'Z';
       const s=storms.get(sid)||{id:sid,name:String(row.NAME||'UNNAMED').trim()||'UNNAMED',basin:String(row.BASIN||'').trim(),startAt:null,endAt:null,maxWindKt:null,minPressureMb:null,peakAt:null,lat:null,lon:null};
       if(!s.startAt||ts<s.startAt)s.startAt=ts;if(!s.endAt||ts>s.endAt)s.endAt=ts;
