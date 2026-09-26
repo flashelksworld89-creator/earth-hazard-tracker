@@ -30,3 +30,12 @@ No ephemeris API route, npm astronomy dependency, API key, or new environment va
 - Five-minute atmospheric refresh.
 - Physical NOAA measurements remain separate from astrology overlays.
 - GLM lightning is represented without generating synthetic strike locations.
+
+
+## v1.18 Weather Storm Agent
+- New /weather.html page modeled after the Aviation Agent.
+- NOAA IBTrACS hurricane-strength tropical cyclone history from January 1, 2025 forward.
+- NOAA Storm Events heavy-rain history, with rainfall totals extracted when explicitly reported.
+- NOAA Stage IV current 24-hour QPE availability/status.
+- Moon phase, Lahiri sidereal Moon zodiac/nakshatra, and Venus-Moon major aspect calculated at each event or cyclone peak timestamp.
+- Monthly frequency reports and strongest/heaviest vs lower-intensity quartile comparisons.
