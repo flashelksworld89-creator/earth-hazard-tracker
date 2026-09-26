@@ -13,10 +13,10 @@
       "maxDuration": 20
     },
     "api/weather-cyclones.js": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/weather-rain.js": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/weather-qpe.js": {
       "maxDuration": 10
