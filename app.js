@@ -244,7 +244,7 @@ function bindControls(){
     }
   });
 
-  ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showGrid','showPlaceLabels','showTecAnomaly','showGeomagnetic','showLightning']
+  ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showGrid','showPlaceLabels','showTimeZones','showTecAnomaly','showGeomagnetic','showLightning']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
   document.getElementById('refreshAtmosBtn').addEventListener('click',loadAtmosphericEnergy);
 
@@ -521,6 +521,10 @@ function draw(){
 
     drawRisingField(w,h,earthShiftDeg,frameDate);
 
+    if(document.getElementById('showTimeZones')?.checked){
+      drawTimeZoneOverlay(w,h,earthShiftDeg,frameDate);
+    }
+
     if(document.getElementById('showPlaceLabels').checked){
       drawPoliticalLabels(w,h,earthShiftDeg);
     }
@@ -617,6 +621,72 @@ function drawGrid(w,h,shiftDeg){
     }
   }
 
+  ctx.restore();
+}
+
+function formatZoneClock(date,offsetHours){
+  const shifted=new Date(date.getTime()+offsetHours*3600000);
+  let h=shifted.getUTCHours();
+  const m=String(shifted.getUTCMinutes()).padStart(2,'0');
+  const ampm=h>=12?'PM':'AM';
+  h=h%12||12;
+  return h+':'+m+' '+ampm;
+}
+
+function formatAscDegree(lon){
+  const within=normalize360(lon)%30;
+  const d=Math.floor(within);
+  const m=Math.floor((within-d)*60);
+  return d+'°'+String(m).padStart(2,'0')+'′';
+}
+
+function drawTimeZoneOverlay(w,h,shiftDeg,date){
+  const referenceLat=state.observer?.lat??0;
+  const aya=lahiriAyanamsa(date);
+  const bandWidth=w/24;
+
+  ctx.save();
+  ctx.font='600 10px Inter,system-ui,sans-serif';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+
+  for(let offset=-12;offset<=11;offset++){
+    const centerLon=offset*15;
+    const leftLon=centerLon-7.5;
+    const xCenter=lonToX(centerLon+shiftDeg,w);
+    const xLeft=lonToX(leftLon+shiftDeg,w);
+
+    const asc=normalize360(tropicalAscendant(date,referenceLat,centerLon)-aya);
+    const signIndex=Math.floor(asc/30);
+    const symbol=SIGNS[signIndex][1];
+    const zoneLabel=offset===0?'UTC':('UTC'+(offset>0?'+':'')+offset);
+    const text=zoneLabel+'  '+formatZoneClock(date,offset)+'  '+symbol+' '+formatAscDegree(asc);
+
+    for(const xx of wrappedXs(xLeft,w)){
+      ctx.fillStyle=offset%2===0?'rgba(125,211,252,.045)':'rgba(255,255,255,.025)';
+      ctx.fillRect(xx,0,bandWidth,h);
+      ctx.strokeStyle='rgba(125,211,252,.22)';
+      ctx.lineWidth=.8/Math.max(1,state.zoom);
+      ctx.beginPath();ctx.moveTo(xx,0);ctx.lineTo(xx,h);ctx.stroke();
+    }
+
+    for(const cx of wrappedXs(xCenter,w)){
+      const y=28/Math.max(1,Math.sqrt(state.zoom));
+      const metrics=ctx.measureText(text);
+      const pad=6;
+      ctx.fillStyle='rgba(2,8,18,.78)';
+      ctx.fillRect(cx-metrics.width/2-pad,y-9,metrics.width+pad*2,18);
+      ctx.strokeStyle='rgba(125,211,252,.28)';
+      ctx.strokeRect(cx-metrics.width/2-pad,y-9,metrics.width+pad*2,18);
+      ctx.fillStyle='#eaf4ff';
+      ctx.fillText(text,cx,y);
+    }
+  }
+
+  ctx.fillStyle='rgba(159,183,200,.78)';
+  ctx.font='500 9px Inter,system-ui,sans-serif';
+  ctx.textAlign='left';
+  ctx.fillText('ASC latitude reference: '+referenceLat.toFixed(1)+'°',8,h-12);
   ctx.restore();
 }
 
