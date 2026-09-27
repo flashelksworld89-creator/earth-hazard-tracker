@@ -1,212 +1,91 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#02070d"><title>Weather Storm Agent</title>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#02070d"><title>Landfall Cyclone Report</title>
 <style>
-:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.18);--text:#eaf4ff;--muted:#91a8bf}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}body{min-height:100vh;background:radial-gradient(circle at 50% -20%,#0c2940 0,#02070d 46%)}
-header{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 18px;background:rgba(2,7,13,.93);border-bottom:1px solid var(--border);backdrop-filter:blur(14px)}
-.brand{color:#eef8ff;text-decoration:none;font-weight:800}.brand small{display:block;color:#7fa7bf;font-size:9px;font-weight:500}nav{display:flex;gap:6px;flex-wrap:wrap}nav a{color:#bddcef;text-decoration:none;font-size:10px;border:1px solid var(--border);border-radius:7px;padding:7px 8px}nav a.active{border-color:#38bdf8;color:#fff}
-main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{background:rgba(7,20,32,.88);border:1px solid var(--border);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.26)}
-.hero{padding:18px;display:flex;justify-content:space-between;gap:18px;align-items:center}.hero h1{margin:4px 0 7px;font-size:26px}.hero p{margin:0;max-width:980px;color:#9db6c8;font-size:11px;line-height:1.6}.eyebrow{font-size:9px;color:#67e8f9;letter-spacing:.09em}.btn,select{border:1px solid var(--border);background:#0b1b2b;color:var(--text);border-radius:8px;padding:8px 10px}.btn{cursor:pointer;font-weight:700}
-.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}.metric,.card{background:rgba(6,18,30,.88);border:1px solid var(--border);border-radius:11px;padding:12px}.metric small,.card small{display:block;color:#7fa7bf;font-size:8px;text-transform:uppercase;letter-spacing:.07em}.metric b,.card b{display:block;font-size:18px;margin-top:5px}.metric span,.card p{display:block;color:#93aabd;font-size:9px;margin:4px 0 0;line-height:1.45}
-.panel{padding:14px;margin-top:12px}.panel-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}.panel-head strong{font-size:11px;letter-spacing:.08em}.status{font-size:9px;color:#67e8f9}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.compare{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.compare>div{border:1px solid var(--border);border-radius:10px;background:#06111c;padding:11px}.compare h3{font-size:10px;margin:0 0 7px}.compare p{font-size:9px;color:#9fb7c7;line-height:1.65;margin:0}
-.ranks{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.rankbox{border:1px solid var(--border);border-radius:10px;background:#06111c;padding:10px}.rankbox h3{margin:0 0 7px;font-size:9px;color:#a8c7d9}.rank-row{display:grid;grid-template-columns:150px 1fr 34px;gap:7px;align-items:center;margin:4px 0;font-size:8px}.track{height:7px;background:#0d2638;border-radius:99px;overflow:hidden}.fill{height:100%;background:linear-gradient(90deg,#2563eb,#38bdf8)}.controls{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}.months{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.month{border:1px solid rgba(124,185,255,.12);border-radius:8px;padding:8px;background:#06111c;font-size:8px;color:#90aabd;line-height:1.5}.month b{display:block;color:#eef8ff;font-size:10px}
-.pattern-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.pattern-card{border:1px solid var(--border);border-radius:10px;background:#06111c;padding:11px}.pattern-card h3{font-size:10px;margin:0 0 8px}.pattern-line{padding:7px 0;border-top:1px solid rgba(124,185,255,.08);font-size:9px;line-height:1.45;color:#9fb7c7}.pattern-line:first-of-type{border-top:0}.pattern-line b{color:#eef8ff}.pattern-up{color:#86efac}.pattern-down{color:#fca5a5}.pattern-warn{color:#facc15}.table-wrap{overflow:auto;max-height:650px;border:1px solid rgba(124,185,255,.1);border-radius:9px}table{border-collapse:collapse;width:100%;min-width:1200px;font-size:8px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid rgba(124,185,255,.07);vertical-align:top}th{position:sticky;top:0;background:#081724;color:#b9d7e6;white-space:nowrap}td{color:#8faebe}.note{margin-top:9px;padding-top:9px;border-top:1px solid rgba(124,185,255,.08);color:#718a9a;font-size:8px;line-height:1.5}
-@media(max-width:1000px){.metrics{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:repeat(2,1fr)}.ranks,.compare,.pattern-grid{grid-template-columns:1fr}.months{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){header,.hero{flex-direction:column;align-items:stretch}.metrics,.grid,.months{grid-template-columns:1fr}}
+:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.18);--text:#eaf4ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% -20%,#0c2940 0,#02070d 45%);color:var(--text);font-family:Inter,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 18px;background:rgba(2,7,13,.94);border-bottom:1px solid var(--border)}
+header a{color:#dff5ff;text-decoration:none}nav{display:flex;gap:6px;flex-wrap:wrap}nav a{font-size:10px;border:1px solid var(--border);padding:7px 8px;border-radius:7px}.active{border-color:#38bdf8!important}
+main{width:min(1450px,calc(100% - 24px));margin:18px auto 60px}.panel,.hero{background:rgba(7,20,32,.9);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:12px}.hero{display:flex;justify-content:space-between;gap:20px;align-items:center}.hero h1{margin:4px 0 8px}.hero p{margin:0;color:#9fb7c7;font-size:11px;line-height:1.55}.eyebrow{font-size:9px;color:#67e8f9;letter-spacing:.08em}.btn,select{background:#0b1b2b;color:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px}.btn{cursor:pointer;font-weight:700}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}.metric,.card{background:#06111c;border:1px solid var(--border);border-radius:11px;padding:11px}.metric small,.card small{display:block;color:#82a0b3;font-size:8px;text-transform:uppercase}.metric b,.card b{display:block;font-size:18px;margin-top:5px}.metric span,.card p{color:#91a9bb;font-size:9px;line-height:1.45}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.head strong{font-size:11px;letter-spacing:.07em}.status{font-size:9px;color:#67e8f9}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.chartbox{background:#06111c;border:1px solid var(--border);border-radius:10px;padding:10px}.chartbox h3{font-size:10px;margin:0 0 8px}.bar{display:grid;grid-template-columns:150px 1fr 34px;gap:7px;align-items:center;margin:4px 0;font-size:8px}.track{height:8px;background:#0d2638;border-radius:99px;overflow:hidden}.fill{height:100%;background:linear-gradient(90deg,#2563eb,#38bdf8)}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.table-wrap{overflow:auto;max-height:650px;border:1px solid rgba(124,185,255,.1);border-radius:9px}table{border-collapse:collapse;width:100%;min-width:1100px;font-size:8px}th,td{padding:7px 8px;text-align:left;border-bottom:1px solid rgba(124,185,255,.08)}th{position:sticky;top:0;background:#081724;color:#bfd9e7}.note{font-size:8px;color:#748c9d;line-height:1.5;margin-top:8px}
+@media(max-width:950px){.chart-grid,.summary,.metrics{grid-template-columns:1fr 1fr}}@media(max-width:650px){header,.hero{flex-direction:column;align-items:stretch}.chart-grid,.summary,.metrics{grid-template-columns:1fr}}
 </style></head><body>
 <script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/weather.html'));</script>
-<header><a class="brand" href="/">◎ WEATHER STORM AGENT<small>Hurricanes · heavy rain · Moon/Venus reports</small></a><nav><a href="/">🌎 Earth Tracker</a><a href="/news.html">◉ Leader Agents</a><a href="/aviation.html">✈ Aviation</a><a class="active" href="/weather.html">☔ Weather</a><a href="/worldfocus.html">◎ World Focus</a><a href="/patterns.html">◫ Pattern Lab</a></nav></header>
+<header><a href="/">◎ LANDFALL CYCLONE REPORT</a><nav><a href="/">Earth Tracker</a><a href="/aviation.html">Aviation</a><a class="active" href="/weather.html">Landfall Cyclones</a><a href="/patterns.html">Pattern Lab</a></nav></header>
 <main>
-<section class="hero"><div><span class="eyebrow">NOAA HISTORY · JAN 1, 2025 → PRESENT</span><h1>Hurricane & Heavy Rain Tracker</h1><p>Tracks hurricane-strength tropical cyclones and heavy-rain events, then compares storm frequency and intensity with Moon phase, Lahiri sidereal Moon zodiac/nakshatra, and Venus–Moon major aspects. Raw counts are shown separately from seasonality-adjusted expected-vs-observed patterns. NOAA Stage IV QPE is monitored for current measured rainfall while Storm Events provides validated historical event records.</p></div><button id="refreshBtn" class="btn">Reload weather data</button></section>
-<section class="metrics"><div class="metric"><small>Total events</small><b id="total">—</b><span>Jan 1, 2025 → today</span></div><div class="metric"><small>Cyclones</small><b id="cyclones">—</b><span>global · ≥64 kt</span></div><div class="metric"><small>Heavy rain</small><b id="rain">—</b><span>validated NOAA records</span></div><div class="metric"><small>Measured rain</small><b id="measured">—</b><span id="measuredNote">reported NOAA totals</span></div><div class="metric"><small>Stage IV live QPE</small><b id="qpe">—</b><span id="qpeNote">checking latest 24h</span></div></section>
+<section class="hero"><div><span class="eyebrow">NOAA IBTRACS · JAN 1, 2025 → PRESENT</span><h1>Hurricanes & Cyclones That Made Landfall</h1><p>One focused dataset: distinct tropical-cyclone landfall events. Each landfall is matched to the Moon sign and nakshatra plus Venus sign and nakshatra at the estimated landfall time.</p></div><button id="reload" class="btn">Reload landfalls</button></section>
+<section class="metrics"><div class="metric"><small>Total landfalls</small><b id="total">—</b><span>2025 → present</span></div><div class="metric"><small>This year</small><b id="thisYear">—</b><span id="yearLabel">—</span></div><div class="metric"><small>Strongest landfall</small><b id="strongest">—</b><span id="strongestNote">—</span></div><div class="metric"><small>Data status</small><b id="dataStatus">LOADING</b><span id="statusNote">NOAA IBTrACS</span></div></section>
 
-<section class="panel"><div class="panel-head"><strong>ALL-STORM RAW FREQUENCY REPORT</strong><span id="status" class="status">Loading…</span></div><div class="grid">
-<div class="card"><small>Most events · Moon zodiac</small><b id="mostSign">—</b><p id="mostSignNote">—</p></div><div class="card"><small>Least events · Moon zodiac</small><b id="leastSign">—</b><p id="leastSignNote">—</p></div><div class="card"><small>Most events · Moon nakshatra</small><b id="mostNak">—</b><p id="mostNakNote">—</p></div><div class="card"><small>Least events · Moon nakshatra</small><b id="leastNak">—</b><p id="leastNakNote">—</p></div><div class="card"><small>Most common Moon phase</small><b id="phase">—</b><p id="phaseNote">—</p></div><div class="card"><small>Most common Venus–Moon aspect</small><b id="venus">—</b><p id="venusNote">—</p></div><div class="card"><small>Strongest cyclone</small><b id="strongCyclone">—</b><p id="strongCycloneNote">—</p></div><div class="card"><small>Heaviest reported rain</small><b id="heavyRain">—</b><p id="heavyRainNote">—</p></div>
-</div><div class="ranks"><div class="rankbox"><h3>MOON ZODIAC · LOWEST → HIGHEST</h3><div id="signRanks"></div></div><div class="rankbox"><h3>MOON NAKSHATRA · LOWEST → HIGHEST</h3><div id="nakRanks"></div></div></div></section>
+<section class="panel"><div class="head"><strong>YEAR-TO-DATE MOON SIGN RESULT</strong><select id="yearSelect"></select></div><div class="summary">
+<div class="card"><small>Highest Moon zodiac</small><b id="highSign">—</b><p id="highSignNote">—</p></div>
+<div class="card"><small>Lowest Moon zodiac</small><b id="lowSign">—</b><p id="lowSignNote">—</p></div>
+<div class="card"><small>Highest Moon nakshatra</small><b id="highNak">—</b><p id="highNakNote">—</p></div>
+<div class="card"><small>Lowest Moon nakshatra</small><b id="lowNak">—</b><p id="lowNakNote">—</p></div>
+</div></section>
 
-<section class="panel"><div class="panel-head"><strong>SEASONALITY-ADJUSTED PATTERN REPORT</strong><span id="patternStatus" class="status">calculating expected vs observed</span></div>
-<div class="pattern-grid"><div id="patternAll" class="pattern-card"></div><div id="patternCyclone" class="pattern-card"></div><div id="patternRain" class="pattern-card"></div></div>
-<div class="note">Observed event counts are compared with an expected background built from 6-hour astrology snapshots inside the same calendar months in which the events occurred. This controls for seasonal clustering. “Lift” is observed ÷ expected; values above 1.0 are overrepresented and below 1.0 are underrepresented. The z-score is a screening statistic, not proof of causation.</div></section>
+<section class="panel"><div class="head"><strong>MOON REPORT</strong><span class="status">landfall counts · low → high</span></div><div class="chart-grid">
+<div class="chartbox"><h3>Moon sign at landfall</h3><div id="moonSignChart"></div></div>
+<div class="chartbox"><h3>Moon nakshatra at landfall</h3><div id="moonNakChart"></div></div>
+</div></section>
 
-<section class="panel"><div class="panel-head"><strong>HEAVIEST vs LOWER-INTENSITY COMPARISON</strong><span class="status">reported rainfall + cyclone intensity</span></div><div id="compare" class="compare"></div><div class="note">Cyclones rank by maximum sustained wind. Rain ranks only events with a reported NOAA rainfall total; unmeasured rain events still count in frequency reports.</div></section>
+<section class="panel"><div class="head"><strong>VENUS REPORT</strong><span class="status">landfall counts · low → high</span></div><div class="chart-grid">
+<div class="chartbox"><h3>Venus sign at landfall</h3><div id="venusSignChart"></div></div>
+<div class="chartbox"><h3>Venus nakshatra at landfall</h3><div id="venusNakChart"></div></div>
+</div></section>
 
-<section class="panel"><div class="panel-head"><strong>MONTHLY REPORT</strong><span class="status">event-time astrology, same pattern-report concept as Aviation</span></div><div class="controls"><select id="year"></select><select id="monthType"><option value="all">All storm types</option><option value="Tropical Cyclone">Cyclones</option><option value="Heavy Rain">Heavy rain</option></select></div><div id="months" class="months"></div></section>
-
-<section class="panel"><div class="panel-head"><strong>WEATHER DATASET</strong><span id="datasetCount" class="status">0 records</span></div><div class="controls"><select id="type"><option value="all">All storm types</option><option value="Tropical Cyclone">Cyclones</option><option value="Heavy Rain">Heavy rain</option></select><select id="moon"><option value="all">All Moon signs</option></select><select id="phaseFilter"><option value="all">All Moon phases</option></select><select id="venusFilter"><option value="all">All Venus aspects</option></select></div><div class="table-wrap"><table><thead><tr><th>Date/time</th><th>Type</th><th>Storm/location</th><th>Intensity</th><th>Moon phase</th><th>Moon zodiac</th><th>Moon nakshatra</th><th>Venus → Moon</th><th>Source</th></tr></thead><tbody id="body"></tbody></table></div><div class="note">The status line above reports each NOAA source separately. A source error no longer prevents the other datasets from rendering. Storm Events can lag the present; Stage IV status is shown separately. Astrology fields are exploratory pattern variables and do not establish weather causation.</div></section>
+<section class="panel"><div class="head"><strong>LANDFALL DATASET</strong><span id="count" class="status">0 rows</span></div><div class="table-wrap"><table><thead><tr><th>Landfall time</th><th>Storm</th><th>Basin</th><th>Wind</th><th>Category</th><th>Moon sign</th><th>Moon nakshatra</th><th>Venus sign</th><th>Venus nakshatra</th></tr></thead><tbody id="body"></tbody></table></div><div class="note">IBTrACS defines LANDFALL=0 as a coastline crossing between the current and next track observation. This page uses the midpoint of that observation window as the estimated landfall time. The IBTrACS land mask covers continents and islands larger than 1,400 km².</div></section>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script><script>
-const A=window.Astronomy,SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'],NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];let events=[];const baselineMonthCache=new Map();
-const norm=v=>((v%360)+360)%360,norm180=v=>((v+180)%360+360)%360-180;
+<script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+<script>
+const A=window.Astronomy;
+const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
+let rows=[];
+const norm=v=>((v%360)+360)%360;
 function lahiri(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
-function lon(name,d,a){const v=A.GeoVector(A.Body[name],d,true),e=A.Ecliptic(v);return norm(Number(e.elon)-a)}
-function aspect(sep){const xs=[['conjunction',0],['sextile',60],['square',90],['trine',120],['opposition',180]];let b=null;for(const [name,deg] of xs){const orb=Math.abs(sep-deg);if(!b||orb<b.orb)b={name,orb}}return b&&b.orb<=8?b:null}
-function phase(s,m){const e=norm(m-s);if(e<22.5||e>=337.5)return'New Moon';if(e<67.5)return'Waxing Crescent';if(e<112.5)return'First Quarter';if(e<157.5)return'Waxing Gibbous';if(e<202.5)return'Full Moon';if(e<247.5)return'Waning Gibbous';if(e<292.5)return'Last Quarter';return'Waning Crescent'}
-function astro(at){const d=new Date(at),a=lahiri(d),m=lon('Moon',d,a),v=lon('Venus',d,a),s=lon('Sun',d,a),nak=Math.floor(m/(360/27)),asp=aspect(Math.abs(norm180(v-m)));return{moonSign:Math.floor(m/30),moonDegree:m%30,nakshatra:NAK[nak],phase:phase(s,m),venusAspect:asp?asp.name:'no major aspect',venusOrb:asp?asp.orb:null}}
-const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-function counts(vals){const m=new Map();vals.forEach(v=>m.set(v,(m.get(v)||0)+1));return m}
-function top(m,dir='max'){const a=[...m].sort((x,y)=>dir==='max'?y[1]-x[1]:x[1]-y[1]);return a[0]||null}
-function addAstro(e){const at=e.peakAt||e.eventAt||e.startAt;e.eventAt=at;e.astro=astro(at);return e}
-function label(e){return e.type==='Tropical Cyclone'?e.name:[e.area,e.state].filter(Boolean).join(', ')||'Heavy rain'}
-function rainValue(e){return Number.isFinite(e.rainfallInches)?e.rainfallInches:null}
-function intensity(e){return e.type==='Tropical Cyclone'?(e.maxWindKt+' kt · '+e.category):(Number.isFinite(e.rainfallInches)?e.rainfallInches.toFixed(2)+' in reported':'rainfall total not measured')}
-async function fetchJsonSafe(url,label){
-  try{
-    const r=await fetch(url,{cache:'no-store'});
-    const text=await r.text();
-    let data=null;try{data=JSON.parse(text)}catch{}
-    if(!r.ok)return{ok:false,label,error:(data&&data.error)||('HTTP '+r.status),events:[]};
-    if(!data)return{ok:false,label,error:'Invalid JSON response',events:[]};
-    return{...data,label};
-  }catch(error){return{ok:false,label,error:String(error?.message||error),events:[]}}
-}
-async function load(){
-  const status=document.getElementById('status');
-  status.textContent='Loading NOAA sources…';
-  events=[];
-  safeRender();
-
-  if(!window.Astronomy){
-    status.textContent='ASTRONOMY ENGINE ERROR: calculation library did not load';
-    return;
-  }
-
-  const end=new Date().toISOString().slice(0,10);
-  const years=[];for(let y=2025;y<=new Date().getUTCFullYear();y++)years.push(y);
-  const sourceState=new Map();
-  const updateStatus=()=>{status.textContent=[...sourceState.values()].join(' · ')||'Loading NOAA sources…'};
-
-  const ingest=(result,label)=>{
-    if(result.ok&&Array.isArray(result.events)){
-      const enriched=[];
-      for(const e of result.events){
-        try{enriched.push(addAstro(e))}catch(err){console.warn('Astrology enrichment failed',e?.id,err)}
-      }
-      events.push(...enriched);
-      const seen=new Set();
-      events=events.filter(e=>{const k=(e.type||'')+'|'+(e.id||'')+'|'+(e.eventAt||'');if(seen.has(k))return false;seen.add(k);return true}).sort((a,b)=>new Date(b.eventAt)-new Date(a.eventAt));
-      sourceState.set(label,label+' '+enriched.length);
-    }else{
-      sourceState.set(label,label+' ERROR: '+(result.error||'unknown error'));
-    }
-    updateStatus();
-    safeRender();
-  };
-
-  const cycloneTask=fetchJsonSafe('/api/weather-cyclones?start=2025-01-01&end='+end,'Cyclones').then(r=>ingest(r,'Cyclones'));
-  const rainTasks=years.map(y=>fetchJsonSafe('/api/weather-rain?year='+y,'Rain '+y).then(r=>ingest(r,'Rain '+y)));
-  const qpeTask=fetchJsonSafe('/api/weather-qpe','Stage IV').then(q=>{
-    document.getElementById('qpe').textContent=q.ok?'ONLINE':'UNAVAILABLE';
-    document.getElementById('qpeNote').textContent=q.ok&&q.lastModified?('updated '+new Date(q.lastModified).toLocaleString()):(q.error||'latest 24h NOAA Stage IV');
-  });
-
-  await Promise.allSettled([cycloneTask,...rainTasks,qpeTask]);
-  updateStatus();
-}
-function monthKey(v){
-  const d=v instanceof Date?v:new Date(v);
-  return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
-}
-function baselineMonth(key){
-  if(baselineMonthCache.has(key))return baselineMonthCache.get(key);
-  const [y,m]=key.split('-').map(Number);
-  const start=new Date(Date.UTC(y,m-1,1,0,0,0));
-  const end=new Date(Date.UTC(y,m,1,0,0,0));
-  const now=new Date(),min=new Date('2025-01-01T00:00:00Z');
-  const rows=[];
-  for(let d=new Date(start);d<end&&d<=now;d=new Date(d.getTime()+6*3600000)){
-    if(d<min)continue;
-    try{rows.push(astro(d))}catch{}
-  }
-  baselineMonthCache.set(key,rows);
-  return rows;
-}
-function expectedDistribution(records,getter,categories){
-  const monthCounts=counts(records.map(r=>monthKey(r.eventAt)));
-  const weighted=new Map(categories.map(c=>[c,0]));
-  for(const [mk,n] of monthCounts){
-    const rows=baselineMonth(mk);
-    if(!rows.length)continue;
-    const dist=counts(rows.map(getter));
-    for(const c of categories){
-      weighted.set(c,(weighted.get(c)||0)+n*((dist.get(c)||0)/rows.length));
-    }
-  }
-  return weighted;
-}
-function patternRows(records,getter,categories){
-  const obs=counts(records.map(r=>getter(r.astro)));
-  const exp=expectedDistribution(records,getter,categories);
-  const n=records.length;
-  return categories.map(c=>{
-    const observed=obs.get(c)||0,expected=exp.get(c)||0,p=n?expected/n:0;
-    const lift=expected>0?observed/expected:null;
-    const denom=Math.sqrt(Math.max(.000001,n*p*(1-p)));
-    const z=expected>0?(observed-expected)/denom:null;
-    return{category:c,observed,expected,lift,z};
-  });
-}
-function standout(rows,dir){
-  const eligible=rows.filter(r=>r.expected>=1&&Number.isFinite(r.z));
-  if(!eligible.length)return null;
-  return [...eligible].sort((a,b)=>dir==='up'?b.z-a.z:a.z-b.z)[0];
-}
-function fmtPattern(r,dir){
-  if(!r)return'<span class="pattern-warn">insufficient sample</span>';
-  const cls=dir==='up'?'pattern-up':'pattern-down',word=dir==='up'?'over':'under';
-  return '<span class="'+cls+'"><b>'+esc(r.category)+'</b> · '+word+'represented</span><br>Observed '+r.observed+' · expected '+r.expected.toFixed(1)+' · lift '+(r.lift===null?'—':r.lift.toFixed(2)+'×')+' · z '+(r.z===null?'—':r.z.toFixed(2));
-}
-function variablePattern(records,label,getter,categories){
-  const rows=patternRows(records,getter,categories);
-  return '<div class="pattern-line"><b>'+esc(label)+'</b><br>'+fmtPattern(standout(rows,'up'),'up')+'<br>'+fmtPattern(standout(rows,'down'),'down')+'</div>';
-}
-function renderPatternCard(id,title,records){
-  const el=document.getElementById(id);if(!el)return;
-  if(records.length<8){
-    el.innerHTML='<h3>'+esc(title)+'</h3><div class="pattern-line"><span class="pattern-warn">Only '+records.length+' events. More data is needed before treating differences as stable patterns.</span></div>';
-    return;
-  }
-  const phases=['New Moon','Waxing Crescent','First Quarter','Waxing Gibbous','Full Moon','Waning Gibbous','Last Quarter','Waning Crescent'];
-  const venusCats=['conjunction','sextile','square','trine','opposition','no major aspect'];
-  el.innerHTML='<h3>'+esc(title)+' · '+records.length+' events</h3>'+
-    variablePattern(records,'Moon zodiac',a=>SIGNS[a.moonSign],SIGNS)+
-    variablePattern(records,'Moon nakshatra',a=>a.nakshatra,NAK)+
-    variablePattern(records,'Moon phase',a=>a.phase,phases)+
-    variablePattern(records,'Venus → Moon',a=>a.venusAspect,venusCats);
-}
-function renderAdjustedPatterns(){
-  const cyclones=events.filter(e=>e.type==='Tropical Cyclone');
-  const rain=events.filter(e=>e.type==='Heavy Rain');
-  const status=document.getElementById('patternStatus');
-  try{
-    renderPatternCard('patternAll','All weather events',events);
-    renderPatternCard('patternCyclone','Hurricanes / cyclones',cyclones);
-    renderPatternCard('patternRain','Heavy rain',rain);
-    if(status)status.textContent='seasonality-adjusted · 6-hour baseline';
-  }catch(error){
-    if(status)status.textContent='pattern engine error: '+String(error?.message||error);
-  }
-}
-function safeRender(){
-  try{render()}catch(error){
-    console.error('Weather render failed',error);
-    const status=document.getElementById('status');
-    if(status)status.textContent=(status.textContent?status.textContent+' · ':'')+'RENDER ERROR: '+String(error?.message||error);
-  }
+function bodyLon(name,d,a){const v=A.GeoVector(A.Body[name],d,true),e=A.Ecliptic(v);return norm(Number(e.elon)-a)}
+function pos(lon){const n=Math.floor(lon/(360/27));return{sign:Math.floor(lon/30),degree:lon%30,nak:NAK[n],nakDegree:lon%(360/27)}}
+function enrich(e){const d=new Date(e.landfallAt),a=lahiri(d);return{...e,moon:pos(bodyLon('Moon',d,a)),venus:pos(bodyLon('Venus',d,a))}}
+function counts(vals){const m=new Map();for(const v of vals)m.set(v,(m.get(v)||0)+1);return m}
+function ranked(categories,map){return categories.map(c=>[c,map.get(c)||0]).sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0]))}
+function draw(id,data){const el=document.getElementById(id),mx=Math.max(1,...data.map(x=>x[1]));el.innerHTML=data.map((r,i)=>'<div class="bar"><div>'+(i+1)+'. '+r[0]+'</div><div class="track"><div class="fill" style="width:'+(r[1]/mx*100)+'%"></div></div><div>'+r[1]+'</div></div>').join('')}
+function extrema(data,dir){const available=data.filter(x=>x[1]>0);if(!available.length)return null;return [...available].sort((a,b)=>dir==='high'?b[1]-a[1]:a[1]-b[1])[0]}
+function renderYear(){
+  const y=Number(document.getElementById('yearSelect').value),r=rows.filter(x=>new Date(x.landfallAt).getUTCFullYear()===y);
+  const ms=ranked(SIGNS,counts(r.map(x=>SIGNS[x.moon.sign]))),mn=ranked(NAK,counts(r.map(x=>x.moon.nak)));
+  const hi=extrema(ms,'high'),lo=extrema(ms,'low'),hin=extrema(mn,'high'),lon=extrema(mn,'low');
+  document.getElementById('highSign').textContent=hi?.[0]||'—';document.getElementById('highSignNote').textContent=hi?hi[1]+' landfalls in '+y:'No landfalls';
+  document.getElementById('lowSign').textContent=lo?.[0]||'—';document.getElementById('lowSignNote').textContent=lo?lo[1]+' landfalls in '+y:'No landfalls';
+  document.getElementById('highNak').textContent=hin?.[0]||'—';document.getElementById('highNakNote').textContent=hin?hin[1]+' landfalls in '+y:'No landfalls';
+  document.getElementById('lowNak').textContent=lon?.[0]||'—';document.getElementById('lowNakNote').textContent=lon?lon[1]+' landfalls in '+y:'No landfalls';
 }
 function render(){
-  const cyclone=events.filter(e=>e.type==='Tropical Cyclone'),rainEvents=events.filter(e=>e.type==='Heavy Rain'),measured=rainEvents.filter(e=>Number.isFinite(rainValue(e)));
-  document.getElementById('total').textContent=events.length;document.getElementById('cyclones').textContent=cyclone.length;document.getElementById('rain').textContent=rainEvents.length;document.getElementById('measured').textContent=measured.length;document.getElementById('measuredNote').textContent=rainEvents.filter(e=>Number.isFinite(e.rainfallInches)).length+' NOAA events with reported totals';
-  const sm=counts(events.map(e=>SIGNS[e.astro.moonSign])),nm=counts(events.map(e=>e.astro.nakshatra)),pm=counts(events.map(e=>e.astro.phase)),vm=counts(events.map(e=>e.astro.venusAspect)),ms=top(sm),ls=top(sm,'min'),mn=top(nm),ln=top(nm,'min'),ph=top(pm),ve=top(vm);
-  document.getElementById('mostSign').textContent=ms?.[0]||'—';document.getElementById('leastSign').textContent=ls?.[0]||'—';document.getElementById('mostNak').textContent=mn?.[0]||'—';document.getElementById('leastNak').textContent=ln?.[0]||'—';document.getElementById('phase').textContent=ph?.[0]||'—';document.getElementById('venus').textContent=ve?.[0]||'—';
-  document.getElementById('mostSignNote').textContent=ms?ms[1]+' events':'—';document.getElementById('leastSignNote').textContent=ls?ls[1]+' events':'—';document.getElementById('mostNakNote').textContent=mn?mn[1]+' events':'—';document.getElementById('leastNakNote').textContent=ln?ln[1]+' events':'—';document.getElementById('phaseNote').textContent=ph?ph[1]+' events':'—';document.getElementById('venusNote').textContent=ve?ve[1]+' events':'—';
-  const sc=[...cyclone].sort((a,b)=>b.maxWindKt-a.maxWindKt)[0],hr=[...measured].sort((a,b)=>rainValue(b)-rainValue(a))[0];
-  document.getElementById('strongCyclone').textContent=sc?sc.name:'—';document.getElementById('strongCycloneNote').textContent=sc?intensity(sc)+' · '+sc.astro.phase+' · '+SIGNS[sc.astro.moonSign]+' · Venus '+sc.astro.venusAspect:'—';document.getElementById('heavyRain').textContent=hr?label(hr):'—';document.getElementById('heavyRainNote').textContent=hr?intensity(hr)+' · '+hr.astro.phase+' · '+SIGNS[hr.astro.moonSign]+' · Venus '+hr.astro.venusAspect:'—';
-  ranks('signRanks',SIGNS.map(s=>[s,sm.get(s)||0]));ranks('nakRanks',NAK.map(s=>[s,nm.get(s)||0]));renderAdjustedPatterns();renderCompare(cyclone,measured);renderFilters();renderMonths();renderTable();
+  const currentYear=new Date().getUTCFullYear();
+  document.getElementById('total').textContent=rows.length;
+  document.getElementById('thisYear').textContent=rows.filter(x=>new Date(x.landfallAt).getUTCFullYear()===currentYear).length;
+  document.getElementById('yearLabel').textContent=String(currentYear);
+  const strongest=[...rows].filter(x=>Number.isFinite(x.windKt)).sort((a,b)=>b.windKt-a.windKt)[0];
+  document.getElementById('strongest').textContent=strongest?strongest.name:'—';document.getElementById('strongestNote').textContent=strongest?strongest.windKt+' kt · '+strongest.category:'—';
+  draw('moonSignChart',ranked(SIGNS,counts(rows.map(x=>SIGNS[x.moon.sign]))));
+  draw('moonNakChart',ranked(NAK,counts(rows.map(x=>x.moon.nak))));
+  draw('venusSignChart',ranked(SIGNS,counts(rows.map(x=>SIGNS[x.venus.sign]))));
+  draw('venusNakChart',ranked(NAK,counts(rows.map(x=>x.venus.nak))));
+  const years=[...new Set(rows.map(x=>new Date(x.landfallAt).getUTCFullYear()))].sort((a,b)=>b-a);
+  const ys=document.getElementById('yearSelect'),cur=ys.value;ys.innerHTML=years.map(y=>'<option value="'+y+'">'+y+'</option>').join('');ys.value=years.includes(Number(cur))?cur:String(years[0]||currentYear);
+  renderYear();
+  document.getElementById('count').textContent=rows.length+' rows';
+  document.getElementById('body').innerHTML=rows.map(e=>'<tr><td>'+new Date(e.landfallAt).toLocaleString()+'</td><td>'+e.name+'</td><td>'+e.basin+'</td><td>'+(Number.isFinite(e.windKt)?e.windKt+' kt':'—')+'</td><td>'+e.category+'</td><td>'+SIGNS[e.moon.sign]+' '+e.moon.degree.toFixed(1)+'°</td><td>'+e.moon.nak+'</td><td>'+SIGNS[e.venus.sign]+' '+e.venus.degree.toFixed(1)+'°</td><td>'+e.venus.nak+'</td></tr>').join('');
 }
-function ranks(id,rows){const el=document.getElementById(id),s=[...rows].sort((a,b)=>a[1]-b[1]||a[0].localeCompare(b[0])),mx=Math.max(1,...s.map(x=>x[1]));el.innerHTML=s.map((r,i)=>'<div class="rank-row"><div>'+(i+1)+'. '+esc(r[0])+'</div><div class="track"><div class="fill" style="width:'+(r[1]/mx*100)+'%"></div></div><div>'+r[1]+'</div></div>').join('')}
-function groupSummary(arr,title){if(!arr.length)return'<div><h3>'+esc(title)+'</h3><p>No measurable sample.</p></div>';const pm=top(counts(arr.map(e=>e.astro.phase))),sm=top(counts(arr.map(e=>SIGNS[e.astro.moonSign]))),nm=top(counts(arr.map(e=>e.astro.nakshatra))),vm=top(counts(arr.map(e=>e.astro.venusAspect)));return'<div><h3>'+esc(title)+'</h3><p>Moon phase: <b>'+esc(pm?.[0]||'—')+'</b><br>Moon zodiac: <b>'+esc(sm?.[0]||'—')+'</b><br>Moon nakshatra: <b>'+esc(nm?.[0]||'—')+'</b><br>Venus–Moon: <b>'+esc(vm?.[0]||'—')+'</b><br>Sample: '+arr.length+' events</p></div>'}
-function renderCompare(c,r){let html='';const cs=[...c].filter(x=>Number.isFinite(x.maxWindKt)).sort((x,y)=>y.maxWindKt-x.maxWindKt),cn=Math.max(1,Math.ceil(cs.length*.25));html+=groupSummary(cs.slice(0,cn),'Cyclones · strongest quartile')+groupSummary(cs.slice(-cn),'Cyclones · lower-intensity quartile');const rs=[...r].filter(x=>Number.isFinite(rainValue(x))).sort((x,y)=>rainValue(y)-rainValue(x)),rn=Math.max(1,Math.ceil(rs.length*.25));html+=groupSummary(rs.slice(0,rn),'Measured rain · heaviest quartile')+groupSummary(rs.slice(-rn),'Measured rain · lower-intensity quartile');document.getElementById('compare').innerHTML=html}
-function renderFilters(){const set=(id,vals,label)=>{const e=document.getElementById(id),cur=e.value;e.innerHTML='<option value="all">'+label+'</option>'+[...new Set(vals)].sort().map(v=>'<option>'+esc(v)+'</option>').join('');if([...e.options].some(o=>o.value===cur))e.value=cur};set('moon',events.map(e=>SIGNS[e.astro.moonSign]),'All Moon signs');set('phaseFilter',events.map(e=>e.astro.phase),'All Moon phases');set('venusFilter',events.map(e=>e.astro.venusAspect),'All Venus aspects');const ys=[...new Set(events.map(e=>new Date(e.eventAt).getUTCFullYear()))].sort();document.getElementById('year').innerHTML=ys.map(y=>'<option value="'+y+'">'+y+'</option>').join('');if(ys.length)document.getElementById('year').value=String(Math.max(...ys))}
-function renderMonths(){const y=Number(document.getElementById('year').value)||new Date().getUTCFullYear(),t=document.getElementById('monthType').value;let out='';for(let m=0;m<12;m++){const a=events.filter(e=>{const d=new Date(e.eventAt);return d.getUTCFullYear()===y&&d.getUTCMonth()===m&&(t==='all'||e.type===t)}),sm=top(counts(a.map(e=>SIGNS[e.astro.moonSign]))),nm=top(counts(a.map(e=>e.astro.nakshatra))),vm=top(counts(a.map(e=>e.astro.venusAspect)));out+='<div class="month"><b>'+new Date(Date.UTC(y,m,1)).toLocaleString([],{month:'long'})+' · '+a.length+'</b>Moon: '+esc(sm?.[0]||'—')+'<br>Nakshatra: '+esc(nm?.[0]||'—')+'<br>Venus: '+esc(vm?.[0]||'—')+'</div>'}document.getElementById('months').innerHTML=out}
-function filtered(){const t=document.getElementById('type').value,m=document.getElementById('moon').value,p=document.getElementById('phaseFilter').value,v=document.getElementById('venusFilter').value;return events.filter(e=>(t==='all'||e.type===t)&&(m==='all'||SIGNS[e.astro.moonSign]===m)&&(p==='all'||e.astro.phase===p)&&(v==='all'||e.astro.venusAspect===v))}
-function renderTable(){const a=filtered();document.getElementById('datasetCount').textContent=a.length+' records';document.getElementById('body').innerHTML=a.slice(0,700).map(e=>'<tr><td>'+esc(new Date(e.eventAt).toLocaleString())+'</td><td>'+esc(e.type)+'</td><td>'+esc(label(e))+'</td><td>'+esc(intensity(e))+'</td><td>'+esc(e.astro.phase)+'</td><td>'+esc(SIGNS[e.astro.moonSign]+' '+e.astro.moonDegree.toFixed(1)+'°')+'</td><td>'+esc(e.astro.nakshatra)+'</td><td>'+esc(e.astro.venusAspect+(e.astro.venusOrb!==null?' · orb '+e.astro.venusOrb.toFixed(1)+'°':''))+'</td><td>'+esc(e.source)+'</td></tr>').join('')}
-document.getElementById('refreshBtn').onclick=load;['type','moon','phaseFilter','venusFilter'].forEach(id=>document.getElementById(id).onchange=renderTable);['year','monthType'].forEach(id=>document.getElementById(id).onchange=renderMonths);load();
+async function load(){
+  const st=document.getElementById('dataStatus'),note=document.getElementById('statusNote');st.textContent='LOADING';note.textContent='Fetching NOAA IBTrACS';
+  try{
+    if(!A)throw new Error('Astronomy Engine did not load');
+    const end=new Date().toISOString().slice(0,10),r=await fetch('/api/weather-landfalls?start=2025-01-01&end='+end,{cache:'no-store'}),j=await r.json();
+    if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));
+    rows=(j.events||[]).map(enrich);
+    st.textContent='ONLINE';note.textContent=j.count+' landfalls · '+new Date(j.fetchedAt).toLocaleString();render();
+  }catch(error){rows=[];st.textContent='ERROR';note.textContent=String(error?.message||error);render()}
+}
+document.getElementById('reload').onclick=load;document.getElementById('yearSelect').onchange=renderYear;load();
 </script></body></html>
