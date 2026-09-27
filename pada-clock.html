@@ -1,47 +1,41 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#02070d"><title>108 Pada Clock</title>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#02070d"><title>108 Pada Ascendant Clock</title>
 <style>
-:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.18);--text:#eaf4ff;--muted:#97adc2;--accent:#38bdf8;--moon:#e8f4ff;--venus:#f7b2d9}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% -20%,#0c2940 0,#02070d 46%);color:var(--text);font-family:Inter,system-ui,sans-serif}
-header{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 18px;background:rgba(2,7,13,.95);border-bottom:1px solid var(--border)}
-header a{color:#e9f8ff;text-decoration:none}nav{display:flex;gap:6px;flex-wrap:wrap}nav a{font-size:10px;border:1px solid var(--border);padding:7px 8px;border-radius:7px}.active{border-color:var(--accent)!important}
-main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.panel,.hero{background:rgba(7,20,32,.9);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:12px}
-.hero{display:flex;justify-content:space-between;gap:20px;align-items:center}.hero h1{margin:4px 0 7px}.hero p{margin:0;color:#9fb7c7;font-size:11px;line-height:1.55;max-width:900px}.eyebrow{font-size:9px;color:#67e8f9;letter-spacing:.09em}
-.layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,.6fr);gap:12px}.clock-card{display:flex;align-items:center;justify-content:center;min-width:0}.clock-wrap{width:min(900px,100%);aspect-ratio:1/1;position:relative}.clock-wrap svg{width:100%;height:100%;display:block}
-.controls{display:grid;gap:9px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.controls label{font-size:9px;color:#9fb7c7;display:grid;gap:5px}.controls input,.controls button{width:100%;border:1px solid var(--border);background:#0a1b2a;color:#fff;border-radius:8px;padding:9px 10px}.controls button{cursor:pointer;font-weight:700}.readouts{display:grid;gap:8px;margin-top:10px}.card{background:#06111c;border:1px solid var(--border);border-radius:10px;padding:11px}.card small{display:block;color:#82a0b3;font-size:8px;text-transform:uppercase}.card b{display:block;font-size:20px;margin:5px 0}.card p{margin:0;color:#9fb7c7;font-size:9px;line-height:1.5}.status{font-size:9px;color:#67e8f9}.legend{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:9px}.legend span{font-size:10px;color:#b8d0df}.sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
-.note{font-size:8px;color:#748c9d;line-height:1.55;margin-top:9px}.mini{font-size:9px;color:#9fb7c7;line-height:1.5}
-@media(max-width:1050px){.layout{grid-template-columns:1fr}}@media(max-width:650px){header,.hero{flex-direction:column;align-items:stretch}.row,.legend{grid-template-columns:1fr}}
+:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.18);--text:#edf7ff;--muted:#95acbf;--accent:#38bdf8}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% -20%,#12324d 0,#04111d 38%,#02070d 72%);color:var(--text);font-family:Inter,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 18px;background:rgba(2,7,13,.95);border-bottom:1px solid var(--border)}header a{color:#eaf8ff;text-decoration:none}nav{display:flex;gap:6px;flex-wrap:wrap}nav a{font-size:10px;border:1px solid var(--border);padding:7px 8px;border-radius:7px}.active{border-color:var(--accent)!important}
+main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{background:rgba(7,20,32,.92);border:1px solid var(--border);border-radius:15px;padding:14px;margin-top:12px}.hero{display:flex;justify-content:space-between;gap:18px;align-items:center}.hero h1{margin:4px 0 7px}.hero p{margin:0;color:#a5bdcf;font-size:11px;line-height:1.6}.eyebrow{font-size:9px;color:#7dd3fc;letter-spacing:.09em}.status{font-size:10px;color:#7dd3fc}
+.layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(330px,.65fr);gap:12px}.clock-card{display:flex;justify-content:center;align-items:center}.clock-wrap{width:min(900px,100%);aspect-ratio:1/1}.clock-wrap svg{width:100%;height:100%;display:block}
+.controls{display:grid;gap:9px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.controls label{font-size:9px;color:#a7becf;display:grid;gap:5px}.controls input,.controls button{width:100%;padding:10px;border-radius:9px;border:1px solid var(--border);background:#0b1b2b;color:#fff}.controls button{cursor:pointer;font-weight:700}
+.cards{display:grid;gap:9px;margin-top:12px}.card{background:#06111c;border:1px solid var(--border);border-radius:11px;padding:11px}.card small{display:block;color:#87a4b8;font-size:8px;text-transform:uppercase}.card b{display:block;font-size:19px;margin:5px 0}.card p{margin:0;color:#9fb7c8;font-size:9px;line-height:1.5}
+.legend{display:grid;gap:7px;margin-top:10px}.legend div{display:flex;gap:8px;align-items:center;font-size:9px;color:#a9c2d3}.dot{width:11px;height:11px;border-radius:50%;display:inline-block}.note{font-size:8px;color:#7891a3;line-height:1.55;margin-top:9px}
+@media(max-width:1050px){.layout{grid-template-columns:1fr}}@media(max-width:650px){header,.hero{flex-direction:column;align-items:stretch}.row{grid-template-columns:1fr}}
 </style></head><body>
 <script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/pada-clock.html'));</script>
-<header><a href="/">◉ 108 PADA CLOCK</a><nav><a href="/">Earth Tracker</a><a href="/weather.html">Landfall Cyclones</a><a href="/convective.html">Severe Convection</a><a class="active" href="/pada-clock.html">108 Pada Clock</a><a href="/geo-clock.html">Geo Clock</a><a href="/patterns.html">Pattern Lab</a></nav></header>
+<header><a href="/">◉ 108 PADA ASCENDANT CLOCK</a><nav><a href="/">Earth Tracker</a><a class="active" href="/pada-clock.html">108 Pada Clock</a><a href="/geo-clock.html">Geo Clock</a><a href="/weather.html">Landfall Cyclones</a><a href="/convective.html">Severe Convection</a></nav></header>
 <main>
-<section class="hero"><div><span class="eyebrow">SIDEREAL LAHIRI · 12 SIGNS · 27 NAKSHATRAS · 108 PADAS</span><h1>108 Pada Clock</h1><p>A local sidereal clock using the Ascendant as the main hour-style hand, the Moon as the second primary hand, and Venus as a secondary analysis hand. The zodiac ring is 12 × 30°, the nakshatra ring is 27 × 13°20′, and the pada ring is 108 × 3°20′.</p></div><span id="status" class="status">Current time</span></section>
-
+<section class="hero"><div><span class="eyebrow">LOCAL SIDEREAL TIME · LAHIRI ASCENDANT · RISING-SIGN PROGRESS</span><h1>108 Pada Ascendant Clock</h1><p>The hour hand is the actual local Ascendant moving through the 12 zodiac signs. The minute hand measures progress through the current 30° rising sign. The second hand measures progress through the current 3°20′ pada. Moon and Venus calculations remain available in the background for tracker analytics but are not drawn on this clock.</p></div><span id="status" class="status">Live</span></section>
 <section class="layout">
-<div class="panel clock-card"><div class="clock-wrap"><svg id="clock" viewBox="0 0 900 900" role="img" aria-label="Sidereal zodiac, nakshatra and pada clock"></svg></div></div>
+<div class="panel clock-card"><div class="clock-wrap"><svg id="clock" viewBox="0 0 900 900" role="img" aria-label="108 Pada Ascendant Clock"></svg></div></div>
 <div class="panel">
   <div class="controls">
-    <div class="row">
-      <label>Date<input id="date" type="date"></label>
-      <label>Time<input id="time" type="time" step="60"></label>
-    </div>
-    <div class="row">
-      <label>Latitude<input id="latitude" type="number" min="-89.9" max="89.9" step="0.0001" value="36.1699"></label>
-      <label>Longitude<input id="longitude" type="number" min="-180" max="180" step="0.0001" value="-115.1398"></label>
-    </div>
-    <div class="row"><button id="setTime" type="button">Set selected time</button><button id="now" type="button">Use current time</button></div>
-    <div class="row"><button id="minusHour" type="button">− 1 hour</button><button id="plusHour" type="button">+ 1 hour</button></div>
+    <div class="card"><small>Automatic geographic location</small><b id="locationMain">Locating…</b><p id="locationDetail">Allow location access when your browser asks. Coordinates are detected automatically and updated as your device moves.</p></div>
+    <div class="row"><label>Date<input id="date" type="date"></label><label>Time<input id="time" type="time" step="1"></label></div>
+    <div class="row"><button id="liveBtn" type="button">Use live time</button><button id="setBtn" type="button">Use selected time</button></div>
+    <div class="row"><button id="minus" type="button">− 1 minute</button><button id="plus" type="button">+ 1 minute</button></div>
+    <button id="locateBtn" type="button">Refresh automatic location</button>
   </div>
-
-  <div class="readouts">
-    <div class="card"><small>Ascendant · Main hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
-    <div class="card"><small>Moon · Second hand</small><b id="moonMain">—</b><p id="moonDetail">—</p></div>
-    <div class="card"><small>Venus</small><b id="venusMain">—</b><p id="venusDetail">—</p></div>
-    <div class="card"><small>Moon ↔ Venus</small><b id="separation">—</b><p id="sepDetail">Exact angular separation on the sidereal wheel.</p></div>
-    <div class="card"><small>Selected moment</small><b id="moment">—</b><p id="momentDetail">—</p></div>
+  <div class="cards">
+    <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
+    <div class="card"><small>Sign progress · Minute hand</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
+    <div class="card"><small>Pada progress · Second hand</small><b id="padaProgress">—</b><p id="padaDetail">—</p></div>
+    <div class="card"><small>Local sidereal state</small><b id="lst">—</b><p id="timeDetail">—</p></div>
   </div>
-
-  <div class="legend"><span><i class="sw" style="background:#dbeafe"></i>Moon hand + highlighted sector</span><span><i class="sw" style="background:#f9a8d4"></i>Venus hand + highlighted sector</span></div>
-  <div class="note">0° sidereal Aries is fixed at 12 o’clock and longitude increases clockwise. The Ascendant depends on the selected latitude, longitude, date, and time. Moon and Venus are geocentric sidereal positions. Nakshatra and pada boundaries remain independent of zodiac boundaries.</div>
+  <div class="legend">
+    <div><span class="dot" style="background:#7dd3fc"></span>ASC hour hand — true sidereal longitude</div>
+    <div><span class="dot" style="background:#e8f4ff"></span>Minute hand — 0°→30° progress through current sign</div>
+    <div><span class="dot" style="background:#f9a8d4"></span>Second hand — 0°→3°20′ progress through current pada</div>
+  </div>
+  <div class="note">The minute and second hands do not use fixed civil-time rates. They are derived from the actual local Ascendant, so they naturally accelerate or slow as rising signs move at different rates for your detected latitude. Location is requested automatically through the browser; no coordinate entry is required.</div>
 </div>
 </section>
 </main>
@@ -52,135 +46,117 @@ const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio',
 const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
 const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
 const svg=document.getElementById('clock');
-let current=new Date();
+let mode='live',selectedTime=new Date(),timer=null,watchId=null;
+let userLocation=null;
+try{
+  const saved=JSON.parse(localStorage.getItem('geoClockLocation')||'null');
+  if(saved&&Number.isFinite(saved.lat)&&Number.isFinite(saved.lon)){
+    userLocation={lat:saved.lat,lon:saved.lon,accuracy:saved.accuracy||null,cached:true};
+  }
+}catch(_){}
 
+function setLocationStatus(message,detail){
+  document.getElementById('locationMain').textContent=message;
+  document.getElementById('locationDetail').textContent=detail;
+}
+function acceptLocation(pos){
+  const lat=Number(pos.coords.latitude),lon=Number(pos.coords.longitude),accuracy=Number(pos.coords.accuracy);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
+  userLocation={lat,lon,accuracy,cached:false};
+  try{localStorage.setItem('geoClockLocation',JSON.stringify({lat,lon,accuracy,ts:Date.now()}));}catch(_){}
+  setLocationStatus(lat.toFixed(5)+'°, '+lon.toFixed(5)+'°',
+    'Device location · accuracy about '+(Number.isFinite(accuracy)?Math.round(accuracy)+' m':'unknown')+'. Coordinates update automatically as the device moves.');
+  draw();
+}
+function locationError(err){
+  const reason=err&&err.code===1?'Location permission was denied.':err&&err.code===2?'Your device could not determine a location.':'Location request timed out.';
+  if(userLocation){
+    setLocationStatus(userLocation.lat.toFixed(5)+'°, '+userLocation.lon.toFixed(5)+'°',
+      reason+' Using the last saved position until a new device location is available.');
+    draw();
+  }else{
+    setLocationStatus('Location required',reason+' This clock needs geographic location to calculate the local Ascendant accurately.');
+    document.getElementById('status').textContent='Location required';
+  }
+}
+function startLocation(){
+  if(!navigator.geolocation){
+    locationError({code:2});
+    return;
+  }
+  setLocationStatus('Locating…','Requesting your device position automatically.');
+  navigator.geolocation.getCurrentPosition(acceptLocation,locationError,{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
+  if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+  watchId=navigator.geolocation.watchPosition(acceptLocation,locationError,{enableHighAccuracy:true,timeout:20000,maximumAge:30000});
+}
 const norm=v=>((v%360)+360)%360;
 function lahiri(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
 function bodyLon(name,d,a){const v=A.GeoVector(A.Body[name],d,true),e=A.Ecliptic(v);return norm(Number(e.elon)-a)}
-function meanObliquity(d){
-  const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;
-  return 23+26/60+(21.448-46.8150*T-0.00059*T*T+0.001813*T*T*T)/3600;
-}
+function meanObliquity(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return 23+26/60+(21.448-46.8150*T-.00059*T*T+.001813*T*T*T)/3600}
 function ascendantSidereal(d,lat,lon,a){
-  const rad=Math.PI/180;
-  const lst=norm(A.SiderealTime(d)*15+lon)*rad;
-  const phi=lat*rad,eps=meanObliquity(d)*rad;
-  const y=Math.cos(lst);
-  const x=-(Math.sin(lst)*Math.cos(eps)+Math.tan(phi)*Math.sin(eps));
-  const tropical=norm(Math.atan2(y,x)/rad);
-  return norm(tropical-a);
+  const rad=Math.PI/180,lst=norm(A.SiderealTime(d)*15+lon)*rad,phi=lat*rad,eps=meanObliquity(d)*rad;
+  const y=Math.cos(lst),x=-(Math.sin(lst)*Math.cos(eps)+Math.tan(phi)*Math.sin(eps));
+  return norm(Math.atan2(y,x)/rad-a);
 }
 function pos(lon){
-  const nakSize=360/27,padaSize=360/108;
-  const sign=Math.floor(lon/30),nak=Math.floor(lon/nakSize),padaInNak=Math.floor((lon%nakSize)/padaSize)+1,globalPada=Math.floor(lon/padaSize)+1;
-  return{lon,sign,degree:lon%30,nak,nakName:NAK[nak],pada:padaInNak,globalPada,nakDegree:lon%nakSize};
+  const nakSize=360/27,padaSize=360/108,sign=Math.floor(lon/30),nak=Math.floor(lon/nakSize),nakDeg=lon%nakSize;
+  return{lon,sign,degree:lon%30,nak,nakName:NAK[nak],pada:Math.floor(nakDeg/padaSize)+1,globalPada:Math.floor(lon/padaSize)+1,padaDegree:lon%padaSize};
 }
 function polar(angle,r){const a=(angle-90)*Math.PI/180;return[450+r*Math.cos(a),450+r*Math.sin(a)]}
-function arcPath(rOuter,rInner,startAngle,endAngle){
-  const large=(endAngle-startAngle)>180?1:0;
-  const p1=polar(startAngle,rOuter),p2=polar(endAngle,rOuter),p3=polar(endAngle,rInner),p4=polar(startAngle,rInner);
-  return 'M '+p1[0]+' '+p1[1]+' A '+rOuter+' '+rOuter+' 0 '+large+' 1 '+p2[0]+' '+p2[1]+' L '+p3[0]+' '+p3[1]+' A '+rInner+' '+rInner+' 0 '+large+' 0 '+p4[0]+' '+p4[1]+' Z';
-}
-function line(angle,r1,r2,stroke,width,opacity=1){
-  const a=polar(angle,r1),b=polar(angle,r2);return '<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+stroke+'" stroke-width="'+width+'" opacity="'+opacity+'"/>';
-}
-function textAt(angle,r,txt,size,fill,weight='500'){
-  const p=polar(angle,r);return '<text x="'+p[0]+'" y="'+p[1]+'" fill="'+fill+'" font-size="'+size+'" font-weight="'+weight+'" text-anchor="middle" dominant-baseline="middle">'+txt+'</text>';
-}
-function rotatedText(angle,r,txt,size,fill){
-  const p=polar(angle,r);return '<text x="'+p[0]+'" y="'+p[1]+'" fill="'+fill+'" font-size="'+size+'" text-anchor="middle" dominant-baseline="middle" transform="rotate('+angle+' '+p[0]+' '+p[1]+')">'+txt+'</text>';
-}
-const SIGN_COLORS=['#20324a','#294053','#24454f','#304b43','#4a3c25','#4b432d','#403653','#3c314b','#463d29','#35404c','#29414d','#2d4350'];
-function drawBase(asc,moon,venus){
-  let out='<defs><filter id="glowMoon" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="glowVenus" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
-  out+='<rect width="900" height="900" fill="#04101b"/><circle cx="450" cy="450" r="420" fill="#05111d" stroke="rgba(124,185,255,.25)" stroke-width="2"/>';
-
-  for(let i=0;i<12;i++){
-    out+='<path d="'+arcPath(420,345,i*30,i*30+30)+'" fill="'+SIGN_COLORS[i]+'" stroke="rgba(255,255,255,.08)" stroke-width="1"/>';
-  }
-  out+='<path d="'+arcPath(420,345,asc.sign*30,asc.sign*30+30)+'" fill="rgba(125,211,252,.18)" stroke="rgba(125,211,252,.75)" stroke-width="2.4"/>';
-  out+='<path d="'+arcPath(420,345,moon.sign*30,moon.sign*30+30)+'" fill="rgba(232,244,255,.15)" stroke="rgba(232,244,255,.55)" stroke-width="2"/>';
-  out+='<path d="'+arcPath(420,345,venus.sign*30,venus.sign*30+30)+'" fill="rgba(247,178,217,.14)" stroke="rgba(247,178,217,.55)" stroke-width="2"/>';
-
-  const nakSize=360/27;
-  for(let i=0;i<27;i++){
-    const fill=i%2===0?'rgba(147,197,253,.045)':'rgba(167,139,250,.06)';
-    out+='<path d="'+arcPath(345,255,i*nakSize,i*nakSize+nakSize)+'" fill="'+fill+'" stroke="rgba(255,255,255,.05)" stroke-width=".7"/>';
-  }
-  out+='<path d="'+arcPath(345,255,asc.nak*nakSize,asc.nak*nakSize+nakSize)+'" fill="rgba(125,211,252,.13)" stroke="rgba(125,211,252,.55)" stroke-width="1.8"/>';
-  out+='<path d="'+arcPath(345,255,moon.nak*nakSize,moon.nak*nakSize+nakSize)+'" fill="rgba(232,244,255,.11)" stroke="rgba(232,244,255,.38)" stroke-width="1.5"/>';
-  out+='<path d="'+arcPath(345,255,venus.nak*nakSize,venus.nak*nakSize+nakSize)+'" fill="rgba(247,178,217,.11)" stroke="rgba(247,178,217,.38)" stroke-width="1.5"/>';
-
-  out+='<circle cx="450" cy="450" r="255" fill="none" stroke="rgba(124,185,255,.17)"/><circle cx="450" cy="450" r="180" fill="#06111c" stroke="rgba(124,185,255,.20)" stroke-width="2"/>';
-
-  for(let i=0;i<360;i++){
-    const major=i%30===0,ten=i%10===0,five=i%5===0;
-    out+=line(i,major?338:ten?350:five?360:369,420,major?'#a6ddff':ten?'#638da9':'#3f586a',major?2.2:ten?1.3:five?.9:.5,major?.98:.78);
-  }
-  for(let i=0;i<12;i++){
-    const a=i*30;
-    out+=line(a,255,420,'#48baf4',1.8,.88);
-    out+=textAt(a+15,389,GLYPHS[i],28,'#f3fbff','700');
-    out+=textAt(a+15,361,SIGNS[i],11,'#d7ecfa','700');
-  }
-  for(let i=0;i<27;i++){
-    const a=i*nakSize;
-    out+=line(a,180,345,'#b49cfb',1.15,.85);
-    out+=textAt(a+nakSize/2,304,String(i+1),10,'#eadcff','800');
-    out+=rotatedText(a+nakSize/2,278,NAK[i],7.5,'#b9c9d7');
-  }
-  const padaSize=360/108;
-  for(let i=0;i<108;i++){
-    const a=i*padaSize,isNak=i%4===0,isHalf=i%2===0;
-    out+=line(a,180,isNak?255:isHalf?231:220,isNak?'#8aaabd':'#5d7587',isNak?1.2:.65,isNak?.88:.66);
-  }
-  out+='<circle cx="450" cy="450" r="142" fill="#07121d" stroke="rgba(124,185,255,.18)" stroke-width="2"/><circle cx="450" cy="450" r="116" fill="#081624" stroke="rgba(124,185,255,.10)"/>';
-  return out;
-}
-function hand(angle,r,color,width,label,filterId){
-  const p=polar(angle,r),lab=polar(angle,126);
-  return '<line x1="450" y1="450" x2="'+p[0]+'" y2="'+p[1]+'" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round" filter="url(#'+filterId+')"/><circle cx="'+p[0]+'" cy="'+p[1]+'" r="6.5" fill="'+color+'" filter="url(#'+filterId+')"/><text x="'+lab[0]+'" y="'+lab[1]+'" fill="'+color+'" font-size="18" font-weight="800" text-anchor="middle" dominant-baseline="middle">'+label+'</text>';
-}
-function deg(v){const d=Math.floor(v),m=Math.round((v-d)*60);return d+'° '+String(m).padStart(2,'0')+'′'}
-function render(){
+function line(angle,r1,r2,color,width,opacity=1){const a=polar(angle,r1),b=polar(angle,r2);return'<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+color+'" stroke-width="'+width+'" opacity="'+opacity+'"/>'}
+function textAt(angle,r,text,size,color,weight='600'){const p=polar(angle,r);return'<text x="'+p[0]+'" y="'+p[1]+'" fill="'+color+'" font-size="'+size+'" font-weight="'+weight+'" text-anchor="middle" dominant-baseline="middle">'+text+'</text>'}
+function hand(angle,r,color,width,label){const p=polar(angle,r),l=polar(angle,118);return'<line x1="450" y1="450" x2="'+p[0]+'" y2="'+p[1]+'" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round"/><circle cx="'+p[0]+'" cy="'+p[1]+'" r="5.5" fill="'+color+'"/><text x="'+l[0]+'" y="'+l[1]+'" fill="'+color+'" font-size="14" font-weight="800" text-anchor="middle" dominant-baseline="middle">'+label+'</text>'}
+function deg(v){let d=Math.floor(v),m=Math.round((v-d)*60);if(m===60){d++;m=0}return d+'° '+String(m).padStart(2,'0')+'′'}
+function syncInputs(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'),hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0'),ss=String(d.getSeconds()).padStart(2,'0');document.getElementById('date').value=y+'-'+m+'-'+day;document.getElementById('time').value=hh+':'+mm+':'+ss}
+function currentMoment(){return mode==='live'?new Date():selectedTime}
+function draw(){
+  const d=currentMoment();
   if(!A){document.getElementById('status').textContent='Astronomy engine unavailable';return}
-  const lat=Math.max(-89.9,Math.min(89.9,Number(document.getElementById('latitude').value)));
-  const lon=Math.max(-180,Math.min(180,Number(document.getElementById('longitude').value)));
-  if(!Number.isFinite(lat)||!Number.isFinite(lon)){document.getElementById('status').textContent='Enter a valid latitude and longitude';return}
-  const aya=lahiri(current);
-  const asc=pos(ascendantSidereal(current,lat,lon,aya));
-  const moon=pos(bodyLon('Moon',current,aya)),venus=pos(bodyLon('Venus',current,aya));
-  let out=drawBase(asc,moon,venus);
-  out+=hand(asc.lon,165,'#7dd3fc',7,'ASC','glowMoon');
-  out+=hand(moon.lon,153,'#e8f4ff',5.5,'☾','glowMoon');
-  out+=hand(venus.lon,141,'#f7b2d9',4.5,'♀','glowVenus');
-  out+='<circle cx="450" cy="450" r="9" fill="#f4fbff" stroke="#9cc9e8" stroke-width="1.5"/>';
-  out+='<text x="450" y="432" fill="#eef8ff" font-size="20" font-weight="800" text-anchor="middle">108 PADA</text><text x="450" y="456" fill="#7dd3fc" font-size="11" font-weight="700" text-anchor="middle">SIDEREAL LAHIRI CLOCK</text><text x="450" y="476" fill="#93aac0" font-size="10" text-anchor="middle">'+current.toISOString().replace('T',' ').slice(0,16)+' UTC</text>';
+  if(!userLocation){document.getElementById('status').textContent='Locating…';return}
+  const lat=userLocation.lat,lon=userLocation.lon;
+  const aya=lahiri(d),asc=pos(ascendantSidereal(d,lat,lon,aya));
+  // Background-only planetary state for aviation/convection correlation work.
+  const moonLon=bodyLon('Moon',d,aya),venusLon=bodyLon('Venus',d,aya);
+  window.dispatchEvent(new CustomEvent('pada-clock-astro-state',{detail:{timestamp:d.getTime(),lat,lon,ayanamsa:aya,ascendant:asc.lon,moon:moonLon,venus:venusLon}}));
+  const signFrac=asc.degree/30;
+  const signMinuteAngle=signFrac*360;
+  const padaSize=360/108,padaFrac=asc.padaDegree/padaSize,secondAngle=padaFrac*360;
+  let out='<rect width="900" height="900" fill="#04101b"/><circle cx="450" cy="450" r="420" fill="#06121e" stroke="rgba(124,185,255,.25)" stroke-width="2"/>';
+  for(let i=0;i<12;i++){
+    const a=i*30;out+=line(a,270,420,'#48baf4',1.7,.8);out+=textAt(a+15,383,GLYPHS[i],27,'#eef8ff','700');out+=textAt(a+15,355,SIGNS[i],10,'#bed9e8','700');
+  }
+  for(let i=0;i<108;i++){const a=i*(360/108),major=i%9===0,pada=i%1===0;out+=line(a,major?270:300,major?420:330,major?'#7dd3fc':'#4b6578',major?1.4:.55,major?.8:.6)}
+  for(let i=0;i<9;i++){out+=line(i*40,190,265,'#9fb7c8',1,.65);out+=textAt(i*40+20,230,String(i+1),11,'#c8d9e5','700')}
+  for(let i=0;i<60;i++){out+=line(i*6,i%5===0?150:165,190,i%5===0?'#8aa8bc':'#4e6575',i%5===0?1:.5,.7)}
+  out+='<circle cx="450" cy="450" r="145" fill="#07121d" stroke="rgba(124,185,255,.18)" stroke-width="2"/>';
+  out+=hand(asc.lon,175,'#7dd3fc',7,'ASC');
+  out+=hand(signMinuteAngle,162,'#e8f4ff',5,'MIN');
+  out+=hand(padaTickerAngle,150,'#f9a8d4',3.5,'P');
+  out+='<circle cx="450" cy="450" r="8" fill="#eef8ff"/><text x="450" y="435" fill="#eef8ff" font-size="18" font-weight="800" text-anchor="middle">LOCAL ASC</text><text x="450" y="458" fill="#7dd3fc" font-size="10" text-anchor="middle">SIGN + PADA MOTION</text>';
   svg.innerHTML=out;
   document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
-  document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global pada '+asc.globalPada+' · '+lat.toFixed(4)+'°, '+lon.toFixed(4)+'°';
-  document.getElementById('moonMain').textContent=SIGNS[moon.sign]+' '+deg(moon.degree);
-  document.getElementById('moonDetail').textContent=moon.nakName+' · Pada '+moon.pada+' · Global pada '+moon.globalPada+' · Nakshatra '+deg(moon.nakDegree);
-  document.getElementById('venusMain').textContent=SIGNS[venus.sign]+' '+deg(venus.degree);
-  document.getElementById('venusDetail').textContent=venus.nakName+' · Pada '+venus.pada+' · Global pada '+venus.globalPada+' · Nakshatra '+deg(venus.nakDegree);
-  const sep=Math.abs(((venus.lon-moon.lon+540)%360)-180);
-  document.getElementById('separation').textContent=sep.toFixed(2)+'°';
-  document.getElementById('moment').textContent=current.toLocaleString();
-  document.getElementById('momentDetail').textContent='Lahiri ayanamsa '+aya.toFixed(4)+'° · local apparent sidereal time '+(norm(A.SiderealTime(current)*15+lon)/15).toFixed(3)+' h';
-  syncInputs();
+  document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
+  document.getElementById('signProgress').textContent=(signFrac*100).toFixed(1)+'%';
+  document.getElementById('signDetail').textContent=deg(asc.degree)+' through '+SIGNS[asc.sign]+' · minute-hand angle '+signMinuteAngle.toFixed(1)+'°';
+  document.getElementById('padaProgress').textContent=(padaFrac*100).toFixed(1)+'%';
+  document.getElementById('padaDetail').textContent='Pada '+asc.pada+' · '+deg(asc.padaDegree)+' of 3°20′ · ticker angle '+padaTickerAngle.toFixed(1)+'°';
+  const lst=norm(A.SiderealTime(d)*15+lon)/15;
+  document.getElementById('lst').textContent=lst.toFixed(4)+' h';
+  document.getElementById('timeDetail').textContent=d.toLocaleString()+' · '+lat.toFixed(4)+'°, '+lon.toFixed(4)+'°';
+  document.getElementById('status').textContent=mode==='live'?'Live':'Selected time';
+  if(mode==='live')syncInputs(d);
 }
-function syncInputs(){
-  const y=current.getFullYear(),m=String(current.getMonth()+1).padStart(2,'0'),d=String(current.getDate()).padStart(2,'0'),hh=String(current.getHours()).padStart(2,'0'),mm=String(current.getMinutes()).padStart(2,'0');
-  document.getElementById('date').value=y+'-'+m+'-'+d;document.getElementById('time').value=hh+':'+mm;
+function selectedFromInputs(){const dv=document.getElementById('date').value,tv=document.getElementById('time').value;if(!dv||!tv)return null;const [y,m,d]=dv.split('-').map(Number),parts=tv.split(':').map(Number),x=new Date(y,m-1,d,parts[0]||0,parts[1]||0,parts[2]||0);return Number.isFinite(x.getTime())?x:null}
+function start(){if(timer)clearInterval(timer);timer=setInterval(draw,1000);draw()}
+document.getElementById('liveBtn').addEventListener('click',()=>{mode='live';draw()});
+document.getElementById('setBtn').addEventListener('click',()=>{const x=selectedFromInputs();if(x){selectedTime=x;mode='fixed';draw()}});
+document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()-60000);mode='fixed';syncInputs(selectedTime);draw()});
+document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';syncInputs(selectedTime);draw()});
+document.getElementById('locateBtn').addEventListener('click',startLocation);
+syncInputs(new Date());
+if(userLocation){
+  setLocationStatus(userLocation.lat.toFixed(5)+'°, '+userLocation.lon.toFixed(5)+'°','Last saved device position · refreshing automatically now.');
 }
-function selected(){
-  const dv=document.getElementById('date').value,tv=document.getElementById('time').value;if(!dv||!tv)return null;
-  const [y,m,d]=dv.split('-').map(Number),[hh,mm]=tv.split(':').map(Number);const x=new Date(y,m-1,d,hh,mm,0,0);return Number.isFinite(x.getTime())?x:null;
-}
-document.getElementById('setTime').addEventListener('click',()=>{const x=selected();if(x){current=x;document.getElementById('status').textContent='Selected time';render()}});
-document.getElementById('now').addEventListener('click',()=>{current=new Date();document.getElementById('status').textContent='Current time';render()});
-document.getElementById('minusHour').addEventListener('click',()=>{current=new Date(current.getTime()-3600000);document.getElementById('status').textContent='Selected time';render()});
-document.getElementById('plusHour').addEventListener('click',()=>{current=new Date(current.getTime()+3600000);document.getElementById('status').textContent='Selected time';render()});
-['latitude','longitude'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{document.getElementById('status').textContent='Selected location';render()}));
-render();
+start();
+startLocation();
 </script></body></html>
