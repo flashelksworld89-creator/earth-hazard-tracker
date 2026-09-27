@@ -1,0 +1,108 @@
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#02070d"><title>Geographical Ascendant Clock</title>
+<style>
+:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.18);--text:#edf7ff;--muted:#95acbf;--accent:#38bdf8}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% -20%,#12324d 0,#04111d 38%,#02070d 72%);color:var(--text);font-family:Inter,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 18px;background:rgba(2,7,13,.95);border-bottom:1px solid var(--border)}header a{color:#eaf8ff;text-decoration:none}nav{display:flex;gap:6px;flex-wrap:wrap}nav a{font-size:10px;border:1px solid var(--border);padding:7px 8px;border-radius:7px}.active{border-color:var(--accent)!important}
+main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{background:rgba(7,20,32,.92);border:1px solid var(--border);border-radius:15px;padding:14px;margin-top:12px}.hero{display:flex;justify-content:space-between;gap:18px;align-items:center}.hero h1{margin:4px 0 7px}.hero p{margin:0;color:#a5bdcf;font-size:11px;line-height:1.6}.eyebrow{font-size:9px;color:#7dd3fc;letter-spacing:.09em}.status{font-size:10px;color:#7dd3fc}
+.layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(330px,.65fr);gap:12px}.clock-card{display:flex;justify-content:center;align-items:center}.clock-wrap{width:min(900px,100%);aspect-ratio:1/1}.clock-wrap svg{width:100%;height:100%;display:block}
+.controls{display:grid;gap:9px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.controls label{font-size:9px;color:#a7becf;display:grid;gap:5px}.controls input,.controls button{width:100%;padding:10px;border-radius:9px;border:1px solid var(--border);background:#0b1b2b;color:#fff}.controls button{cursor:pointer;font-weight:700}
+.cards{display:grid;gap:9px;margin-top:12px}.card{background:#06111c;border:1px solid var(--border);border-radius:11px;padding:11px}.card small{display:block;color:#87a4b8;font-size:8px;text-transform:uppercase}.card b{display:block;font-size:19px;margin:5px 0}.card p{margin:0;color:#9fb7c8;font-size:9px;line-height:1.5}
+.legend{display:grid;gap:7px;margin-top:10px}.legend div{display:flex;gap:8px;align-items:center;font-size:9px;color:#a9c2d3}.dot{width:11px;height:11px;border-radius:50%;display:inline-block}.note{font-size:8px;color:#7891a3;line-height:1.55;margin-top:9px}
+@media(max-width:1050px){.layout{grid-template-columns:1fr}}@media(max-width:650px){header,.hero{flex-direction:column;align-items:stretch}.row{grid-template-columns:1fr}}
+</style></head><body>
+<script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/geo-clock.html'));</script>
+<header><a href="/">◎ GEOGRAPHICAL ASCENDANT CLOCK</a><nav><a href="/">Earth Tracker</a><a href="/pada-clock.html">108 Pada Clock</a><a class="active" href="/geo-clock.html">Geo Clock</a><a href="/weather.html">Landfall Cyclones</a><a href="/convective.html">Severe Convection</a></nav></header>
+<main>
+<section class="hero"><div><span class="eyebrow">LOCAL SIDEREAL TIME · LAHIRI ASCENDANT · RISING-SIGN PROGRESS</span><h1>Geographical Ascendant Clock</h1><p>The hour hand is the actual local Ascendant. The minute hand measures how far the Ascendant has progressed through the current 30° rising sign. The sweep ticker measures progress through the current 3°20′ pada, so all three hands remain synchronized to the same local rising motion.</p></div><span id="status" class="status">Live</span></section>
+<section class="layout">
+<div class="panel clock-card"><div class="clock-wrap"><svg id="clock" viewBox="0 0 900 900" role="img" aria-label="Geographical Ascendant Clock"></svg></div></div>
+<div class="panel">
+  <div class="controls">
+    <div class="row"><label>Latitude<input id="latitude" type="number" min="-89.9" max="89.9" step="0.0001" value="36.1699"></label><label>Longitude<input id="longitude" type="number" min="-180" max="180" step="0.0001" value="-115.1398"></label></div>
+    <div class="row"><label>Date<input id="date" type="date"></label><label>Time<input id="time" type="time" step="1"></label></div>
+    <div class="row"><button id="liveBtn" type="button">Use live time</button><button id="setBtn" type="button">Use selected time</button></div>
+    <div class="row"><button id="minus" type="button">− 1 minute</button><button id="plus" type="button">+ 1 minute</button></div>
+  </div>
+  <div class="cards">
+    <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
+    <div class="card"><small>Sign progress · Minute hand</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
+    <div class="card"><small>Pada ticker · Sweep hand</small><b id="padaProgress">—</b><p id="padaDetail">—</p></div>
+    <div class="card"><small>Local sidereal state</small><b id="lst">—</b><p id="timeDetail">—</p></div>
+  </div>
+  <div class="legend">
+    <div><span class="dot" style="background:#7dd3fc"></span>ASC hour hand — true sidereal longitude</div>
+    <div><span class="dot" style="background:#e8f4ff"></span>Minute hand — 0°→30° progress through current sign</div>
+    <div><span class="dot" style="background:#f9a8d4"></span>Pada ticker — 0°→3°20′ progress through current pada</div>
+  </div>
+  <div class="note">The minute and ticker hands do not use fixed civil-time rates. They are derived from the actual local Ascendant, so they naturally accelerate or slow as rising signs move at different rates for the selected latitude.</div>
+</div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+<script>
+const A=window.Astronomy;
+const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
+const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
+const svg=document.getElementById('clock');
+let mode='live',selectedTime=new Date(),timer=null;
+const norm=v=>((v%360)+360)%360;
+function lahiri(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
+function meanObliquity(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return 23+26/60+(21.448-46.8150*T-.00059*T*T+.001813*T*T*T)/3600}
+function ascendantSidereal(d,lat,lon,a){
+  const rad=Math.PI/180,lst=norm(A.SiderealTime(d)*15+lon)*rad,phi=lat*rad,eps=meanObliquity(d)*rad;
+  const y=Math.cos(lst),x=-(Math.sin(lst)*Math.cos(eps)+Math.tan(phi)*Math.sin(eps));
+  return norm(Math.atan2(y,x)/rad-a);
+}
+function pos(lon){
+  const nakSize=360/27,padaSize=360/108,sign=Math.floor(lon/30),nak=Math.floor(lon/nakSize),nakDeg=lon%nakSize;
+  return{lon,sign,degree:lon%30,nak,nakName:NAK[nak],pada:Math.floor(nakDeg/padaSize)+1,globalPada:Math.floor(lon/padaSize)+1,padaDegree:lon%padaSize};
+}
+function polar(angle,r){const a=(angle-90)*Math.PI/180;return[450+r*Math.cos(a),450+r*Math.sin(a)]}
+function line(angle,r1,r2,color,width,opacity=1){const a=polar(angle,r1),b=polar(angle,r2);return'<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+color+'" stroke-width="'+width+'" opacity="'+opacity+'"/>'}
+function textAt(angle,r,text,size,color,weight='600'){const p=polar(angle,r);return'<text x="'+p[0]+'" y="'+p[1]+'" fill="'+color+'" font-size="'+size+'" font-weight="'+weight+'" text-anchor="middle" dominant-baseline="middle">'+text+'</text>'}
+function hand(angle,r,color,width,label){const p=polar(angle,r),l=polar(angle,118);return'<line x1="450" y1="450" x2="'+p[0]+'" y2="'+p[1]+'" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round"/><circle cx="'+p[0]+'" cy="'+p[1]+'" r="5.5" fill="'+color+'"/><text x="'+l[0]+'" y="'+l[1]+'" fill="'+color+'" font-size="14" font-weight="800" text-anchor="middle" dominant-baseline="middle">'+label+'</text>'}
+function deg(v){let d=Math.floor(v),m=Math.round((v-d)*60);if(m===60){d++;m=0}return d+'° '+String(m).padStart(2,'0')+'′'}
+function syncInputs(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'),hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0'),ss=String(d.getSeconds()).padStart(2,'0');document.getElementById('date').value=y+'-'+m+'-'+day;document.getElementById('time').value=hh+':'+mm+':'+ss}
+function currentMoment(){return mode==='live'?new Date():selectedTime}
+function draw(){
+  const d=currentMoment(),lat=Number(document.getElementById('latitude').value),lon=Number(document.getElementById('longitude').value);
+  if(!A||!Number.isFinite(lat)||!Number.isFinite(lon)){document.getElementById('status').textContent='Invalid configuration';return}
+  const aya=lahiri(d),asc=pos(ascendantSidereal(d,lat,lon,aya));
+  const signFrac=asc.degree/30;
+  const signMinuteAngle=signFrac*360;
+  const padaSize=360/108,padaFrac=asc.padaDegree/padaSize,padaTickerAngle=padaFrac*360;
+  let out='<rect width="900" height="900" fill="#04101b"/><circle cx="450" cy="450" r="420" fill="#06121e" stroke="rgba(124,185,255,.25)" stroke-width="2"/>';
+  for(let i=0;i<12;i++){
+    const a=i*30;out+=line(a,270,420,'#48baf4',1.7,.8);out+=textAt(a+15,383,GLYPHS[i],27,'#eef8ff','700');out+=textAt(a+15,355,SIGNS[i],10,'#bed9e8','700');
+  }
+  for(let i=0;i<108;i++){const a=i*(360/108),major=i%9===0,pada=i%1===0;out+=line(a,major?270:300,major?420:330,major?'#7dd3fc':'#4b6578',major?1.4:.55,major?.8:.6)}
+  for(let i=0;i<9;i++){out+=line(i*40,190,265,'#9fb7c8',1,.65);out+=textAt(i*40+20,230,String(i+1),11,'#c8d9e5','700')}
+  for(let i=0;i<60;i++){out+=line(i*6,i%5===0?150:165,190,i%5===0?'#8aa8bc':'#4e6575',i%5===0?1:.5,.7)}
+  out+='<circle cx="450" cy="450" r="145" fill="#07121d" stroke="rgba(124,185,255,.18)" stroke-width="2"/>';
+  out+=hand(asc.lon,175,'#7dd3fc',7,'ASC');
+  out+=hand(signMinuteAngle,162,'#e8f4ff',5,'MIN');
+  out+=hand(padaTickerAngle,150,'#f9a8d4',3.5,'P');
+  out+='<circle cx="450" cy="450" r="8" fill="#eef8ff"/><text x="450" y="435" fill="#eef8ff" font-size="18" font-weight="800" text-anchor="middle">LOCAL ASC</text><text x="450" y="458" fill="#7dd3fc" font-size="10" text-anchor="middle">SIGN + PADA MOTION</text>';
+  svg.innerHTML=out;
+  document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
+  document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
+  document.getElementById('signProgress').textContent=(signFrac*100).toFixed(1)+'%';
+  document.getElementById('signDetail').textContent=deg(asc.degree)+' through '+SIGNS[asc.sign]+' · minute-hand angle '+signMinuteAngle.toFixed(1)+'°';
+  document.getElementById('padaProgress').textContent=(padaFrac*100).toFixed(1)+'%';
+  document.getElementById('padaDetail').textContent='Pada '+asc.pada+' · '+deg(asc.padaDegree)+' of 3°20′ · ticker angle '+padaTickerAngle.toFixed(1)+'°';
+  const lst=norm(A.SiderealTime(d)*15+lon)/15;
+  document.getElementById('lst').textContent=lst.toFixed(4)+' h';
+  document.getElementById('timeDetail').textContent=d.toLocaleString()+' · '+lat.toFixed(4)+'°, '+lon.toFixed(4)+'°';
+  document.getElementById('status').textContent=mode==='live'?'Live':'Selected time';
+  if(mode==='live')syncInputs(d);
+}
+function selectedFromInputs(){const dv=document.getElementById('date').value,tv=document.getElementById('time').value;if(!dv||!tv)return null;const [y,m,d]=dv.split('-').map(Number),parts=tv.split(':').map(Number),x=new Date(y,m-1,d,parts[0]||0,parts[1]||0,parts[2]||0);return Number.isFinite(x.getTime())?x:null}
+function start(){if(timer)clearInterval(timer);timer=setInterval(draw,1000);draw()}
+document.getElementById('liveBtn').addEventListener('click',()=>{mode='live';draw()});
+document.getElementById('setBtn').addEventListener('click',()=>{const x=selectedFromInputs();if(x){selectedTime=x;mode='fixed';draw()}});
+document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()-60000);mode='fixed';syncInputs(selectedTime);draw()});
+document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';syncInputs(selectedTime);draw()});
+['latitude','longitude'].forEach(id=>document.getElementById(id).addEventListener('change',draw));
+syncInputs(new Date());start();
+</script></body></html>
