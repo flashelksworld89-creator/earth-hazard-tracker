@@ -30,16 +30,16 @@
   <div class="controls">
     <input id="videoInput" placeholder="Paste YouTube URL or video ID">
     <button id="loadBtn">Play</button>
-    <div class="note">This player stays alive while you switch between Earth Tracker, Leader Agents, Aviation Agent, Weather Agent, World Focus and Pattern Lab.</div>
+    <div class="note">This player stays alive while you switch between Earth Tracker, Leader Agents, Aviation Agent, Weather Agent, Severe Convection, World Focus and Pattern Lab.</div>
   </div>
 </div>
 <button id="launch" class="launch" aria-label="Open persistent video player">▶ Video</button>
 <script>
 const frame=document.getElementById('siteFrame'),player=document.getElementById('player'),launch=document.getElementById('launch');
 const params=new URLSearchParams(location.search);
-const allowed=['/','/news.html','/aviation.html','/weather.html','/worldfocus.html','/patterns.html'];
+const allowed=['/','/news.html','/aviation.html','/weather.html','/convective.html','/worldfocus.html','/patterns.html'];
 const initial=allowed.includes(params.get('page'))?params.get('page'):'/';
-frame.src=initial+(initial.includes('?')?'&':'?')+'build=20260926w';
+frame.src=initial+(initial.includes('?')?'&':'?')+'build=20260926c';
 
 function extractYouTubeId(value){
  const v=String(value||'').trim();
