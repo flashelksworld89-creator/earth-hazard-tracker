@@ -135,8 +135,9 @@ async function searchCity(){
 function acceptLocation(pos){
   const lat=Number(pos.coords.latitude),lon=Number(pos.coords.longitude),accuracy=Number(pos.coords.accuracy);
   if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
-  userLocation={lat,lon,accuracy,cached:false,source:'gps'};
-  try{localStorage.setItem('geoClockLocation',JSON.stringify({lat,lon,accuracy,ts:Date.now()}));}catch(_){}
+  const timeZone=timeZoneFor(lat,lon);
+  userLocation={lat,lon,accuracy,cached:false,source:'gps',timeZone};
+  try{localStorage.setItem('geoClockLocation',JSON.stringify({lat,lon,accuracy,ts:Date.now(),source:'gps',timeZone}));}catch(_){}
   setLocationStatus(lat.toFixed(5)+'°, '+lon.toFixed(5)+'°',
     'Device location · accuracy about '+(Number.isFinite(accuracy)?Math.round(accuracy)+' m':'unknown')+' · '+timeZone+'. Coordinates update automatically as the device moves.');
   draw();
