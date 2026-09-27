@@ -18,10 +18,11 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
 <div class="panel clock-card"><div class="clock-wrap"><svg id="clock" viewBox="0 0 900 900" role="img" aria-label="Geographical Ascendant Clock"></svg></div></div>
 <div class="panel">
   <div class="controls">
-    <div class="row"><label>Latitude<input id="latitude" type="number" min="-89.9" max="89.9" step="0.0001" value="36.1699"></label><label>Longitude<input id="longitude" type="number" min="-180" max="180" step="0.0001" value="-115.1398"></label></div>
+    <div class="card"><small>Automatic geographic location</small><b id="locationMain">Locating…</b><p id="locationDetail">Allow location access when your browser asks. Coordinates are detected automatically and updated as your device moves.</p></div>
     <div class="row"><label>Date<input id="date" type="date"></label><label>Time<input id="time" type="time" step="1"></label></div>
     <div class="row"><button id="liveBtn" type="button">Use live time</button><button id="setBtn" type="button">Use selected time</button></div>
     <div class="row"><button id="minus" type="button">− 1 minute</button><button id="plus" type="button">+ 1 minute</button></div>
+    <button id="locateBtn" type="button">Refresh automatic location</button>
   </div>
   <div class="cards">
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
@@ -34,7 +35,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div><span class="dot" style="background:#e8f4ff"></span>Minute hand — 0°→30° progress through current sign</div>
     <div><span class="dot" style="background:#f9a8d4"></span>Pada ticker — 0°→3°20′ progress through current pada</div>
   </div>
-  <div class="note">The minute and ticker hands do not use fixed civil-time rates. They are derived from the actual local Ascendant, so they naturally accelerate or slow as rising signs move at different rates for the selected latitude.</div>
+  <div class="note">The minute and ticker hands do not use fixed civil-time rates. They are derived from the actual local Ascendant, so they naturally accelerate or slow as rising signs move at different rates for your detected latitude. Location is requested automatically through the browser; no coordinate entry is required.</div>
 </div>
 </section>
 </main>
@@ -45,7 +46,49 @@ const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio',
 const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
 const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
 const svg=document.getElementById('clock');
-let mode='live',selectedTime=new Date(),timer=null;
+let mode='live',selectedTime=new Date(),timer=null,watchId=null;
+let userLocation=null;
+try{
+  const saved=JSON.parse(localStorage.getItem('geoClockLocation')||'null');
+  if(saved&&Number.isFinite(saved.lat)&&Number.isFinite(saved.lon)){
+    userLocation={lat:saved.lat,lon:saved.lon,accuracy:saved.accuracy||null,cached:true};
+  }
+}catch(_){}
+
+function setLocationStatus(message,detail){
+  document.getElementById('locationMain').textContent=message;
+  document.getElementById('locationDetail').textContent=detail;
+}
+function acceptLocation(pos){
+  const lat=Number(pos.coords.latitude),lon=Number(pos.coords.longitude),accuracy=Number(pos.coords.accuracy);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
+  userLocation={lat,lon,accuracy,cached:false};
+  try{localStorage.setItem('geoClockLocation',JSON.stringify({lat,lon,accuracy,ts:Date.now()}));}catch(_){}
+  setLocationStatus(lat.toFixed(5)+'°, '+lon.toFixed(5)+'°',
+    'Device location · accuracy about '+(Number.isFinite(accuracy)?Math.round(accuracy)+' m':'unknown')+'. Coordinates update automatically as the device moves.');
+  draw();
+}
+function locationError(err){
+  const reason=err&&err.code===1?'Location permission was denied.':err&&err.code===2?'Your device could not determine a location.':'Location request timed out.';
+  if(userLocation){
+    setLocationStatus(userLocation.lat.toFixed(5)+'°, '+userLocation.lon.toFixed(5)+'°',
+      reason+' Using the last saved position until a new device location is available.');
+    draw();
+  }else{
+    setLocationStatus('Location required',reason+' This clock needs geographic location to calculate the local Ascendant accurately.');
+    document.getElementById('status').textContent='Location required';
+  }
+}
+function startLocation(){
+  if(!navigator.geolocation){
+    locationError({code:2});
+    return;
+  }
+  setLocationStatus('Locating…','Requesting your device position automatically.');
+  navigator.geolocation.getCurrentPosition(acceptLocation,locationError,{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
+  if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+  watchId=navigator.geolocation.watchPosition(acceptLocation,locationError,{enableHighAccuracy:true,timeout:20000,maximumAge:30000});
+}
 const norm=v=>((v%360)+360)%360;
 function lahiri(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
 function meanObliquity(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return 23+26/60+(21.448-46.8150*T-.00059*T*T+.001813*T*T*T)/3600}
@@ -66,8 +109,10 @@ function deg(v){let d=Math.floor(v),m=Math.round((v-d)*60);if(m===60){d++;m=0}re
 function syncInputs(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'),hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0'),ss=String(d.getSeconds()).padStart(2,'0');document.getElementById('date').value=y+'-'+m+'-'+day;document.getElementById('time').value=hh+':'+mm+':'+ss}
 function currentMoment(){return mode==='live'?new Date():selectedTime}
 function draw(){
-  const d=currentMoment(),lat=Number(document.getElementById('latitude').value),lon=Number(document.getElementById('longitude').value);
-  if(!A||!Number.isFinite(lat)||!Number.isFinite(lon)){document.getElementById('status').textContent='Invalid configuration';return}
+  const d=currentMoment();
+  if(!A){document.getElementById('status').textContent='Astronomy engine unavailable';return}
+  if(!userLocation){document.getElementById('status').textContent='Locating…';return}
+  const lat=userLocation.lat,lon=userLocation.lon;
   const aya=lahiri(d),asc=pos(ascendantSidereal(d,lat,lon,aya));
   const signFrac=asc.degree/30;
   const signMinuteAngle=signFrac*360;
@@ -103,6 +148,11 @@ document.getElementById('liveBtn').addEventListener('click',()=>{mode='live';dra
 document.getElementById('setBtn').addEventListener('click',()=>{const x=selectedFromInputs();if(x){selectedTime=x;mode='fixed';draw()}});
 document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()-60000);mode='fixed';syncInputs(selectedTime);draw()});
 document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';syncInputs(selectedTime);draw()});
-['latitude','longitude'].forEach(id=>document.getElementById(id).addEventListener('change',draw));
-syncInputs(new Date());start();
+document.getElementById('locateBtn').addEventListener('click',startLocation);
+syncInputs(new Date());
+if(userLocation){
+  setLocationStatus(userLocation.lat.toFixed(5)+'°, '+userLocation.lon.toFixed(5)+'°','Last saved device position · refreshing automatically now.');
+}
+start();
+startLocation();
 </script></body></html>
