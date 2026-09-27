@@ -99,6 +99,7 @@ function ascendantSidereal(d,lat,lon,a){
   return norm(Math.atan2(y,x)/rad-a);
 }
 function pos(lon){
+  lon=norm(lon);
   const nakSize=360/27,padaSize=360/108,sign=Math.floor(lon/30),nak=Math.floor(lon/nakSize),nakDeg=lon%nakSize;
   return{lon,sign,degree:lon%30,nak,nakName:NAK[nak],pada:Math.floor(nakDeg/padaSize)+1,globalPada:Math.floor(lon/padaSize)+1,padaDegree:lon%padaSize};
 }
@@ -121,6 +122,8 @@ function draw(){
   const signFrac=asc.degree/30;
   const signMinuteAngle=signFrac*360;
   const padaSize=360/108,padaFrac=asc.padaDegree/padaSize,secondAngle=padaFrac*360;
+  const minutePos=pos(signMinuteAngle);
+  const secondPos=pos(secondAngle);
   let out='<rect width="900" height="900" fill="#04101b"/><circle cx="450" cy="450" r="420" fill="#06121e" stroke="rgba(124,185,255,.25)" stroke-width="2"/>';
   for(let i=0;i<12;i++){
     const a=i*30;out+=line(a,270,420,'#48baf4',1.7,.8);out+=textAt(a+15,383,GLYPHS[i],27,'#eef8ff','700');out+=textAt(a+15,355,SIGNS[i],10,'#bed9e8','700');
@@ -136,10 +139,10 @@ function draw(){
   svg.innerHTML=out;
   document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
   document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
-  document.getElementById('signProgress').textContent=GLYPHS[asc.sign]+' '+SIGNS[asc.sign]+' · '+asc.nakName;
-  document.getElementById('signDetail').textContent='Minute hand · '+deg(asc.degree)+' through '+SIGNS[asc.sign]+' · '+(signFrac*100).toFixed(1)+'% of sign · angle '+signMinuteAngle.toFixed(1)+'°';
-  document.getElementById('padaProgress').textContent=GLYPHS[asc.sign]+' '+SIGNS[asc.sign]+' · '+asc.nakName+' P'+asc.pada;
-  document.getElementById('padaDetail').textContent='Second hand · Pada '+asc.pada+' · '+deg(asc.padaDegree)+' of 3°20′ · '+(padaFrac*100).toFixed(1)+'% of pada · angle '+secondAngle.toFixed(1)+'°';
+  document.getElementById('signProgress').textContent=GLYPHS[minutePos.sign]+' '+SIGNS[minutePos.sign]+' · '+minutePos.nakName+' P'+minutePos.pada;
+  document.getElementById('signDetail').textContent='Minute hand position '+deg(minutePos.degree)+' · '+(signFrac*100).toFixed(1)+'% through ASC sign · hand angle '+signMinuteAngle.toFixed(1)+'°';
+  document.getElementById('padaProgress').textContent=GLYPHS[secondPos.sign]+' '+SIGNS[secondPos.sign]+' · '+secondPos.nakName+' P'+secondPos.pada;
+  document.getElementById('padaDetail').textContent='Second hand position '+deg(secondPos.degree)+' · '+(padaFrac*100).toFixed(1)+'% through current ASC pada · hand angle '+secondAngle.toFixed(1)+'°';
   const lst=norm(A.SiderealTime(d)*15+lon)/15;
   document.getElementById('lst').textContent=lst.toFixed(4)+' h';
   document.getElementById('timeDetail').textContent=d.toLocaleString()+' · '+lat.toFixed(4)+'°, '+lon.toFixed(4)+'°';
