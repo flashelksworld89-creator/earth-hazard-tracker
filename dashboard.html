@@ -37,9 +37,9 @@
 <script>
 const frame=document.getElementById('siteFrame'),player=document.getElementById('player'),launch=document.getElementById('launch');
 const params=new URLSearchParams(location.search);
-const allowed=['/','/news.html','/aviation.html','/weather.html','/convective.html','/worldfocus.html','/patterns.html'];
+const allowed=['/','/news.html','/aviation.html','/weather.html','/convective.html','/pada-clock.html','/worldfocus.html','/patterns.html'];
 const initial=allowed.includes(params.get('page'))?params.get('page'):'/';
-frame.src=initial+(initial.includes('?')?'&':'?')+'build=20260926c';
+frame.src=initial+(initial.includes('?')?'&':'?')+'build=20260926p';
 
 function extractYouTubeId(value){
  const v=String(value||'').trim();
