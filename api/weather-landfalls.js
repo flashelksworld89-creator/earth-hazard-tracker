@@ -63,8 +63,11 @@ export default async function handler(req,res){
     const rows=parseCsv(await r.text()).filter(row=>{
       const t=iso(row); if(!t)return false;
       const day=t.slice(0,10); if(day<start||day>end)return false;
-      const tt=String(row.TRACK_TYPE||'').toLowerCase();
-      return !tt.includes('spur');
+      const tt=String(row.TRACK_TYPE||'').trim().toUpperCase();
+      // Count only the primary/best track. IBTrACS may also include
+      // provisional or spur tracks for recent storms; those can duplicate
+      // or distort coastline-crossing windows if mixed into the same SID.
+      return tt==='MAIN' || tt==='';
     });
     const byStorm=new Map();
     for(const row of rows){
@@ -110,7 +113,7 @@ export default async function handler(req,res){
       }
     }
     events.sort((a,b)=>new Date(b.landfallAt)-new Date(a.landfallAt));
-    res.status(200).json({ok:true,start,end,count:events.length,events,source:SOURCE,fetchedAt:new Date().toISOString(),method:'Distinct valid LANDFALL=0 runs only; blank numeric cells are excluded; intensity uses WMO wind when present and otherwise strongest available agency wind across the landfall interval; timestamp is the midpoint of the IBTrACS crossing window'});
+    res.status(200).json({ok:true,start,end,count:events.length,events,source:SOURCE,fetchedAt:new Date().toISOString(),method:'Primary/main-track rows only; distinct valid LANDFALL=0 runs; blank numeric cells excluded; intensity uses WMO wind when present and otherwise strongest available agency wind across the landfall interval; timestamp is the midpoint of the IBTrACS crossing window'});
   }catch(error){
     res.status(502).json({ok:false,error:String(error?.message||error),events:[]});
   }
