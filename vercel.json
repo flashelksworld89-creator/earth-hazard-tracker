@@ -14,6 +14,9 @@
     },
     "api/weather-landfalls.js": {
       "maxDuration": 60
+    },
+    "api/severe-convective.js": {
+      "maxDuration": 60
     }
   },
   "headers": [
