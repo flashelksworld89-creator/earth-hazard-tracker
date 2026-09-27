@@ -1,30 +1,10 @@
-import { gunzipSync } from 'node:zlib';
+import { createGunzip } from 'node:zlib';
+import { Readable } from 'node:stream';
 
 const INDEX='https://www.ncei.noaa.gov/pub/data/swdi/stormevents/csvfiles/';
 
-function parseCsv(text){
-  const rows=[];let row=[],field='',quoted=false;
-  const pushField=()=>{row.push(field);field=''};
-  const pushRow=()=>{pushField();rows.push(row);row=[]};
-  const s=String(text||'');
-  for(let i=0;i<s.length;i++){
-    const ch=s[i];
-    if(ch==='"'){
-      if(quoted&&s[i+1]==='"'){field+='"';i++}else quoted=!quoted;
-    }else if(ch===','&&!quoted)pushField();
-    else if((ch==='\n'||ch==='\r')&&!quoted){
-      if(ch==='\r'&&s[i+1]==='\n')i++;
-      if(row.length||field)pushRow();
-    }else field+=ch;
-  }
-  if(row.length||field)pushRow();
-  if(!rows.length)return [];
-  const headers=rows.shift().map(h=>String(h||'').replace(/^\uFEFF/,''));
-  return rows.filter(r=>r.some(v=>String(v||'').trim()!=='')).map(vals=>{
-    const o={};headers.forEach((h,i)=>o[h]=vals[i]??'');return o;
-  });
-}
 const num=v=>{const raw=String(v??'').trim();if(!raw)return null;const n=Number(raw);return Number.isFinite(n)?n:null};
+
 function timestamp(row,prefix='BEGIN'){
   const ym=String(row[prefix+'_YEARMONTH']||''),day=Number(row[prefix+'_DAY']),hhmm=String(row[prefix+'_TIME']||'0').padStart(4,'0');
   if(!/^\d{6}$/.test(ym)||!day)return null;
@@ -59,30 +39,88 @@ function severity(row){
   const type=String(row.EVENT_TYPE||'').trim(),mag=num(row.MAGNITUDE);
   if(mag===null)return{score:0,mag:null,unit:''};
   if(type==='Thunderstorm Wind')return{score:mag/50,mag,unit:'kt'};
-  if(type==='Hail')return{score:mag/1,mag,unit:'in'};
+  if(type==='Hail')return{score:mag,mag,unit:'in'};
   return{score:0,mag,unit:''};
+}
+function rowObject(headers,values){
+  const o={};for(let i=0;i<headers.length;i++)o[headers[i]]=values[i]??'';return o;
+}
+async function streamCsv(readable,onRow){
+  let headers=null,row=[],field='',quoted=false,pendingQuote=false;
+  const finishField=()=>{row.push(field);field=''};
+  const finishRow=async()=>{
+    finishField();
+    if(!headers)headers=row.map(h=>String(h||'').replace(/^\uFEFF/,''));
+    else if(row.some(v=>String(v||'').trim()!==''))await onRow(rowObject(headers,row));
+    row=[];
+  };
+  for await(const chunk of readable){
+    const s=chunk.toString('utf8');
+    for(let i=0;i<s.length;i++){
+      const ch=s[i];
+
+      if(pendingQuote){
+        pendingQuote=false;
+        if(ch==='"'){field+='"';continue}
+        quoted=false;
+        // fall through and process current character outside the quote
+      }
+
+      if(ch==='"'){
+        if(quoted){
+          if(i+1<s.length){
+            if(s[i+1]==='"'){field+='"';i++}
+            else quoted=false;
+          }else{
+            pendingQuote=true;
+          }
+        }else{
+          quoted=true;
+        }
+      }else if(ch===','&&!quoted){
+        finishField();
+      }else if((ch==='\n'||ch==='\r')&&!quoted){
+        if(ch==='\r'&&s[i+1]==='\n')i++;
+        if(row.length||field)await finishRow();
+      }else{
+        field+=ch;
+      }
+    }
+  }
+  if(pendingQuote){quoted=false;pendingQuote=false}
+  if(row.length||field)await finishRow();
 }
 
 export default async function handler(req,res){
   res.setHeader('Cache-Control','s-maxage=21600, stale-while-revalidate=86400');
+  res.setHeader('Content-Type','application/json; charset=utf-8');
   const year=Number(req.query?.year||new Date().getUTCFullYear());
   try{
-    const file=await latestFile(year),url=INDEX+file,r=await fetch(url,{cache:'no-store',headers:{'User-Agent':'Earth-Hazard-Tracker/Convective-Agent'}});
+    const file=await latestFile(year),url=INDEX+file;
+    const r=await fetch(url,{cache:'no-store',headers:{'User-Agent':'Earth-Hazard-Tracker/Convective-Agent'}});
     if(!r.ok)throw new Error('Storm Events HTTP '+r.status);
-    const rows=parseCsv(gunzipSync(Buffer.from(await r.arrayBuffer())).toString('utf8'));
-    const episodes=new Map();
-    for(const row of rows){
-      if(!isConvective(row))continue;
-      const at=timestamp(row,'BEGIN');if(!at||new Date(at)>new Date())continue;
-      const id=String(row.EPISODE_ID||'').trim();if(!id)continue;
+    if(!r.body)throw new Error('Storm Events response body unavailable');
+
+    const episodes=new Map();let scanned=0,matched=0;
+    const gunzip=Readable.fromWeb(r.body).pipe(createGunzip());
+
+    await streamCsv(gunzip,async row=>{
+      scanned++;
+      if(!isConvective(row))return;
+      matched++;
+      const at=timestamp(row,'BEGIN');if(!at||new Date(at)>new Date())return;
+      const id=String(row.EPISODE_ID||'').trim();if(!id)return;
+
       const sev=severity(row);
       const narrative=(String(row.EPISODE_NARRATIVE||'')+' '+String(row.EVENT_NARRATIVE||'')).trim();
       const state=String(row.STATE||'').trim(),tag=mcsTag(narrative);
+
       const e=episodes.get(id)||{
         id:'NCEI-EP-'+id,episodeId:id,startAt:at,endAt:timestamp(row,'END')||at,peakAt:at,
         peakType:String(row.EVENT_TYPE||''),peakMagnitude:sev.mag,peakUnit:sev.unit,peakScore:sev.score,
         maxWindKt:null,maxHailIn:null,reportCount:0,states:[],mcsTag:null,narrative:'',source:'NOAA/NWS Storm Events'
       };
+
       e.reportCount++;
       if(state&&!e.states.includes(state))e.states.push(state);
       if(at<e.startAt)e.startAt=at;
@@ -93,10 +131,15 @@ export default async function handler(req,res){
       if(tag&&!e.mcsTag)e.mcsTag=tag;
       if(narrative.length>e.narrative.length)e.narrative=narrative.slice(0,900);
       episodes.set(id,e);
-    }
+    });
+
     const events=[...episodes.values()].filter(e=>e.reportCount>0).sort((a,b)=>new Date(b.peakAt)-new Date(a.peakAt));
-    res.status(200).json({ok:true,year,count:events.length,mcsTagged:events.filter(e=>e.mcsTag).length,events,source:url,fetchedAt:new Date().toISOString(),coverageNote:'Storm Events is quality-controlled and may lag the present date.'});
+    return res.status(200).json({
+      ok:true,year,count:events.length,mcsTagged:events.filter(e=>e.mcsTag).length,
+      scannedRows:scanned,convectiveRows:matched,events,source:url,fetchedAt:new Date().toISOString(),
+      coverageNote:'Storm Events is quality-controlled and may lag the present date.'
+    });
   }catch(error){
-    res.status(502).json({ok:false,year,error:String(error?.message||error),events:[]});
+    return res.status(502).json({ok:false,year,error:String(error?.message||error),events:[]});
   }
 }
