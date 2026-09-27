@@ -22,12 +22,13 @@ function parseCsv(text){
     const o={};headers.forEach((h,i)=>o[h]=vals[i]??'');return o;
   });
 }
-const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
+const num=v=>{const raw=String(v??'').trim();if(!raw)return null;const n=Number(raw);return Number.isFinite(n)?n:null};
 function wind(row){
-  for(const k of ['WMO_WIND','USA_WIND','TOKYO_WIND','CMA_WIND','HKO_WIND','NEWDELHI_WIND','REUNION_WIND','BOM_WIND','NADI_WIND','WELLINGTON_WIND']){
-    const n=num(row[k]);if(n!==null&&n>=0)return n;
-  }
-  return null;
+  const preferred=num(row.WMO_WIND);
+  if(preferred!==null&&preferred>0)return preferred;
+  const vals=['USA_WIND','TOKYO_WIND','CMA_WIND','HKO_WIND','NEWDELHI_WIND','REUNION_WIND','BOM_WIND','NADI_WIND','WELLINGTON_WIND']
+    .map(k=>num(row[k])).filter(n=>n!==null&&n>0);
+  return vals.length?Math.max(...vals):null;
 }
 function pressure(row){
   for(const k of ['WMO_PRES','USA_PRES','TOKYO_PRES','CMA_PRES','HKO_PRES','NEWDELHI_PRES','REUNION_PRES','BOM_PRES','NADI_PRES','WELLINGTON_PRES']){
@@ -82,8 +83,12 @@ export default async function handler(req,res){
         inZeroRun=true;
         const next=track[i+1],nextTime=next?iso(next):null;
         const landfallAt=nextTime?midpoint(t,nextTime):t;
-        const w=wind(row),p=pressure(row);
-        if(w!==null&&w<34)continue;
+        const nextWind=next?wind(next):null;
+        const winds=[wind(row),nextWind].filter(Number.isFinite);
+        const w=winds.length?Math.max(...winds):null;
+        const pressures=[pressure(row),next?pressure(next):null].filter(Number.isFinite);
+        const p=pressures.length?Math.min(...pressures):null;
+        if(w===null||w<34)continue;
         events.push({
           id:sid+'-'+t,
           sid,
@@ -99,12 +104,13 @@ export default async function handler(req,res){
           category:category(w),
           dist2landKm:dist,
           nature:String(row.NATURE||'').trim(),
+          landfallFlag:lf,
           source:'NOAA IBTrACS v04r01'
         });
       }
     }
     events.sort((a,b)=>new Date(b.landfallAt)-new Date(a.landfallAt));
-    res.status(200).json({ok:true,start,end,count:events.length,events,source:SOURCE,fetchedAt:new Date().toISOString(),method:'Distinct LANDFALL=0 runs; timestamp estimated at midpoint of current and next IBTrACS observation'});
+    res.status(200).json({ok:true,start,end,count:events.length,events,source:SOURCE,fetchedAt:new Date().toISOString(),method:'Distinct valid LANDFALL=0 runs only; blank numeric cells are excluded; intensity uses WMO wind when present and otherwise strongest available agency wind across the landfall interval; timestamp is the midpoint of the IBTrACS crossing window'});
   }catch(error){
     res.status(502).json({ok:false,error:String(error?.message||error),events:[]});
   }
