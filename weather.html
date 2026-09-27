@@ -8,8 +8,8 @@ main{width:min(1450px,calc(100% - 24px));margin:18px auto 60px}.panel,.hero{back
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}.metric,.card{background:#06111c;border:1px solid var(--border);border-radius:11px;padding:11px}.metric small,.card small{display:block;color:#82a0b3;font-size:8px;text-transform:uppercase}.metric b,.card b{display:block;font-size:18px;margin-top:5px}.metric span,.card p{color:#91a9bb;font-size:9px;line-height:1.45}
 .head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.head strong{font-size:11px;letter-spacing:.07em}.status{font-size:9px;color:#67e8f9}
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.chartbox{background:#06111c;border:1px solid var(--border);border-radius:10px;padding:10px}.chartbox h3{font-size:10px;margin:0 0 8px}.bar{display:grid;grid-template-columns:150px 1fr 34px;gap:7px;align-items:center;margin:4px 0;font-size:8px}.track{height:8px;background:#0d2638;border-radius:99px;overflow:hidden}.fill{height:100%;background:linear-gradient(90deg,#2563eb,#38bdf8)}
-.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.table-wrap{overflow:auto;max-height:650px;border:1px solid rgba(124,185,255,.1);border-radius:9px}table{border-collapse:collapse;width:100%;min-width:1100px;font-size:8px}th,td{padding:7px 8px;text-align:left;border-bottom:1px solid rgba(124,185,255,.08)}th{position:sticky;top:0;background:#081724;color:#bfd9e7}.note{font-size:8px;color:#748c9d;line-height:1.5;margin-top:8px}
-@media(max-width:950px){.chart-grid,.summary,.metrics{grid-template-columns:1fr 1fr}}@media(max-width:650px){header,.hero{flex-direction:column;align-items:stretch}.chart-grid,.summary,.metrics{grid-template-columns:1fr}}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.intensity-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.intensity-card{background:#06111c;border:1px solid var(--border);border-radius:10px;padding:11px}.intensity-card h3{margin:0 0 8px;font-size:10px}.intensity-card p{margin:5px 0;color:#9fb7c7;font-size:9px;line-height:1.5}.intensity-card b{color:#eef8ff}.table-wrap{overflow:auto;max-height:650px;border:1px solid rgba(124,185,255,.1);border-radius:9px}table{border-collapse:collapse;width:100%;min-width:1100px;font-size:8px}th,td{padding:7px 8px;text-align:left;border-bottom:1px solid rgba(124,185,255,.08)}th{position:sticky;top:0;background:#081724;color:#bfd9e7}.note{font-size:8px;color:#748c9d;line-height:1.5;margin-top:8px}
+@media(max-width:950px){.chart-grid,.summary,.metrics,.intensity-grid{grid-template-columns:1fr 1fr}}@media(max-width:650px){header,.hero{flex-direction:column;align-items:stretch}.chart-grid,.summary,.metrics,.intensity-grid{grid-template-columns:1fr}}
 </style></head><body>
 <script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/weather.html'));</script>
 <header><a href="/">◎ LANDFALL CYCLONE REPORT</a><nav><a href="/">Earth Tracker</a><a href="/aviation.html">Aviation</a><a class="active" href="/weather.html">Landfall Cyclones</a><a href="/convective.html">Severe Convection</a><a href="/patterns.html">Pattern Lab</a></nav></header>
@@ -33,6 +33,12 @@ main{width:min(1450px,calc(100% - 24px));margin:18px auto 60px}.panel,.hero{back
 <div class="chartbox"><h3>Venus sign at landfall</h3><div id="venusSignChart"></div></div>
 <div class="chartbox"><h3>Venus nakshatra at landfall</h3><div id="venusNakChart"></div></div>
 </div></section>
+
+<section class="panel"><div class="head"><strong>INTENSITY PATTERN REPORT</strong><select id="intensityYear"></select></div>
+<div class="intensity-grid">
+<div class="intensity-card"><h3>Top 10% strongest landfalls</h3><div id="top10Report"></div></div>
+<div class="intensity-card"><h3>Lower 90% landfalls</h3><div id="lower90Report"></div></div>
+</div><div class="note">Intensity is ranked by maximum sustained wind at the landfall interval. The top group contains the strongest 10% of landfalls for the selected year, with a minimum of one event.</div></section>
 
 <section class="panel"><div class="head"><strong>LANDFALL DATASET</strong><span id="count" class="status">0 rows</span></div><div class="table-wrap"><table><thead><tr><th>Landfall time</th><th>Storm</th><th>Basin</th><th>Wind</th><th>Category</th><th>Moon sign</th><th>Moon nakshatra</th><th>Venus sign</th><th>Venus nakshatra</th></tr></thead><tbody id="body"></tbody></table></div><div class="note">IBTrACS defines LANDFALL=0 as a coastline crossing between the current and next track observation. This page uses the midpoint of that observation window as the estimated landfall time. The IBTrACS land mask covers continents and islands larger than 1,400 km².</div></section>
 </main>
@@ -60,7 +66,23 @@ function renderYear(){
   document.getElementById('highNak').textContent=hin?.[0]||'—';document.getElementById('highNakNote').textContent=hin?hin[1]+' landfalls in '+y:'No landfalls';
   document.getElementById('lowNak').textContent=lon?.[0]||'—';document.getElementById('lowNakNote').textContent=lon?lon[1]+' landfalls in '+y:'No landfalls';
 }
-function render(){
+function modeLabel(arr,getter){if(!arr.length)return'—';const m=counts(arr.map(getter));const top=[...m].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0];return top?top[0]+' · '+top[1]:'—'}
+function intensitySummary(arr){
+  if(!arr.length)return'<p>No events in this group.</p>';
+  return '<p><b>Moon zodiac:</b> '+modeLabel(arr,x=>SIGNS[x.moon.sign])+'</p>'+
+    '<p><b>Moon nakshatra:</b> '+modeLabel(arr,x=>x.moon.nak)+'</p>'+
+    '<p><b>Venus zodiac:</b> '+modeLabel(arr,x=>SIGNS[x.venus.sign])+'</p>'+
+    '<p><b>Venus nakshatra:</b> '+modeLabel(arr,x=>x.venus.nak)+'</p>'+
+    '<p><b>Sample:</b> '+arr.length+'</p>';
+}
+function renderIntensity(){
+  const y=Number(document.getElementById('intensityYear').value);
+  const yearly=rows.filter(x=>new Date(x.landfallAt).getUTCFullYear()===y&&Number.isFinite(x.windKt)).sort((a,b)=>b.windKt-a.windKt);
+  const n=yearly.length?Math.max(1,Math.ceil(yearly.length*.10)):0;
+  const top10=yearly.slice(0,n),lower=yearly.slice(n);
+  document.getElementById('top10Report').innerHTML=intensitySummary(top10);
+  document.getElementById('lower90Report').innerHTML=intensitySummary(lower);
+}function render(){
   const currentYear=new Date().getUTCFullYear();
   document.getElementById('total').textContent=rows.length;
   document.getElementById('thisYear').textContent=rows.filter(x=>new Date(x.landfallAt).getUTCFullYear()===currentYear).length;
@@ -73,7 +95,8 @@ function render(){
   draw('venusNakChart',ranked(NAK,counts(rows.map(x=>x.venus.nak))));
   const years=[...new Set(rows.map(x=>new Date(x.landfallAt).getUTCFullYear()))].sort((a,b)=>b-a);
   const ys=document.getElementById('yearSelect'),cur=ys.value;ys.innerHTML=years.map(y=>'<option value="'+y+'">'+y+'</option>').join('');ys.value=years.includes(Number(cur))?cur:String(years[0]||currentYear);
-  renderYear();
+  const iy=document.getElementById('intensityYear'),icur=iy.value;iy.innerHTML=years.map(y=>'<option value="'+y+'">'+y+'</option>').join('');iy.value=years.includes(Number(icur))?icur:String(years[0]||currentYear);
+  renderYear();renderIntensity();
   document.getElementById('count').textContent=rows.length+' rows';
   document.getElementById('body').innerHTML=rows.map(e=>'<tr><td>'+new Date(e.landfallAt).toLocaleString()+'</td><td>'+e.name+'</td><td>'+e.basin+'</td><td>'+(Number.isFinite(e.windKt)?e.windKt+' kt':'—')+'</td><td>'+e.category+'</td><td>'+SIGNS[e.moon.sign]+' '+e.moon.degree.toFixed(1)+'°</td><td>'+e.moon.nak+'</td><td>'+SIGNS[e.venus.sign]+' '+e.venus.degree.toFixed(1)+'°</td><td>'+e.venus.nak+'</td></tr>').join('');
 }
@@ -87,5 +110,5 @@ async function load(){
     st.textContent='ONLINE';note.textContent=j.count+' landfalls · '+new Date(j.fetchedAt).toLocaleString();render();
   }catch(error){rows=[];st.textContent='ERROR';note.textContent=String(error?.message||error);render()}
 }
-document.getElementById('reload').onclick=load;document.getElementById('yearSelect').onchange=renderYear;load();
+document.getElementById('reload').onclick=load;document.getElementById('yearSelect').onchange=renderYear;document.getElementById('intensityYear').onchange=renderIntensity;load();
 </script></body></html>
