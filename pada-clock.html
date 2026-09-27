@@ -52,7 +52,7 @@ const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio',
 const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
 const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
 const svg=document.getElementById('clock');
-let mode='live',selectedTime=new Date(),timer=null,watchId=null;
+let mode='live',selectedTime=new Date(),timer=null,watchId=null,controlsDirty=false;
 let userLocation=null;
 try{
   const saved=JSON.parse(localStorage.getItem('geoClockLocation')||'null');
@@ -214,7 +214,7 @@ function draw(){
   document.getElementById('lst').textContent=lst.toFixed(4)+' h';
   document.getElementById('timeDetail').textContent=d.toLocaleString()+' · '+lat.toFixed(4)+'°, '+lon.toFixed(4)+'°';
   document.getElementById('status').textContent=mode==='live'?'Live':'Selected time';
-  if(mode==='live')syncInputs(d);
+  if(mode==='live'&&!controlsDirty)syncInputs(d);
 }
 function selectedFromInputs(){
   const dv=document.getElementById('date').value;
@@ -229,13 +229,17 @@ function selectedFromInputs(){
   return Number.isFinite(x.getTime())?x:null;
 }
 function start(){if(timer)clearInterval(timer);timer=setInterval(draw,1000);draw()}
-document.getElementById('liveBtn').addEventListener('click',()=>{mode='live';draw()});
-document.getElementById('setBtn').addEventListener('click',()=>{const x=selectedFromInputs();if(x){selectedTime=x;mode='fixed';draw()}});
-document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()-60000);mode='fixed';syncInputs(selectedTime);draw()});
-document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';syncInputs(selectedTime);draw()});
+document.getElementById('liveBtn').addEventListener('click',()=>{mode='live';controlsDirty=false;syncInputs(new Date());draw()});
+document.getElementById('setBtn').addEventListener('click',()=>{const x=selectedFromInputs();if(x){selectedTime=x;mode='fixed';controlsDirty=false;draw()}});
+document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()-60000);mode='fixed';controlsDirty=false;syncInputs(selectedTime);draw()});
+document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';controlsDirty=false;syncInputs(selectedTime);draw()});
 document.getElementById('locateBtn').addEventListener('click',startLocation);
 document.getElementById('searchCityBtn').addEventListener('click',searchCity);
 document.getElementById('citySearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchCity();}});
+['date','hour12','minute12','ampm'].forEach(id=>{
+  const el=document.getElementById(id);
+  ['input','change','focus'].forEach(evt=>el.addEventListener(evt,()=>{controlsDirty=true;}));
+});
 syncInputs(new Date());
 if(userLocation){
   const label=userLocation.name||userLocation.lat.toFixed(5)+'°, '+userLocation.lon.toFixed(5)+'°';
