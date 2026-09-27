@@ -136,6 +136,8 @@ const state = {
 
 init();
 
+let dateInputsDirty=false;
+
 async function init(){
   buildNakshatraKey();
   populateFocusControls();
@@ -166,6 +168,10 @@ async function init(){
 
 function bindControls(){
   syncDateTimeInputs(currentDate());
+  ['dateInput','timeInput'].forEach(id=>{
+    const el=document.getElementById(id);
+    ['input','change','focus'].forEach(evt=>el.addEventListener(evt,()=>{dateInputsDirty=true;}));
+  });
   document.querySelectorAll('[data-minutes]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       freezePlayback();
@@ -204,10 +210,12 @@ function bindControls(){
       status.textContent='Invalid UTC date/time';
       return;
     }
+    dateInputsDirty=false;
     setCompassDate(target);
   });
 
   document.getElementById('resetBtn').addEventListener('click',()=>{
+    dateInputsDirty=false;
     state.playing=false;
     state.offsetMs=0;
     state.frozenDateMs=null;
@@ -387,6 +395,7 @@ function freezePlayback(){
 }
 
 function setCompassDate(target){
+  dateInputsDirty=false;
   const min=Date.UTC(1900,0,1,0,0,0,0),max=Date.UTC(2100,11,31,23,59,59,999);
   const t=Math.min(max,Math.max(min,target.getTime()));
   state.playing=false;
@@ -441,7 +450,7 @@ function refreshAstronomy(){
   }
 
   try{
-    syncDateTimeInputs(date);
+    if(!dateInputsDirty)syncDateTimeInputs(date);
     const aya=lahiriAyanamsa(date);
     const eps=meanObliquityFromDate(date);
     const gmst=greenwichSiderealDegrees(date);
