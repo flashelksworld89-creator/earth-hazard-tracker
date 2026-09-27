@@ -139,7 +139,7 @@ function draw(){
   document.getElementById('signProgress').textContent=(signFrac*100).toFixed(1)+'%';
   document.getElementById('signDetail').textContent=deg(asc.degree)+' through '+SIGNS[asc.sign]+' · minute-hand angle '+signMinuteAngle.toFixed(1)+'°';
   document.getElementById('padaProgress').textContent=(padaFrac*100).toFixed(1)+'%';
-  document.getElementById('padaDetail').textContent='Pada '+asc.pada+' · '+deg(asc.padaDegree)+' of 3°20′ · ticker angle '+padaTickerAngle.toFixed(1)+'°';
+  document.getElementById('padaDetail').textContent='Pada '+asc.pada+' · '+deg(asc.padaDegree)+' of 3°20′ · second-hand angle '+secondAngle.toFixed(1)+'°';
   const lst=norm(A.SiderealTime(d)*15+lon)/15;
   document.getElementById('lst').textContent=lst.toFixed(4)+' h';
   document.getElementById('timeDetail').textContent=d.toLocaleString()+' · '+lat.toFixed(4)+'°, '+lon.toFixed(4)+'°';
