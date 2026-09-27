@@ -25,6 +25,8 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <button id="locateBtn" type="button">Refresh automatic location</button>
   </div>
   <div class="cards">
+    <div class="card"><small>Standard civil time</small><b id="standardTime">—</b><p id="standardTimeDetail">Your normal local clock time.</p></div>
+    <div class="card"><small>ASC time · Secondary clock</small><b id="ascTime">—</b><p id="ascTimeDetail">Zodiac hour · sign minute · pada second · solar AM/PM.</p></div>
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
     <div class="card"><small>Minute hand · Zodiac + Nakshatra</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
     <div class="card"><small>Second hand · Zodiac + Nakshatra</small><b id="padaProgress">—</b><p id="padaDetail">—</p></div>
@@ -92,6 +94,19 @@ function startLocation(){
 const norm=v=>((v%360)+360)%360;
 function lahiri(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
 function bodyLon(name,d,a){const v=A.GeoVector(A.Body[name],d,true),e=A.Ecliptic(v);return norm(Number(e.elon)-a)}
+function sunMeridianState(d,lat,lon){
+  try{
+    const observer=new A.Observer(lat,lon,0);
+    const eq=A.Equator(A.Body.Sun,d,observer,true,true);
+    let hourAngle=(A.SiderealTime(d)+lon/15-Number(eq.ra))%24;
+    if(hourAngle>12)hourAngle-=24;
+    if(hourAngle<=-12)hourAngle+=24;
+    return{label:hourAngle<0?'AM':'PM',hourAngle};
+  }catch(_){
+    const civilHour=d.getHours()+d.getMinutes()/60+d.getSeconds()/3600;
+    return{label:civilHour<12?'AM':'PM',hourAngle:null};
+  }
+}
 function meanObliquity(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return 23+26/60+(21.448-46.8150*T-.00059*T*T+.001813*T*T*T)/3600}
 function ascendantSidereal(d,lat,lon,a){
   const rad=Math.PI/180,lst=norm(A.SiderealTime(d)*15+lon)*rad,phi=lat*rad,eps=meanObliquity(d)*rad;
@@ -124,6 +139,11 @@ function draw(){
   const padaSize=360/108,padaFrac=asc.padaDegree/padaSize,secondAngle=padaFrac*360;
   const minutePos=pos(signMinuteAngle);
   const secondPos=pos(secondAngle);
+  const solarHalf=sunMeridianState(d,lat,lon);
+  const ascHour=asc.sign+1;
+  const ascMinute=Math.min(59,Math.floor(signFrac*60));
+  const ascSecond=Math.min(59,Math.floor(padaFrac*60));
+  const ascTimeText=String(ascHour).padStart(2,'0')+':'+String(ascMinute).padStart(2,'0')+':'+String(ascSecond).padStart(2,'0')+' '+solarHalf.label;
   let out='<rect width="900" height="900" fill="#04101b"/><circle cx="450" cy="450" r="420" fill="#06121e" stroke="rgba(124,185,255,.25)" stroke-width="2"/>';
   for(let i=0;i<12;i++){
     const a=i*30;out+=line(a,270,420,'#48baf4',1.7,.8);out+=textAt(a+15,383,GLYPHS[i],27,'#eef8ff','700');out+=textAt(a+15,355,SIGNS[i],10,'#bed9e8','700');
@@ -137,6 +157,11 @@ function draw(){
   out+=hand(secondAngle,150,'#f9a8d4',3.5,'SEC');
   out+='<circle cx="450" cy="450" r="8" fill="#eef8ff"/><text x="450" y="435" fill="#eef8ff" font-size="18" font-weight="800" text-anchor="middle">LOCAL ASC</text><text x="450" y="458" fill="#7dd3fc" font-size="10" text-anchor="middle">SIGN + PADA MOTION</text>';
   svg.innerHTML=out;
+  document.getElementById('standardTime').textContent=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('standardTimeDetail').textContent=d.toLocaleDateString()+' · civil/local device time';
+  document.getElementById('ascTime').textContent=ascTimeText;
+  document.getElementById('ascTimeDetail').textContent=GLYPHS[asc.sign]+' '+SIGNS[asc.sign]+' · '+asc.nakName+' P'+asc.pada+
+    ' · '+(solarHalf.hourAngle===null?'AM/PM fallback from civil time':('solar hour angle '+solarHalf.hourAngle.toFixed(2)+' h'));
   document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
   document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
   document.getElementById('signProgress').textContent=GLYPHS[minutePos.sign]+' '+SIGNS[minutePos.sign]+' · '+minutePos.nakName+' P'+minutePos.pada;
