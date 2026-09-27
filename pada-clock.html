@@ -1,0 +1,116 @@
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#02070d"><title>108 Pada Clock</title>
+<style>
+:root{--bg:#02070d;--panel:#071420;--border:rgba(124,185,255,.18);--text:#eaf4ff;--muted:#8ea6b9;--accent:#38bdf8}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% -20%,#0c2940 0,#02070d 46%);color:var(--text);font-family:Inter,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 18px;background:rgba(2,7,13,.95);border-bottom:1px solid var(--border)}
+header a{color:#e9f8ff;text-decoration:none}nav{display:flex;gap:6px;flex-wrap:wrap}nav a{font-size:10px;border:1px solid var(--border);padding:7px 8px;border-radius:7px}.active{border-color:var(--accent)!important}
+main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.panel,.hero{background:rgba(7,20,32,.9);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:12px}
+.hero{display:flex;justify-content:space-between;gap:20px;align-items:center}.hero h1{margin:4px 0 7px}.hero p{margin:0;color:#9fb7c7;font-size:11px;line-height:1.55;max-width:900px}.eyebrow{font-size:9px;color:#67e8f9;letter-spacing:.09em}
+.layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,.6fr);gap:12px}.clock-card{display:flex;align-items:center;justify-content:center;min-width:0}.clock-wrap{width:min(820px,100%);aspect-ratio:1/1;position:relative}.clock-wrap svg{width:100%;height:100%;display:block}
+.controls{display:grid;gap:9px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.controls label{font-size:9px;color:#9fb7c7;display:grid;gap:5px}.controls input,.controls button{width:100%;border:1px solid var(--border);background:#0a1b2a;color:#fff;border-radius:8px;padding:9px 10px}.controls button{cursor:pointer;font-weight:700}.readouts{display:grid;gap:8px;margin-top:10px}.card{background:#06111c;border:1px solid var(--border);border-radius:10px;padding:11px}.card small{display:block;color:#82a0b3;font-size:8px;text-transform:uppercase}.card b{display:block;font-size:17px;margin:5px 0}.card p{margin:0;color:#9fb7c7;font-size:9px;line-height:1.5}.status{font-size:9px;color:#67e8f9}.legend{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:9px}.legend span{font-size:9px;color:#9fb7c7}.sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.note{font-size:8px;color:#748c9d;line-height:1.55;margin-top:9px}.mini{font-size:9px;color:#9fb7c7;line-height:1.5}
+@media(max-width:1050px){.layout{grid-template-columns:1fr}}@media(max-width:650px){header,.hero{flex-direction:column;align-items:stretch}.row,.legend{grid-template-columns:1fr}}
+</style></head><body>
+<script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/pada-clock.html'));</script>
+<header><a href="/">◉ 108 PADA CLOCK</a><nav><a href="/">Earth Tracker</a><a href="/weather.html">Landfall Cyclones</a><a href="/convective.html">Severe Convection</a><a class="active" href="/pada-clock.html">108 Pada Clock</a><a href="/patterns.html">Pattern Lab</a></nav></header>
+<main>
+<section class="hero"><div><span class="eyebrow">SIDEREAL LAHIRI · 12 SIGNS · 27 NAKSHATRAS · 108 PADAS</span><h1>108 Pada Clock</h1><p>A single sidereal wheel for exact Moon and Venus positions. The zodiac ring is 12 × 30°, the nakshatra ring is 27 × 13°20′, and the pada ring is 108 × 3°20′. The hands always point to true sidereal longitude.</p></div><span id="status" class="status">Current time</span></section>
+
+<section class="layout">
+<div class="panel clock-card"><div class="clock-wrap"><svg id="clock" viewBox="0 0 800 800" role="img" aria-label="Sidereal zodiac, nakshatra and pada clock"></svg></div></div>
+<div class="panel">
+  <div class="controls">
+    <div class="row">
+      <label>Date<input id="date" type="date"></label>
+      <label>Time<input id="time" type="time" step="60"></label>
+    </div>
+    <div class="row"><button id="setTime" type="button">Set selected time</button><button id="now" type="button">Use current time</button></div>
+    <div class="row"><button id="minusHour" type="button">− 1 hour</button><button id="plusHour" type="button">+ 1 hour</button></div>
+  </div>
+
+  <div class="readouts">
+    <div class="card"><small>Moon</small><b id="moonMain">—</b><p id="moonDetail">—</p></div>
+    <div class="card"><small>Venus</small><b id="venusMain">—</b><p id="venusDetail">—</p></div>
+    <div class="card"><small>Moon ↔ Venus</small><b id="separation">—</b><p id="sepDetail">Exact angular separation on the sidereal wheel.</p></div>
+    <div class="card"><small>Selected moment</small><b id="moment">—</b><p id="momentDetail">—</p></div>
+  </div>
+
+  <div class="legend"><span><i class="sw" style="background:#dbeafe"></i>Moon hand</span><span><i class="sw" style="background:#f9a8d4"></i>Venus hand</span></div>
+  <div class="note">0° sidereal Aries is fixed at 12 o’clock and longitude increases clockwise. Nakshatra and pada boundaries are independent of zodiac boundaries, so crossings between rings are shown exactly rather than forced to align.</div>
+</div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+<script>
+const A=window.Astronomy;
+const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
+const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
+const svg=document.getElementById('clock');
+let current=new Date();
+
+const norm=v=>((v%360)+360)%360;
+function lahiri(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
+function bodyLon(name,d,a){const v=A.GeoVector(A.Body[name],d,true),e=A.Ecliptic(v);return norm(Number(e.elon)-a)}
+function pos(lon){
+  const nakSize=360/27,padaSize=360/108;
+  const sign=Math.floor(lon/30),nak=Math.floor(lon/nakSize),padaInNak=Math.floor((lon%nakSize)/padaSize)+1,globalPada=Math.floor(lon/padaSize)+1;
+  return{lon,sign,degree:lon%30,nak,nakName:NAK[nak],pada:padaInNak,globalPada,nakDegree:lon%nakSize};
+}
+function polar(angle,r){const a=(angle-90)*Math.PI/180;return[400+r*Math.cos(a),400+r*Math.sin(a)]}
+function line(angle,r1,r2,stroke,width,opacity=1){
+  const a=polar(angle,r1),b=polar(angle,r2);return '<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+stroke+'" stroke-width="'+width+'" opacity="'+opacity+'"/>';
+}
+function textAt(angle,r,txt,size,fill,weight='500'){
+  const p=polar(angle,r);return '<text x="'+p[0]+'" y="'+p[1]+'" fill="'+fill+'" font-size="'+size+'" font-weight="'+weight+'" text-anchor="middle" dominant-baseline="middle">'+txt+'</text>';
+}
+function drawBase(){
+  let out='<circle cx="400" cy="400" r="388" fill="#04101b" stroke="rgba(124,185,255,.24)" stroke-width="2"/>';
+  out+='<circle cx="400" cy="400" r="330" fill="none" stroke="rgba(124,185,255,.16)"/><circle cx="400" cy="400" r="250" fill="none" stroke="rgba(124,185,255,.16)"/><circle cx="400" cy="400" r="178" fill="none" stroke="rgba(124,185,255,.16)"/>';
+  for(let i=0;i<360;i++){const major=i%30===0,mid=i%5===0;out+=line(i,major?330:mid?342:348,388,major?'#7dd3fc':'#496579',major?2:mid?1.2:.6,major?1:.7)}
+  for(let i=0;i<12;i++){const a=i*30;out+=line(a,250,388,'#38bdf8',1.8,.8);out+=textAt(a+15,360,GLYPHS[i],22,'#eef8ff','700');out+=textAt(a+15,337,SIGNS[i],9,'#9fb7c7','600')}
+  const nakSize=360/27;
+  for(let i=0;i<27;i++){const a=i*nakSize;out+=line(a,178,330,'#a78bfa',1.1,.7);out+=textAt(a+nakSize/2,289,String(i+1),9,'#d8b4fe','700')}
+  const padaSize=360/108;
+  for(let i=0;i<108;i++){const a=i*padaSize;out+=line(a,178,i%4===0?250:232,'#64748b',i%4===0?1:.55,i%4===0?.8:.55)}
+  for(let i=0;i<27;i++){const a=i*nakSize+nakSize/2;const p=polar(a,215);out+='<text x="'+p[0]+'" y="'+p[1]+'" fill="#94a3b8" font-size="6.5" text-anchor="middle" dominant-baseline="middle" transform="rotate('+(a)+' '+p[0]+' '+p[1]+')">'+NAK[i]+'</text>'}
+  out+='<circle cx="400" cy="400" r="150" fill="#06111c" stroke="rgba(124,185,255,.18)" stroke-width="2"/>';
+  return out;
+}
+function hand(angle,r,color,width,label){
+  const p=polar(angle,r),lab=polar(angle,118);return '<line x1="400" y1="400" x2="'+p[0]+'" y2="'+p[1]+'" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round"/><circle cx="'+p[0]+'" cy="'+p[1]+'" r="5" fill="'+color+'"/><text x="'+lab[0]+'" y="'+lab[1]+'" fill="'+color+'" font-size="14" font-weight="800" text-anchor="middle" dominant-baseline="middle">'+label+'</text>';
+}
+function deg(v){const d=Math.floor(v),m=Math.round((v-d)*60);return d+'° '+String(m).padStart(2,'0')+'′'}
+function render(){
+  if(!A){document.getElementById('status').textContent='Astronomy engine unavailable';return}
+  const aya=lahiri(current),moon=pos(bodyLon('Moon',current,aya)),venus=pos(bodyLon('Venus',current,aya));
+  let out=drawBase();
+  out+=hand(moon.lon,145,'#dbeafe',4,'☾');
+  out+=hand(venus.lon,132,'#f9a8d4',4,'♀');
+  out+='<circle cx="400" cy="400" r="7" fill="#e2e8f0"/>';
+  out+='<text x="400" y="382" fill="#eaf4ff" font-size="16" font-weight="800" text-anchor="middle">108 PADA</text><text x="400" y="403" fill="#67e8f9" font-size="10" text-anchor="middle">SIDEREAL LAHIRI</text><text x="400" y="422" fill="#8ea6b9" font-size="9" text-anchor="middle">'+current.toISOString().replace('T',' ').slice(0,16)+' UTC</text>';
+  svg.innerHTML=out;
+  document.getElementById('moonMain').textContent=SIGNS[moon.sign]+' '+deg(moon.degree);
+  document.getElementById('moonDetail').textContent=moon.nakName+' · Pada '+moon.pada+' · Global pada '+moon.globalPada+' · Nakshatra '+deg(moon.nakDegree);
+  document.getElementById('venusMain').textContent=SIGNS[venus.sign]+' '+deg(venus.degree);
+  document.getElementById('venusDetail').textContent=venus.nakName+' · Pada '+venus.pada+' · Global pada '+venus.globalPada+' · Nakshatra '+deg(venus.nakDegree);
+  const sep=Math.abs(((venus.lon-moon.lon+540)%360)-180);
+  document.getElementById('separation').textContent=sep.toFixed(2)+'°';
+  document.getElementById('moment').textContent=current.toLocaleString();
+  document.getElementById('momentDetail').textContent='Lahiri ayanamsa '+aya.toFixed(4)+'°';
+  syncInputs();
+}
+function syncInputs(){
+  const y=current.getFullYear(),m=String(current.getMonth()+1).padStart(2,'0'),d=String(current.getDate()).padStart(2,'0'),hh=String(current.getHours()).padStart(2,'0'),mm=String(current.getMinutes()).padStart(2,'0');
+  document.getElementById('date').value=y+'-'+m+'-'+d;document.getElementById('time').value=hh+':'+mm;
+}
+function selected(){
+  const dv=document.getElementById('date').value,tv=document.getElementById('time').value;if(!dv||!tv)return null;
+  const [y,m,d]=dv.split('-').map(Number),[hh,mm]=tv.split(':').map(Number);const x=new Date(y,m-1,d,hh,mm,0,0);return Number.isFinite(x.getTime())?x:null;
+}
+document.getElementById('setTime').addEventListener('click',()=>{const x=selected();if(x){current=x;document.getElementById('status').textContent='Selected time';render()}});
+document.getElementById('now').addEventListener('click',()=>{current=new Date();document.getElementById('status').textContent='Current time';render()});
+document.getElementById('minusHour').addEventListener('click',()=>{current=new Date(current.getTime()-3600000);document.getElementById('status').textContent='Selected time';render()});
+document.getElementById('plusHour').addEventListener('click',()=>{current=new Date(current.getTime()+3600000);document.getElementById('status').textContent='Selected time';render()});
+render();
+</script></body></html>
