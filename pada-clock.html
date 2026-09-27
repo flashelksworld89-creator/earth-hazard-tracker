@@ -129,9 +129,9 @@ function draw(){
   for(let i=0;i<9;i++){out+=line(i*40,190,265,'#9fb7c8',1,.65);out+=textAt(i*40+20,230,String(i+1),11,'#c8d9e5','700')}
   for(let i=0;i<60;i++){out+=line(i*6,i%5===0?150:165,190,i%5===0?'#8aa8bc':'#4e6575',i%5===0?1:.5,.7)}
   out+='<circle cx="450" cy="450" r="145" fill="#07121d" stroke="rgba(124,185,255,.18)" stroke-width="2"/>';
-  out+=hand(asc.lon,175,'#7dd3fc',7,'ASC');
+  out+=hand(asc.lon,175,'#7dd3fc',7,'HOUR');
   out+=hand(signMinuteAngle,162,'#e8f4ff',5,'MIN');
-  out+=hand(padaTickerAngle,150,'#f9a8d4',3.5,'P');
+  out+=hand(secondAngle,150,'#f9a8d4',3.5,'SEC');
   out+='<circle cx="450" cy="450" r="8" fill="#eef8ff"/><text x="450" y="435" fill="#eef8ff" font-size="18" font-weight="800" text-anchor="middle">LOCAL ASC</text><text x="450" y="458" fill="#7dd3fc" font-size="10" text-anchor="middle">SIGN + PADA MOTION</text>';
   svg.innerHTML=out;
   document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
