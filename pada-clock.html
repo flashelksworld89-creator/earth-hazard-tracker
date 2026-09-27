@@ -18,12 +18,15 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
 <div class="panel clock-card"><div class="clock-wrap"><svg id="clock" viewBox="0 0 900 900" role="img" aria-label="108 Pada Ascendant Clock"></svg></div></div>
 <div class="panel">
   <div class="controls">
-    <div class="card"><small>Automatic geographic location</small><b id="locationMain">Locating…</b><p id="locationDetail">Allow location access when your browser asks. Coordinates are detected automatically and updated as your device moves.</p></div>
+    <div class="card"><small>Clock location</small><b id="locationMain">Locating…</b><p id="locationDetail">Allow device location, or search by city and state below.</p></div>
+    <div class="row"><label style="grid-column:1/-1">City / State<input id="citySearch" type="text" inputmode="search" autocomplete="address-level2" placeholder="e.g. Las Vegas, NV"></label></div>
+    <div class="row"><button id="searchCityBtn" type="button">Use city / state</button><button id="locateBtn" type="button">Use my location</button></div>
+    <div id="citySearchStatus" class="note" aria-live="polite"></div>
     <div class="row"><label>Date<input id="date" type="date"></label><label>Hour<select id="hour12"><option>12</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option></select></label></div>
     <div class="row"><label>Minute<select id="minute12"><option>00</option><option>01</option><option>02</option><option>03</option><option>04</option><option>05</option><option>06</option><option>07</option><option>08</option><option>09</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option><option>27</option><option>28</option><option>29</option><option>30</option><option>31</option><option>32</option><option>33</option><option>34</option><option>35</option><option>36</option><option>37</option><option>38</option><option>39</option><option>40</option><option>41</option><option>42</option><option>43</option><option>44</option><option>45</option><option>46</option><option>47</option><option>48</option><option>49</option><option>50</option><option>51</option><option>52</option><option>53</option><option>54</option><option>55</option><option>56</option><option>57</option><option>58</option><option>59</option></select></label><label>AM / PM<select id="ampm"><option value="AM">AM</option><option value="PM">PM</option></select></label></div>
     <div class="row"><button id="liveBtn" type="button">Use live time</button><button id="setBtn" type="button">Use selected time</button></div>
     <div class="row"><button id="minus" type="button">− 1 minute</button><button id="plus" type="button">+ 1 minute</button></div>
-    <button id="locateBtn" type="button">Refresh automatic location</button>
+
   </div>
   <div class="cards">
     <div class="card"><small>Standard civil time</small><b id="standardTime">—</b><p id="standardTimeDetail">Your normal local clock time.</p></div>
@@ -54,7 +57,7 @@ let userLocation=null;
 try{
   const saved=JSON.parse(localStorage.getItem('geoClockLocation')||'null');
   if(saved&&Number.isFinite(saved.lat)&&Number.isFinite(saved.lon)){
-    userLocation={lat:saved.lat,lon:saved.lon,accuracy:saved.accuracy||null,cached:true};
+    userLocation={lat:saved.lat,lon:saved.lon,accuracy:saved.accuracy||null,cached:true,source:saved.source||'gps',name:saved.name||null};
   }
 }catch(_){}
 
@@ -62,10 +65,41 @@ function setLocationStatus(message,detail){
   document.getElementById('locationMain').textContent=message;
   document.getElementById('locationDetail').textContent=detail;
 }
+async function searchCity(){
+  const input=document.getElementById('citySearch');
+  const status=document.getElementById('citySearchStatus');
+  const q=String(input.value||'').trim();
+  if(q.length<2){status.textContent='Enter a city and state, for example: Las Vegas, NV.';return;}
+  status.textContent='Searching…';
+  try{
+    const url='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q='+encodeURIComponent(q);
+    const res=await fetch(url,{headers:{'Accept':'application/json'}});
+    if(!res.ok)throw new Error('Location search failed');
+    const results=await res.json();
+    if(!Array.isArray(results)||!results.length){
+      status.textContent='No matching city or state was found.';
+      return;
+    }
+    const r=results[0],lat=Number(r.lat),lon=Number(r.lon);
+    if(!Number.isFinite(lat)||!Number.isFinite(lon))throw new Error('Invalid coordinates');
+    if(watchId!==null&&navigator.geolocation){
+      navigator.geolocation.clearWatch(watchId);
+      watchId=null;
+    }
+    userLocation={lat,lon,accuracy:null,cached:false,source:'city',name:r.display_name||q};
+    try{localStorage.setItem('geoClockLocation',JSON.stringify({lat,lon,accuracy:null,ts:Date.now(),source:'city',name:r.display_name||q}));}catch(_){}
+    setLocationStatus(r.display_name||q,'City/state selection · '+lat.toFixed(5)+'°, '+lon.toFixed(5)+'°');
+    status.textContent='Using '+(r.display_name||q)+'.';
+    draw();
+  }catch(err){
+    console.error(err);
+    status.textContent='City search is unavailable right now. You can still use device location.';
+  }
+}
 function acceptLocation(pos){
   const lat=Number(pos.coords.latitude),lon=Number(pos.coords.longitude),accuracy=Number(pos.coords.accuracy);
   if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
-  userLocation={lat,lon,accuracy,cached:false};
+  userLocation={lat,lon,accuracy,cached:false,source:'gps'};
   try{localStorage.setItem('geoClockLocation',JSON.stringify({lat,lon,accuracy,ts:Date.now()}));}catch(_){}
   setLocationStatus(lat.toFixed(5)+'°, '+lon.toFixed(5)+'°',
     'Device location · accuracy about '+(Number.isFinite(accuracy)?Math.round(accuracy)+' m':'unknown')+'. Coordinates update automatically as the device moves.');
@@ -200,10 +234,13 @@ document.getElementById('setBtn').addEventListener('click',()=>{const x=selected
 document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()-60000);mode='fixed';syncInputs(selectedTime);draw()});
 document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';syncInputs(selectedTime);draw()});
 document.getElementById('locateBtn').addEventListener('click',startLocation);
+document.getElementById('searchCityBtn').addEventListener('click',searchCity);
+document.getElementById('citySearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchCity();}});
 syncInputs(new Date());
 if(userLocation){
-  setLocationStatus(userLocation.lat.toFixed(5)+'°, '+userLocation.lon.toFixed(5)+'°','Last saved device position · refreshing automatically now.');
+  const label=userLocation.name||userLocation.lat.toFixed(5)+'°, '+userLocation.lon.toFixed(5)+'°';
+  setLocationStatus(label,userLocation.source==='city'?'Last selected city/state location.':'Last saved device position · refreshing automatically now.');
 }
 start();
-startLocation();
+if(!userLocation||userLocation.source!=='city')startLocation();
 </script></body></html>
