@@ -13,7 +13,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
 <script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/geo-clock.html'));</script>
 <header><a href="/">◎ GEOGRAPHICAL ASCENDANT CLOCK</a><nav><a href="/">Earth Tracker</a><a href="/pada-clock.html">108 Pada Clock</a><a class="active" href="/geo-clock.html">Geo Clock</a><a href="/weather.html">Landfall Cyclones</a><a href="/convective.html">Severe Convection</a></nav></header>
 <main>
-<section class="hero"><div><span class="eyebrow">LOCAL SIDEREAL TIME · LAHIRI ASCENDANT · RISING-SIGN PROGRESS</span><h1>Geographical Ascendant Clock</h1><p>The hour hand is the actual local Ascendant. The minute hand measures how far the Ascendant has progressed through the current 30° rising sign. The sweep ticker measures progress through the current 3°20′ pada, so all three hands remain synchronized to the same local rising motion.</p></div><span id="status" class="status">Live</span></section>
+<section class="hero"><div><span class="eyebrow">LOCAL SIDEREAL TIME · LAHIRI ASCENDANT · RISING-SIGN PROGRESS</span><h1>Geographical Ascendant Clock</h1><p>The hour hand is the actual local Ascendant. The minute hand measures progress through the current 30° rising sign and the sweep ticker measures the current 3°20′ pada. A second ASC date/time system is anchored to each local 0° sidereal Aries rising, so civil time and geographical Ascendant time can be read together.</p></div><span id="status" class="status">Live</span></section>
 <section class="layout">
 <div class="panel clock-card"><div class="clock-wrap"><svg id="clock" viewBox="0 0 900 900" role="img" aria-label="Geographical Ascendant Clock"></svg></div></div>
 <div class="panel">
@@ -28,6 +28,9 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
     <div class="card"><small>Sign progress · Minute hand</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
     <div class="card"><small>Pada ticker · Sweep hand</small><b id="padaProgress">—</b><p id="padaDetail">—</p></div>
+    <div class="card"><small>ASC date</small><b id="ascDate">—</b><p id="ascDateDetail">—</p></div>
+    <div class="card"><small>ASC time · 12-hour notation</small><b id="ascTime">—</b><p id="ascTimeDetail">—</p></div>
+    <div class="card"><small>ASC day progress</small><b id="ascDayProgress">—</b><p id="ascDayDetail">—</p></div>
     <div class="card"><small>Local sidereal state</small><b id="lst">—</b><p id="timeDetail">—</p></div>
   </div>
   <div class="legend">
@@ -97,6 +100,45 @@ function ascendantSidereal(d,lat,lon,a){
   const y=Math.cos(lst),x=-(Math.sin(lst)*Math.cos(eps)+Math.tan(phi)*Math.sin(eps));
   return norm(Math.atan2(y,x)/rad-a);
 }
+function ascLonAt(d,lat,lon){return ascendantSidereal(d,lat,lon,lahiri(d))}
+function refineAriesCrossing(a,b,lat,lon){
+  let lo=a.getTime(),hi=b.getTime();
+  for(let i=0;i<34;i++){
+    const mid=Math.floor((lo+hi)/2),v=ascLonAt(new Date(mid),lat,lon);
+    if(v>180)lo=mid;else hi=mid;
+  }
+  return new Date(hi);
+}
+function findAriesBoundary(d,lat,lon,direction){
+  const step=10*60*1000,maxSteps=180;
+  if(direction<0){
+    let later=new Date(d),laterLon=ascLonAt(later,lat,lon);
+    for(let i=0;i<maxSteps;i++){
+      const earlier=new Date(later.getTime()-step),earlierLon=ascLonAt(earlier,lat,lon);
+      if(earlierLon>300&&laterLon<60)return refineAriesCrossing(earlier,later,lat,lon);
+      later=earlier;laterLon=earlierLon;
+    }
+  }else{
+    let earlier=new Date(d),earlierLon=ascLonAt(earlier,lat,lon);
+    for(let i=0;i<maxSteps;i++){
+      const later=new Date(earlier.getTime()+step),laterLon=ascLonAt(later,lat,lon);
+      if(earlierLon>300&&laterLon<60)return refineAriesCrossing(earlier,later,lat,lon);
+      earlier=later;earlierLon=laterLon;
+    }
+  }
+  return null;
+}
+function formatAscClock(lon){
+  const sign=Math.floor(lon/30);
+  const within=lon-sign*30;
+  const totalSeconds=(within/30)*3600;
+  let mm=Math.floor(totalSeconds/60),ss=Math.floor(totalSeconds%60);
+  if(mm>59){mm=59;ss=59}
+  return String(sign+1).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+}
+function localDateLabel(d){
+  return d.toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+}
 function pos(lon){
   const nakSize=360/27,padaSize=360/108,sign=Math.floor(lon/30),nak=Math.floor(lon/nakSize),nakDeg=lon%nakSize;
   return{lon,sign,degree:lon%30,nak,nakName:NAK[nak],pada:Math.floor(nakDeg/padaSize)+1,globalPada:Math.floor(lon/padaSize)+1,padaDegree:lon%padaSize};
@@ -114,6 +156,9 @@ function draw(){
   if(!userLocation){document.getElementById('status').textContent='Locating…';return}
   const lat=userLocation.lat,lon=userLocation.lon;
   const aya=lahiri(d),asc=pos(ascendantSidereal(d,lat,lon,aya));
+  const prevAries=findAriesBoundary(d,lat,lon,-1);
+  const nextAries=findAriesBoundary(d,lat,lon,1);
+  const ascClock=formatAscClock(asc.lon);
   const signFrac=asc.degree/30;
   const signMinuteAngle=signFrac*360;
   const padaSize=360/108,padaFrac=asc.padaDegree/padaSize,padaTickerAngle=padaFrac*360;
@@ -136,6 +181,24 @@ function draw(){
   document.getElementById('signDetail').textContent=deg(asc.degree)+' through '+SIGNS[asc.sign]+' · minute-hand angle '+signMinuteAngle.toFixed(1)+'°';
   document.getElementById('padaProgress').textContent=(padaFrac*100).toFixed(1)+'%';
   document.getElementById('padaDetail').textContent='Pada '+asc.pada+' · '+deg(asc.padaDegree)+' of 3°20′ · ticker angle '+padaTickerAngle.toFixed(1)+'°';
+  if(prevAries&&nextAries){
+    const span=nextAries.getTime()-prevAries.getTime();
+    const elapsed=d.getTime()-prevAries.getTime();
+    const dayPct=Math.max(0,Math.min(1,elapsed/span))*100;
+    document.getElementById('ascDate').textContent=localDateLabel(prevAries)+' A';
+    document.getElementById('ascDateDetail').textContent='ASC day began at '+prevAries.toLocaleString()+' when 0° sidereal Aries rose locally.';
+    document.getElementById('ascTime').textContent=ascClock+' ASC';
+    document.getElementById('ascTimeDetail').textContent=SIGNS[asc.sign]+' '+deg(asc.degree)+' · '+asc.nakName+' · Pada '+asc.pada;
+    document.getElementById('ascDayProgress').textContent=dayPct.toFixed(2)+'%';
+    document.getElementById('ascDayDetail').textContent='Next ASC day begins '+nextAries.toLocaleString()+' · cycle length '+(span/3600000).toFixed(3)+' civil hours.';
+  }else{
+    document.getElementById('ascDate').textContent='Unavailable';
+    document.getElementById('ascDateDetail').textContent='Could not resolve the local Aries-rising boundary.';
+    document.getElementById('ascTime').textContent=ascClock+' ASC';
+    document.getElementById('ascTimeDetail').textContent=SIGNS[asc.sign]+' '+deg(asc.degree)+' · '+asc.nakName+' · Pada '+asc.pada;
+    document.getElementById('ascDayProgress').textContent='—';
+    document.getElementById('ascDayDetail').textContent='—';
+  }
   const lst=norm(A.SiderealTime(d)*15+lon)/15;
   document.getElementById('lst').textContent=lst.toFixed(4)+' h';
   document.getElementById('timeDetail').textContent=d.toLocaleString()+' · '+lat.toFixed(4)+'°, '+lon.toFixed(4)+'°';
