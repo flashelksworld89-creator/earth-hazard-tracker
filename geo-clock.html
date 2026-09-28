@@ -68,6 +68,53 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     </div>
   </div>
 
+
+  <div id="returnGenerator" class="returnbox">
+    <h3>ASC + Natal Return Date Generator</h3>
+    <div class="note">The current clock position becomes the ASC return target. Enter a natal reference date/time, choose planets, then search forward or backward for the next exact ASC return that also matches the selected natal planets within your orb.</div>
+
+    <div class="row" style="margin-top:9px">
+      <label>Natal date<input id="natalDate" type="date" value="2000-01-01"></label>
+      <label>Natal time<input id="natalTime" type="time" step="1" value="12:00:00"></label>
+    </div>
+
+    <div class="planet-grid" style="margin-top:9px">
+      <label><input class="returnPlanet" type="checkbox" value="Sun">Sun</label>
+      <label><input class="returnPlanet" type="checkbox" value="Moon">Moon</label>
+      <label><input class="returnPlanet" type="checkbox" value="Mercury">Mercury</label>
+      <label><input class="returnPlanet" type="checkbox" value="Venus" checked>Venus</label>
+      <label><input class="returnPlanet" type="checkbox" value="Mars">Mars</label>
+      <label><input class="returnPlanet" type="checkbox" value="Jupiter">Jupiter</label>
+      <label><input class="returnPlanet" type="checkbox" value="Saturn">Saturn</label>
+      <label><input class="returnPlanet" type="checkbox" value="Uranus">Uranus</label>
+      <label><input class="returnPlanet" type="checkbox" value="Neptune">Neptune</label>
+      <label><input class="returnPlanet" type="checkbox" value="Pluto">Pluto</label>
+    </div>
+
+    <div class="row" style="margin-top:9px">
+      <label>ASC orb (degrees)<input id="ascReturnOrb" type="number" min="0.01" max="2" step="0.01" value="0.10"></label>
+      <label>Planet orb (degrees)<input id="planetReturnOrb" type="number" min="0.05" max="10" step="0.05" value="1.00"></label>
+    </div>
+    <div class="row">
+      <label>Search limit (years)<input id="returnYears" type="number" min="1" max="100" step="1" value="20"></label>
+      <label>Reference ASC<input id="returnAscLabel" type="text" readonly value="—"></label>
+    </div>
+    <div class="row">
+      <button id="prevReturn" type="button">← Previous Return</button>
+      <button id="nextReturn" type="button">Next Return →</button>
+    </div>
+
+    <div class="resultbox">
+      <small>Generated date</small>
+      <b id="returnResult">No return calculated yet.</b>
+      <p id="returnDetail">Choose planets and search forward or backward.</p>
+      <div class="result-actions">
+        <button id="loadReturn" type="button" disabled>Set Clock To Generated Date</button>
+        <button id="continueReturn" type="button" disabled>Generate Next From Result</button>
+      </div>
+    </div>
+  </div>
+
 <div class="cards">
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
     <div class="card"><small>Sign progress · Minute hand</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
@@ -138,6 +185,11 @@ function startLocation(){
 }
 const norm=v=>((v%360)+360)%360;
 function lahiri(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
+function bodyLon(name,d,a){
+  const v=A.GeoVector(A.Body[name],d,true),e=A.Ecliptic(v);
+  return norm(Number(e.elon)-a);
+}
+function angularDiff(a,b){return Math.abs(((a-b+540)%360)-180)}
 function meanObliquity(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return 23+26/60+(21.448-46.8150*T-.00059*T*T+.001813*T*T*T)/3600}
 function ascendantSidereal(d,lat,lon,a){
   const rad=Math.PI/180,lst=norm(A.SiderealTime(d)*15+lon)*rad,phi=lat*rad,eps=meanObliquity(d)*rad;
@@ -249,12 +301,121 @@ function hand(angle,r,color,width,label){const p=polar(angle,r),l=polar(angle,11
 function deg(v){let d=Math.floor(v),m=Math.round((v-d)*60);if(m===60){d++;m=0}return d+'° '+String(m).padStart(2,'0')+'′'}
 function syncInputs(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'),hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0'),ss=String(d.getSeconds()).padStart(2,'0');document.getElementById('date').value=y+'-'+m+'-'+day;document.getElementById('time').value=hh+':'+mm+':'+ss}
 function currentMoment(){return mode==='live'?new Date():selectedTime}
+
+let lastGeneratedReturn=null,lastReturnDirection=1,lastReturnTargetAsc=null;
+
+function natalMoment(){
+  const dv=document.getElementById('natalDate').value,tv=document.getElementById('natalTime').value;
+  if(!dv||!tv)return null;
+  const [y,m,d]=dv.split('-').map(Number),p=tv.split(':').map(Number);
+  const x=new Date(y,m-1,d,p[0]||0,p[1]||0,p[2]||0);
+  return Number.isFinite(x.getTime())?x:null;
+}
+function selectedReturnPlanets(){
+  return [...document.querySelectorAll('.returnPlanet:checked')].map(x=>x.value);
+}
+function refineAscTarget(a,b,target,lat,lon){
+  let lo=a.getTime(),hi=b.getTime();
+  for(let i=0;i<36;i++){
+    const mid=Math.floor((lo+hi)/2),v=norm(ascLonAt(new Date(mid),lat,lon)-target);
+    if(v>180)lo=mid;else hi=mid;
+  }
+  return new Date(hi);
+}
+function findAscTarget(start,direction,target,lat,lon){
+  const step=10*60*1000,maxSteps=180;
+  if(direction>0){
+    let a=new Date(start),av=norm(ascLonAt(a,lat,lon)-target);
+    for(let i=0;i<maxSteps;i++){
+      const b=new Date(a.getTime()+step),bv=norm(ascLonAt(b,lat,lon)-target);
+      if(av>300&&bv<60)return refineAscTarget(a,b,target,lat,lon);
+      a=b;av=bv;
+    }
+  }else{
+    let b=new Date(start),bv=norm(ascLonAt(b,lat,lon)-target);
+    for(let i=0;i<maxSteps;i++){
+      const a=new Date(b.getTime()-step),av=norm(ascLonAt(a,lat,lon)-target);
+      if(av>300&&bv<60)return refineAscTarget(a,b,target,lat,lon);
+      b=a;bv=av;
+    }
+  }
+  return null;
+}
+function returnMatch(candidate,targetAsc,natalPositions,planets,ascOrb,planetOrb,lat,lon){
+  const ascNow=ascLonAt(candidate,lat,lon),ascDelta=angularDiff(ascNow,targetAsc);
+  const aya=lahiri(candidate),details=[];
+  let ok=ascDelta<=ascOrb;
+  let sum=ascDelta*ascDelta;
+  for(const name of planets){
+    const now=bodyLon(name,candidate,aya),delta=angularDiff(now,natalPositions[name]);
+    details.push({name,now,target:natalPositions[name],delta});
+    sum+=delta*delta;
+    if(delta>planetOrb)ok=false;
+  }
+  return{ok,ascDelta,details,score:Math.sqrt(sum/(planets.length+1))};
+}
+function formatReturnDetails(m){
+  const parts=['ASC Δ '+m.ascDelta.toFixed(3)+'°'];
+  for(const p of m.details)parts.push(p.name+' Δ '+p.delta.toFixed(3)+'°');
+  return parts.join(' · ')+' · RMS '+m.score.toFixed(3)+'°';
+}
+async function generateReturn(direction,fromGenerated=false){
+  if(!A||!userLocation)return;
+  const natal=natalMoment(),planets=selectedReturnPlanets();
+  if(!natal){
+    document.getElementById('returnResult').textContent='Enter a valid natal date/time.';
+    return;
+  }
+  const ascOrb=Math.max(.01,Number(document.getElementById('ascReturnOrb').value)||.1);
+  const planetOrb=Math.max(.05,Number(document.getElementById('planetReturnOrb').value)||1);
+  const years=Math.max(1,Math.min(100,Number(document.getElementById('returnYears').value)||20));
+  const lat=userLocation.lat,lon=userLocation.lon;
+  const reference=fromGenerated&&lastGeneratedReturn?lastGeneratedReturn:currentMoment();
+  const targetAsc=lastReturnTargetAsc!==null&&fromGenerated?lastReturnTargetAsc:ascLonAt(currentMoment(),lat,lon);
+  lastReturnTargetAsc=targetAsc;
+  const nAya=lahiri(natal),natalPositions={};
+  for(const name of planets)natalPositions[name]=bodyLon(name,natal,nAya);
+
+  document.getElementById('returnResult').textContent='Searching…';
+  document.getElementById('returnDetail').textContent='Testing exact local ASC returns against '+(planets.length?planets.join(', '):'ASC only')+'.';
+  document.getElementById('nextReturn').disabled=true;
+  document.getElementById('prevReturn').disabled=true;
+
+  let cursor=new Date(reference.getTime()+direction*60*1000);
+  const maxCandidates=Math.ceil(years*366);
+  let best=null;
+  for(let i=0;i<maxCandidates;i++){
+    const candidate=findAscTarget(cursor,direction,targetAsc,lat,lon);
+    if(!candidate)break;
+    const match=returnMatch(candidate,targetAsc,natalPositions,planets,ascOrb,planetOrb,lat,lon);
+    if(!best||match.score<best.match.score)best={candidate,match};
+    if(match.ok){
+      lastGeneratedReturn=candidate;lastReturnDirection=direction;
+      document.getElementById('returnResult').textContent=candidate.toLocaleString();
+      document.getElementById('returnDetail').textContent=formatReturnDetails(match)+' · '+(i+1)+' ASC returns tested.';
+      document.getElementById('loadReturn').disabled=false;
+      document.getElementById('continueReturn').disabled=false;
+      document.getElementById('nextReturn').disabled=false;
+      document.getElementById('prevReturn').disabled=false;
+      return;
+    }
+    cursor=new Date(candidate.getTime()+direction*20*60*60*1000);
+    if(i%40===0)await new Promise(r=>setTimeout(r,0));
+  }
+  document.getElementById('returnResult').textContent='No exact match in '+years+' years.';
+  document.getElementById('returnDetail').textContent=best?'Closest tested: '+best.candidate.toLocaleString()+' · '+formatReturnDetails(best.match):'Try a wider orb or longer search range.';
+  document.getElementById('loadReturn').disabled=true;
+  document.getElementById('continueReturn').disabled=true;
+  document.getElementById('nextReturn').disabled=false;
+  document.getElementById('prevReturn').disabled=false;
+}
 function draw(){
   const d=currentMoment();
   if(!A){document.getElementById('status').textContent='Astronomy engine unavailable';return}
   if(!userLocation){document.getElementById('status').textContent='Locating…';return}
   const lat=userLocation.lat,lon=userLocation.lon;
   const aya=lahiri(d),asc=pos(ascendantSidereal(d,lat,lon,aya));
+  document.getElementById('returnAscLabel').value=SIGNS[asc.sign]+' '+deg(asc.degree);
   const prevAries=findAriesBoundary(d,lat,lon,-1);
   const nextAries=findAriesBoundary(d,lat,lon,1);
   const ascClock=formatAscClock(asc.lon);
@@ -323,6 +484,16 @@ document.getElementById('setBtn').addEventListener('click',()=>{const x=selected
 document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()-60000);mode='fixed';syncInputs(selectedTime);draw()});
 document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';syncInputs(selectedTime);draw()});
 document.getElementById('locateBtn').addEventListener('click',startLocation);
+document.getElementById('nextReturn').addEventListener('click',()=>generateReturn(1,false));
+document.getElementById('prevReturn').addEventListener('click',()=>generateReturn(-1,false));
+document.getElementById('loadReturn').addEventListener('click',()=>{
+  if(!lastGeneratedReturn)return;
+  selectedTime=new Date(lastGeneratedReturn);mode='fixed';syncInputs(selectedTime);draw();
+});
+document.getElementById('continueReturn').addEventListener('click',()=>{
+  if(!lastGeneratedReturn)return;
+  generateReturn(lastReturnDirection,true);
+});
 syncInputs(new Date());
 if(userLocation){
   setLocationStatus(userLocation.lat.toFixed(5)+'°, '+userLocation.lon.toFixed(5)+'°','Last saved device position · refreshing automatically now.');
