@@ -13,7 +13,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
 <script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/geo-clock.html'));</script>
 <header><a href="/">◎ GEOGRAPHICAL ASCENDANT CLOCK</a><nav><a href="/">Earth Tracker</a><a href="/pada-clock.html">108 Pada Clock</a><a class="active" href="/geo-clock.html">Geo Clock</a><a href="/weather.html">Landfall Cyclones</a><a href="/convective.html">Severe Convection</a></nav></header>
 <main>
-<section class="hero"><div><span class="eyebrow">LOCAL SIDEREAL TIME · LAHIRI ASCENDANT · RISING-SIGN PROGRESS</span><h1>Geographical Ascendant Clock</h1><p>The hour hand is the actual local Ascendant. The minute hand measures progress through the current 30° rising sign and the sweep ticker measures the current 3°20′ pada. A second ASC date/time system is anchored to each local 0° sidereal Aries rising. You can use the original ASC-day algorithm or switch on an adjustable epoch calendar that produces a completely separate month/day/year date.</p></div><span id="status" class="status">Live</span></section>
+<section class="hero"><div><span class="eyebrow">LOCAL SIDEREAL TIME · LAHIRI ASCENDANT · RISING-SIGN PROGRESS</span><h1>Geographical Ascendant Clock</h1><p>The hour hand is the actual local Ascendant. The minute hand measures progress through the current 30° rising sign and the sweep ticker measures the current 3°20′ pada. A second ASC date/time system is anchored to each local 0° sidereal Aries rising. The page can also generate future or past dates from exact ASC returns and optional natal planetary-return conditions.</p></div><span id="status" class="status">Live</span></section>
 <section class="layout">
 <div class="panel clock-card"><div class="clock-wrap"><svg id="clock" viewBox="0 0 900 900" role="img" aria-label="Geographical Ascendant Clock"></svg></div></div>
 <div class="panel">
@@ -24,51 +24,6 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div class="row"><button id="minus" type="button">− 1 minute</button><button id="plus" type="button">+ 1 minute</button></div>
     <button id="locateBtn" type="button">Refresh automatic location</button>
   </div>
-  
-  <div class="modebox">
-    <label class="toggleline">
-      <span>
-        <b>Epoch Dating Mode</b><br>
-        <span style="color:#8199aa">OFF = original ASC dating · ON = alternate month/day/year calendar</span>
-      </span>
-      <input id="epochMode" type="checkbox">
-    </label>
-
-    <div id="epochPanel" class="epoch-panel">
-      <div class="epoch-title">ASC Epoch Settings</div>
-
-      <div class="row">
-        <label>Epoch civil date
-          <input id="epochCivilDate" type="date" value="2000-01-01">
-        </label>
-        <label>Epoch civil time
-          <input id="epochCivilTime" type="time" step="1" value="00:00:00">
-        </label>
-      </div>
-
-      <div class="row">
-        <label>Epoch ASC month
-          <input id="epochAscMonth" type="number" min="1" max="12" step="1" value="1">
-        </label>
-        <label>Epoch ASC day
-          <input id="epochAscDay" type="number" min="1" max="30" step="1" value="1">
-        </label>
-      </div>
-
-      <div class="row">
-        <label>Epoch ASC year
-          <input id="epochAscYear" type="number" min="1" step="1" value="2000">
-        </label>
-        <button id="resetEpoch" type="button">Reset epoch</button>
-      </div>
-
-      <div class="note">
-        Example: assigning 01/01/2000 to the selected civil epoch means every later or earlier date will be converted relative to that starting point.
-      </div>
-    </div>
-  </div>
-
-
   <div id="returnGenerator" class="returnbox">
     <h3>ASC + Natal Return Date Generator</h3>
     <div class="note">The current clock position becomes the ASC return target. Enter a natal reference date/time, choose planets, then search forward or backward for the next exact ASC return that also matches the selected natal planets within your orb.</div>
@@ -235,61 +190,6 @@ function formatAscClock(lon){
 function localDateLabel(d){
   return d.toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
 }
-const SIDEREAL_DAY_MS=86164.0905*1000;
-function epochCivilMoment(){
-  const dv=document.getElementById('epochCivilDate').value,tv=document.getElementById('epochCivilTime').value;
-  if(!dv||!tv)return null;
-  const [y,m,d]=dv.split('-').map(Number),p=tv.split(':').map(Number);
-  const x=new Date(y,m-1,d,p[0]||0,p[1]||0,p[2]||0);
-  return Number.isFinite(x.getTime())?x:null;
-}
-function calendarSerial(y,m,d){return (y-1)*360+(m-1)*30+(d-1)}
-function serialCalendar(n){
-  const y=Math.floor(n/360)+1,rem=((n%360)+360)%360,m=Math.floor(rem/30)+1,d=(rem%30)+1;
-  return{year:y,month:m,day:d};
-}
-function fmtAscDate(c){return String(c.month).padStart(2,'0')+'/'+String(c.day).padStart(2,'0')+'/'+String(c.year)}
-function epochCalendarFor(targetBoundary,lat,lon){
-  const civil=epochCivilMoment();
-  const ey=Number(document.getElementById('epochAscYear').value),em=Number(document.getElementById('epochAscMonth').value),ed=Number(document.getElementById('epochAscDay').value);
-  if(!civil||!Number.isInteger(ey)||!Number.isInteger(em)||!Number.isInteger(ed)||ey<1||em<1||em>12||ed<1||ed>30)return null;
-  const epochBoundary=findAriesBoundary(civil,lat,lon,-1);
-  if(!epochBoundary||!targetBoundary)return null;
-  const deltaDays=Math.round((targetBoundary.getTime()-epochBoundary.getTime())/SIDEREAL_DAY_MS);
-  return{date:serialCalendar(calendarSerial(ey,em,ed)+deltaDays),deltaDays,epochBoundary};
-}
-function saveEpochSettings(){
-  try{
-    localStorage.setItem('geoClockEpoch',JSON.stringify({
-      enabled:document.getElementById('epochMode').checked,
-      civilDate:document.getElementById('epochCivilDate').value,
-      civilTime:document.getElementById('epochCivilTime').value,
-      ascMonth:document.getElementById('epochAscMonth').value,
-      ascDay:document.getElementById('epochAscDay').value,
-      ascYear:document.getElementById('epochAscYear').value
-    }));
-  }catch{}
-}
-function setEpochControlsState(){
-  const on=document.getElementById('epochMode').checked;
-  ['epochCivilDate','epochCivilTime','epochAscMonth','epochAscDay','epochAscYear','resetEpoch'].forEach(id=>{
-    const el=document.getElementById(id); if(el)el.disabled=!on;
-  });
-  const panel=document.getElementById('epochPanel');
-  if(panel)panel.style.opacity=on?'1':'.48';
-}
-function loadEpochSettings(){
-  try{
-    const x=JSON.parse(localStorage.getItem('geoClockEpoch')||'null');if(!x){setEpochControlsState();return;}
-    document.getElementById('epochMode').checked=!!x.enabled;
-    if(x.civilDate)document.getElementById('epochCivilDate').value=x.civilDate;
-    if(x.civilTime)document.getElementById('epochCivilTime').value=x.civilTime;
-    if(x.ascMonth)document.getElementById('epochAscMonth').value=x.ascMonth;
-    if(x.ascDay)document.getElementById('epochAscDay').value=x.ascDay;
-    if(x.ascYear)document.getElementById('epochAscYear').value=x.ascYear;
-  }catch{}
-  setEpochControlsState();
-}
 function pos(lon){
   const nakSize=360/27,padaSize=360/108,sign=Math.floor(lon/30),nak=Math.floor(lon/nakSize),nakDeg=lon%nakSize;
   return{lon,sign,degree:lon%30,nak,nakName:NAK[nak],pada:Math.floor(nakDeg/padaSize)+1,globalPada:Math.floor(lon/padaSize)+1,padaDegree:lon%padaSize};
@@ -445,20 +345,8 @@ function draw(){
     const span=nextAries.getTime()-prevAries.getTime();
     const elapsed=d.getTime()-prevAries.getTime();
     const dayPct=Math.max(0,Math.min(1,elapsed/span))*100;
-    const epochEnabled=document.getElementById('epochMode').checked;
-    if(epochEnabled){
-      const ec=epochCalendarFor(prevAries,lat,lon);
-      if(ec){
-        document.getElementById('ascDate').textContent=fmtAscDate(ec.date);
-        document.getElementById('ascDateDetail').textContent='Epoch calendar · '+ec.deltaDays+' ASC days from the selected epoch boundary. 12 months × 30 days = 360-day ASC year.';
-      }else{
-        document.getElementById('ascDate').textContent='Invalid epoch';
-        document.getElementById('ascDateDetail').textContent='Check the epoch civil date/time and ASC month/day/year settings.';
-      }
-    }else{
-      document.getElementById('ascDate').textContent=localDateLabel(prevAries)+' A';
-      document.getElementById('ascDateDetail').textContent='Original mode · ASC day began at '+prevAries.toLocaleString()+' when 0° sidereal Aries rose locally.';
-    }
+    document.getElementById('ascDate').textContent=localDateLabel(prevAries)+' A';
+    document.getElementById('ascDateDetail').textContent='ASC day began at '+prevAries.toLocaleString()+' when 0° sidereal Aries rose locally.';
     document.getElementById('ascTime').textContent=ascClock+' ASC';
     document.getElementById('ascTimeDetail').textContent=SIGNS[asc.sign]+' '+deg(asc.degree)+' · '+asc.nakName+' · Pada '+asc.pada;
     document.getElementById('ascDayProgress').textContent=dayPct.toFixed(2)+'%';
