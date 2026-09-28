@@ -24,7 +24,51 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div class="row"><button id="minus" type="button">− 1 minute</button><button id="plus" type="button">+ 1 minute</button></div>
     <button id="locateBtn" type="button">Refresh automatic location</button>
   </div>
-  <div class="cards">
+  
+  <div class="modebox">
+    <label class="toggleline">
+      <span>
+        <b>Epoch Dating Mode</b><br>
+        <span style="color:#8199aa">OFF = original ASC dating · ON = alternate month/day/year calendar</span>
+      </span>
+      <input id="epochMode" type="checkbox">
+    </label>
+
+    <div id="epochPanel" class="epoch-panel">
+      <div class="epoch-title">ASC Epoch Settings</div>
+
+      <div class="row">
+        <label>Epoch civil date
+          <input id="epochCivilDate" type="date" value="2000-01-01">
+        </label>
+        <label>Epoch civil time
+          <input id="epochCivilTime" type="time" step="1" value="00:00:00">
+        </label>
+      </div>
+
+      <div class="row">
+        <label>Epoch ASC month
+          <input id="epochAscMonth" type="number" min="1" max="12" step="1" value="1">
+        </label>
+        <label>Epoch ASC day
+          <input id="epochAscDay" type="number" min="1" max="30" step="1" value="1">
+        </label>
+      </div>
+
+      <div class="row">
+        <label>Epoch ASC year
+          <input id="epochAscYear" type="number" min="1" step="1" value="2000">
+        </label>
+        <button id="resetEpoch" type="button">Reset epoch</button>
+      </div>
+
+      <div class="note">
+        Example: assigning 01/01/2000 to the selected civil epoch means every later or earlier date will be converted relative to that starting point.
+      </div>
+    </div>
+  </div>
+
+<div class="cards">
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
     <div class="card"><small>Sign progress · Minute hand</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
     <div class="card"><small>Pada ticker · Sweep hand</small><b id="padaProgress">—</b><p id="padaDetail">—</p></div>
@@ -174,9 +218,17 @@ function saveEpochSettings(){
     }));
   }catch{}
 }
+function setEpochControlsState(){
+  const on=document.getElementById('epochMode').checked;
+  ['epochCivilDate','epochCivilTime','epochAscMonth','epochAscDay','epochAscYear','resetEpoch'].forEach(id=>{
+    const el=document.getElementById(id); if(el)el.disabled=!on;
+  });
+  const panel=document.getElementById('epochPanel');
+  if(panel)panel.style.opacity=on?'1':'.48';
+}
 function loadEpochSettings(){
   try{
-    const x=JSON.parse(localStorage.getItem('geoClockEpoch')||'null');if(!x)return;
+    const x=JSON.parse(localStorage.getItem('geoClockEpoch')||'null');if(!x){setEpochControlsState();return;}
     document.getElementById('epochMode').checked=!!x.enabled;
     if(x.civilDate)document.getElementById('epochCivilDate').value=x.civilDate;
     if(x.civilTime)document.getElementById('epochCivilTime').value=x.civilTime;
@@ -184,7 +236,7 @@ function loadEpochSettings(){
     if(x.ascDay)document.getElementById('epochAscDay').value=x.ascDay;
     if(x.ascYear)document.getElementById('epochAscYear').value=x.ascYear;
   }catch{}
-  document.getElementById('epochPanel').hidden=!document.getElementById('epochMode').checked;
+  setEpochControlsState();
 }
 function pos(lon){
   const nakSize=360/27,padaSize=360/108,sign=Math.floor(lon/30),nak=Math.floor(lon/nakSize),nakDeg=lon%nakSize;
