@@ -38,28 +38,65 @@ button,select,input{font:inherit}
 
 .topbar{
   position:absolute;
-  z-index:10;
-  top:14px;
-  left:14px;
-  right:14px;
-  min-height:64px;
+  z-index:13;
+  left:50%;
+  bottom:14px;
+  top:auto;
+  right:auto;
+  transform:translateX(-50%);
+  width:min(560px,calc(100vw - 180px));
+  min-height:56px;
   border-radius:14px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:9px 10px 9px 14px;
+}
+.topbar-main{
+  flex:1;
+  min-width:0;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:14px;
-  padding:11px 14px;
 }
-.topbar h1{font-size:18px;margin:0 0 3px}
-.topbar p{font-size:11px;color:var(--muted);margin:0}
-.topbar nav{display:flex;gap:8px}
+.topbar-copy{min-width:0}
+.topbar h1{font-size:15px;margin:0 0 2px;white-space:nowrap}
+.topbar p{font-size:9px;color:var(--muted);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar nav{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .topbar a{
   color:#c9ebff;
   text-decoration:none;
   border:1px solid var(--border);
-  padding:7px 9px;
+  padding:6px 8px;
   border-radius:8px;
-  font-size:11px;
+  font-size:10px;
+  white-space:nowrap;
+}
+.header-collapse-btn{
+  flex:0 0 auto;
+  width:34px;
+  height:34px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  font-size:19px;
+  font-weight:800;
+  line-height:1;
+}
+.topbar.collapsed{
+  width:44px;
+  min-height:44px;
+  height:44px;
+  padding:4px;
+  border-radius:12px;
+}
+.topbar.collapsed .topbar-main{display:none}
+.topbar.collapsed .header-collapse-btn{
+  width:34px;
+  height:34px;
+  border:none;
+  background:transparent;
 }
 
 .control-panel{
@@ -206,9 +243,14 @@ button:hover,select:hover{border-color:rgba(103,232,249,.5)}
 }
 
 @media(max-width:760px){
-  .topbar{align-items:flex-start}
-  .topbar h1{font-size:15px}
-  .topbar nav{flex-direction:column}
+  .topbar{
+    width:min(420px,calc(100vw - 92px));
+    bottom:10px;
+  }
+  .topbar h1{font-size:13px}
+  .topbar p{display:none}
+  .topbar nav{flex-direction:row}
+  .topbar a{font-size:9px;padding:5px 7px}
   .control-panel{max-height:54vh}
   .planet-list{grid-template-columns:1fr}
   .prototype-badge{display:none}
