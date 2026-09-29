@@ -1378,57 +1378,101 @@ function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
   const rh=risingCanvas.height;
   if(!state.risingSignGrid || !state.risingNakGrid) return;
 
+  const equatorRow=Math.max(0,Math.min(rh-1,Math.floor(rh/2)));
+  const equatorY=h/2;
   const occupied=[];
 
-  // Zodiac: one strong, compact marker per visible sign region.
   if(showZodiac){
-    for(let i=0;i<12;i++){
-      const candidates=findRegionLabelCandidates(
-        state.risingSignGrid,i,rw,rh,w,h,earthShiftDeg,34,10
-      );
-      const pt=pickReadableLabelPoint(candidates,occupied,68,48,w,h);
-      if(!pt) continue;
-
-      drawZodiacMarker(
-        SIGNS[i][1],
-        SIGNS[i][0],
-        SIGNS[i][2],
-        pt.x,
-        pt.y
-      );
-      occupied.push({x:pt.x,y:pt.y,w:68,h:48});
-    }
+    drawEquatorRuns(
+      state.risingSignGrid,
+      equatorRow,
+      12,
+      (index,x,runWidth)=>{
+        const glyphSize=(23/Math.max(1,Math.sqrt(state.zoom)))*0.8;
+        const radius=(17/Math.max(1,Math.sqrt(state.zoom)))*0.8;
+        drawEquatorZodiacMarker(SIGNS[index][1],SIGNS[index][2],x,equatorY,glyphSize,radius);
+        occupied.push({x,y:equatorY,w:Math.max(34,glyphSize*1.7),h:Math.max(28,glyphSize*1.6)});
+      },
+      24
+    );
   }
 
-  // Nakshatras: place full names inside an interior candidate that does not
-  // collide with a zodiac marker or another nakshatra label.
   if(showNak){
-    const order=[];
-    for(let i=0;i<27;i++){
-      const candidates=findRegionLabelCandidates(
-        state.risingNakGrid,i,rw,rh,w,h,earthShiftDeg,24,14
-      );
-      if(candidates.length) order.push({i,candidates,best:candidates[0].runWidth});
-    }
+    drawEquatorRuns(
+      state.risingNakGrid,
+      equatorRow,
+      27,
+      (index,x,runWidth)=>{
+        const lines=splitNakshatraLabel(NAKSHATRAS[index]);
+        const scale=Math.max(1,Math.sqrt(state.zoom));
+        const fontSize=Math.max(7.5,Math.min(9.5,9/scale));
+        const longest=Math.max(...lines.map(v=>v.length));
+        const boxW=Math.max(42,longest*fontSize*.60+12);
+        const boxH=lines.length>1?fontSize*2.55:fontSize*1.7;
 
-    // Place the largest / easiest regions first.
-    order.sort((a,b)=>b.best-a.best);
+        const yOffsets=[32,-32,48,-48];
+        let targetY=null;
+        for(const off of yOffsets){
+          const y=equatorY+off/scale;
+          const collide=occupied.some(o=>
+            Math.abs(o.x-x)<(o.w+boxW)/2+5 &&
+            Math.abs(o.y-y)<(o.h+boxH)/2+5
+          );
+          if(!collide){targetY=y;break;}
+        }
+        if(targetY===null)return;
 
-    for(const item of order){
-      const lines=splitNakshatraLabel(NAKSHATRAS[item.i]);
-      const scale=Math.max(1,Math.sqrt(state.zoom));
-      const fontSize=Math.max(8,Math.min(10.5,10/scale));
-      const longest=Math.max(...lines.map(x=>x.length));
-      const boxW=Math.max(46,longest*fontSize*.61+14);
-      const boxH=lines.length>1?fontSize*2.7:fontSize*1.8;
+        drawNakshatraLabel(lines,nakColorCss(index),x,targetY,fontSize);
+        occupied.push({x,y:targetY,w:boxW,h:boxH});
+      },
+      18
+    );
+  }
 
-      const pt=pickReadableLabelPoint(item.candidates,occupied,boxW,boxH,w,h);
-      if(!pt) continue;
+  function drawEquatorRuns(grid,row,count,drawFn,minScreenWidth){
+    let start=0;
+    let current=grid[row*rw];
 
-      drawNakshatraLabel(lines,nakColorCss(item.i),pt.x,pt.y,fontSize);
-      occupied.push({x:pt.x,y:pt.y,w:boxW,h:boxH});
+    for(let x=1;x<=rw;x++){
+      const next=x<rw?grid[row*rw+x]:255;
+      if(next!==current){
+        const runWidth=(x-start)/rw*w;
+        if(current<count && runWidth>=minScreenWidth){
+          const center=(start+x)/2/rw*w + earthShiftDeg/360*w;
+          const candidates=[center-w,center,center+w].filter(cx=>cx>16&&cx<w-16);
+
+          for(const cx of candidates){
+            drawFn(current,cx,runWidth);
+          }
+        }
+        start=x;
+        current=next;
+      }
     }
   }
+}
+
+function drawEquatorZodiacMarker(glyph,color,x,y,glyphSize,radius){
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.arc(x,y,radius,0,Math.PI*2);
+  ctx.fillStyle='rgba(2,8,18,.86)';
+  ctx.fill();
+  ctx.strokeStyle=color;
+  ctx.lineWidth=1.2/Math.max(1,Math.sqrt(state.zoom));
+  ctx.stroke();
+
+  ctx.font=`900 ${glyphSize}px "Segoe UI Symbol",system-ui,sans-serif`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.lineWidth=1.8/Math.max(1,Math.sqrt(state.zoom));
+  ctx.strokeStyle='rgba(0,0,0,.95)';
+  ctx.strokeText(glyph,x,y);
+  ctx.fillStyle=color;
+  ctx.fillText(glyph,x,y);
+
+  ctx.restore();
 }
 
 function findRegionLabelCandidates(grid,target,rw,rh,screenW,screenH,earthShiftDeg,minScreenWidth,maxCount){
