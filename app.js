@@ -1378,51 +1378,148 @@ function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
   const rh=risingCanvas.height;
   if(!state.risingSignGrid || !state.risingNakGrid) return;
 
+  const occupied=[];
+
   if(showZodiac){
-    const yFrac=.055;
-    const row=Math.max(0,Math.min(rh-1,Math.floor(.12*rh)));
-    const seen=new Set();
-    drawCenteredRuns(
-      state.risingSignGrid,row,12,w,h*yFrac,
-      index=>`${SIGNS[index][1]} ${SIGNS[index][0]}`,
-      index=>SIGNS[index][2],
-      13,26,seen
-    );
+    for(let i=0;i<12;i++){
+      const pt=findBestRegionLabelPoint(state.risingSignGrid,i,rw,rh,w,h,earthShiftDeg,18);
+      if(!pt) continue;
+
+      const glyphSize=Math.max(22,Math.min(34,30/Math.sqrt(state.zoom)));
+      const nameSize=Math.max(8,Math.min(12,10/Math.sqrt(state.zoom)));
+
+      drawFieldGlyph(SIGNS[i][1],SIGNS[i][2],pt.x,pt.y,glyphSize);
+      drawFieldLabel(SIGNS[i][0],SIGNS[i][2],pt.x,pt.y+glyphSize*.72,nameSize);
+      occupied.push({x:pt.x,y:pt.y,w:Math.max(46,glyphSize*1.8),h:glyphSize*1.8});
+    }
   }
 
-  if(showNak && w>900){
-    const yFrac=.105;
-    const row=Math.max(0,Math.min(rh-1,Math.floor(.16*rh)));
-    drawCenteredRuns(
-      state.risingNakGrid,row,27,w,h*yFrac,
-      index=>NAKSHATRAS[index],
-      index=>nakColorCss(index),
-      8,16,null
-    );
+  if(showNak){
+    const points=[];
+    for(let i=0;i<27;i++){
+      const pt=findBestRegionLabelPoint(state.risingNakGrid,i,rw,rh,w,h,earthShiftDeg,10);
+      if(pt) points.push({i,...pt});
+    }
+
+    points.sort((a,b)=>b.runWidth-a.runWidth);
+
+    for(const pt of points){
+      const parts=splitNakshatraLabel(NAKSHATRAS[pt.i]);
+      const fontSize=Math.max(8,Math.min(11,10/Math.sqrt(state.zoom)));
+      const estWidth=Math.max(...parts.map(x=>x.length))*fontSize*.58+14;
+      const estHeight=parts.length>1?fontSize*2.5:fontSize*1.7;
+
+      let y=pt.y;
+      const collide=occupied.some(o=>Math.abs(o.x-pt.x)<(o.w+estWidth)/2 && Math.abs(o.y-y)<(o.h+estHeight)/2);
+      if(collide) y+=Math.max(24,estHeight+8);
+
+      drawNakshatraLabel(parts,nakColorCss(pt.i),pt.x,y,fontSize);
+      occupied.push({x:pt.x,y,w:estWidth,h:estHeight});
+    }
   }
+}
 
-  function drawCenteredRuns(grid,row,count,screenW,y,labelFor,colorFor,size,minScreenWidth,seen){
-    let start=0;
-    let current=grid[row*rw];
+function findBestRegionLabelPoint(grid,target,rw,rh,screenW,screenH,earthShiftDeg,minScreenWidth){
+  let best=null;
 
-    for(let x=1;x<=rw;x++){
-      const next=x<rw?grid[row*rw+x]:255;
-      if(next!==current){
-        const runWidth=(x-start)/rw*screenW;
-        if(current<count && runWidth>=minScreenWidth && (!seen || !seen.has(current))){
-          const center=(start+x)/2/rw*screenW + earthShiftDeg/360*screenW;
-          const candidates=[center-screenW,center,center+screenW].filter(cx=>cx>-80&&cx<screenW+80);
-          if(candidates.length){
-            const cx=candidates.sort((a,b)=>Math.abs(a-screenW/2)-Math.abs(b-screenW/2))[0];
-            drawFieldLabel(labelFor(current),colorFor(current),cx,y,size);
-            if(seen)seen.add(current);
-          }
+  for(let row=5;row<rh-5;row+=2){
+    let start=-1;
+    for(let x=0;x<=rw;x++){
+      const match=x<rw && grid[row*rw+x]===target;
+      if(match && start<0) start=x;
+
+      if((!match || x===rw) && start>=0){
+        const len=x-start;
+        const runWidth=len/rw*screenW;
+        if(runWidth>=minScreenWidth && (!best || len>best.len)){
+          best={start,end:x,row,len,runWidth};
         }
-        start=x;
-        current=next;
+        start=-1;
       }
     }
   }
+
+  if(!best) return null;
+
+  const center=(best.start+best.end)/2/rw*screenW + earthShiftDeg/360*screenW;
+  const copies=[center-screenW,center,center+screenW].filter(cx=>cx>-100&&cx<screenW+100);
+  if(!copies.length) return null;
+
+  const x=copies.sort((a,b)=>Math.abs(a-screenW/2)-Math.abs(b-screenW/2))[0];
+  const y=(best.row+.5)/rh*screenH;
+
+  return{x,y,runWidth:best.runWidth};
+}
+
+function splitNakshatraLabel(name){
+  if(name.length<=12 || !name.includes(' ')) return [name];
+  const parts=name.split(' ');
+  if(parts.length===2) return parts;
+  const first=parts.shift();
+  return[first,parts.join(' ')];
+}
+
+function drawFieldGlyph(text,color,x,y,size){
+  const visualScale=Math.max(1,Math.sqrt(state.zoom));
+  const localSize=size/visualScale;
+
+  ctx.save();
+  ctx.font=`900 ${localSize}px "Segoe UI Symbol",system-ui,sans-serif`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.lineJoin='round';
+  ctx.lineWidth=Math.max(3/visualScale,localSize*.16);
+  ctx.strokeStyle='rgba(0,0,0,.94)';
+  ctx.shadowColor='rgba(0,0,0,.98)';
+  ctx.shadowBlur=8/visualScale;
+  ctx.strokeText(text,x,y);
+  ctx.fillStyle=color;
+  ctx.fillText(text,x,y);
+  ctx.restore();
+}
+
+function drawNakshatraLabel(lines,color,x,y,size){
+  const visualScale=Math.max(1,Math.sqrt(state.zoom));
+  const localSize=size/visualScale;
+  const lineHeight=localSize*1.12;
+
+  ctx.save();
+  ctx.font=`800 ${localSize}px system-ui,sans-serif`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+
+  const widths=lines.map(line=>ctx.measureText(line).width);
+  const boxW=Math.max(...widths)+12/visualScale;
+  const boxH=lineHeight*lines.length+8/visualScale;
+
+  ctx.fillStyle='rgba(2,8,18,.78)';
+  ctx.strokeStyle='rgba(255,255,255,.14)';
+  ctx.lineWidth=.8/visualScale;
+  roundRectPath(ctx,x-boxW/2,y-boxH/2,boxW,boxH,5/visualScale);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.shadowColor='rgba(0,0,0,.95)';
+  ctx.shadowBlur=4/visualScale;
+  ctx.fillStyle=color;
+
+  lines.forEach((line,i)=>{
+    const yy=y+(i-(lines.length-1)/2)*lineHeight;
+    ctx.fillText(line,x,yy);
+  });
+
+  ctx.restore();
+}
+
+function roundRectPath(ctx,x,y,w,h,r){
+  const rr=Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+rr,y);
+  ctx.arcTo(x+w,y,x+w,y+h,rr);
+  ctx.arcTo(x+w,y+h,x,y+h,rr);
+  ctx.arcTo(x,y+h,x,y,rr);
+  ctx.arcTo(x,y,x+w,y,rr);
+  ctx.closePath();
 }
 
 function drawFieldLabel(text,color,x,y,size){
