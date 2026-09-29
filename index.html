@@ -12,15 +12,17 @@
   <main class="app-shell">
     <canvas id="worldCanvas" aria-label="Animated world map with zodiac and nakshatra transit band"></canvas>
 
-    <header class="topbar glass">
-      <div>
-        <h1>Sidereal Transit Map</h1>
-        <p>Single-world projection · Lahiri sidereal zodiac · day/night</p>
+    <header id="bottomHeader" class="topbar glass">
+      <div class="topbar-main">
+        <div class="topbar-copy">
+          <h1>Sidereal Transit Map</h1>
+          <p>Single-world projection · Lahiri sidereal zodiac · day/night</p>
+        </div>
+        <nav>
+          <a href="/weather.html">Weather Agent</a><a href="/patterns.html">Pattern Lab</a>
+        </nav>
       </div>
-      <nav>
-        
-        <a href="/weather.html">Weather Agent</a><a href="/patterns.html">Pattern Lab</a>
-      </nav>
+      <button id="collapseHeaderBtn" class="header-collapse-btn" type="button" aria-expanded="true" aria-controls="bottomHeader" aria-label="Collapse header" title="Collapse header">⌄</button>
     </header>
 
     <section class="control-panel glass">
