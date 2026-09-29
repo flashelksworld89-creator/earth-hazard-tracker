@@ -1380,49 +1380,66 @@ function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
 
   const occupied=[];
 
+  // Zodiac: one strong, compact marker per visible sign region.
   if(showZodiac){
     for(let i=0;i<12;i++){
-      const pt=findBestRegionLabelPoint(state.risingSignGrid,i,rw,rh,w,h,earthShiftDeg,18);
+      const candidates=findRegionLabelCandidates(
+        state.risingSignGrid,i,rw,rh,w,h,earthShiftDeg,34,10
+      );
+      const pt=pickReadableLabelPoint(candidates,occupied,68,48,w,h);
       if(!pt) continue;
 
-      const glyphSize=Math.max(22,Math.min(34,30/Math.sqrt(state.zoom)));
-      const nameSize=Math.max(8,Math.min(12,10/Math.sqrt(state.zoom)));
-
-      drawFieldGlyph(SIGNS[i][1],SIGNS[i][2],pt.x,pt.y,glyphSize);
-      drawFieldLabel(SIGNS[i][0],SIGNS[i][2],pt.x,pt.y+glyphSize*.72,nameSize);
-      occupied.push({x:pt.x,y:pt.y,w:Math.max(46,glyphSize*1.8),h:glyphSize*1.8});
+      drawZodiacMarker(
+        SIGNS[i][1],
+        SIGNS[i][0],
+        SIGNS[i][2],
+        pt.x,
+        pt.y
+      );
+      occupied.push({x:pt.x,y:pt.y,w:68,h:48});
     }
   }
 
+  // Nakshatras: place full names inside an interior candidate that does not
+  // collide with a zodiac marker or another nakshatra label.
   if(showNak){
-    const points=[];
+    const order=[];
     for(let i=0;i<27;i++){
-      const pt=findBestRegionLabelPoint(state.risingNakGrid,i,rw,rh,w,h,earthShiftDeg,10);
-      if(pt) points.push({i,...pt});
+      const candidates=findRegionLabelCandidates(
+        state.risingNakGrid,i,rw,rh,w,h,earthShiftDeg,24,14
+      );
+      if(candidates.length) order.push({i,candidates,best:candidates[0].runWidth});
     }
 
-    points.sort((a,b)=>b.runWidth-a.runWidth);
+    // Place the largest / easiest regions first.
+    order.sort((a,b)=>b.best-a.best);
 
-    for(const pt of points){
-      const parts=splitNakshatraLabel(NAKSHATRAS[pt.i]);
-      const fontSize=Math.max(8,Math.min(11,10/Math.sqrt(state.zoom)));
-      const estWidth=Math.max(...parts.map(x=>x.length))*fontSize*.58+14;
-      const estHeight=parts.length>1?fontSize*2.5:fontSize*1.7;
+    for(const item of order){
+      const lines=splitNakshatraLabel(NAKSHATRAS[item.i]);
+      const scale=Math.max(1,Math.sqrt(state.zoom));
+      const fontSize=Math.max(8,Math.min(10.5,10/scale));
+      const longest=Math.max(...lines.map(x=>x.length));
+      const boxW=Math.max(46,longest*fontSize*.61+14);
+      const boxH=lines.length>1?fontSize*2.7:fontSize*1.8;
 
-      let y=pt.y;
-      const collide=occupied.some(o=>Math.abs(o.x-pt.x)<(o.w+estWidth)/2 && Math.abs(o.y-y)<(o.h+estHeight)/2);
-      if(collide) y+=Math.max(24,estHeight+8);
+      const pt=pickReadableLabelPoint(item.candidates,occupied,boxW,boxH,w,h);
+      if(!pt) continue;
 
-      drawNakshatraLabel(parts,nakColorCss(pt.i),pt.x,y,fontSize);
-      occupied.push({x:pt.x,y,w:estWidth,h:estHeight});
+      drawNakshatraLabel(lines,nakColorCss(item.i),pt.x,pt.y,fontSize);
+      occupied.push({x:pt.x,y:pt.y,w:boxW,h:boxH});
     }
   }
 }
 
-function findBestRegionLabelPoint(grid,target,rw,rh,screenW,screenH,earthShiftDeg,minScreenWidth){
-  let best=null;
+function findRegionLabelCandidates(grid,target,rw,rh,screenW,screenH,earthShiftDeg,minScreenWidth,maxCount){
+  const candidates=[];
+  const shiftPx=earthShiftDeg/360*screenW;
 
-  for(let row=5;row<rh-5;row+=2){
+  // Avoid extreme top/bottom edges where controls and degree labels make text busy.
+  const rowStart=Math.max(5,Math.floor(rh*.10));
+  const rowEnd=Math.min(rh-5,Math.ceil(rh*.88));
+
+  for(let row=rowStart;row<rowEnd;row+=3){
     let start=-1;
     for(let x=0;x<=rw;x++){
       const match=x<rw && grid[row*rw+x]===target;
@@ -1431,76 +1448,134 @@ function findBestRegionLabelPoint(grid,target,rw,rh,screenW,screenH,earthShiftDe
       if((!match || x===rw) && start>=0){
         const len=x-start;
         const runWidth=len/rw*screenW;
-        if(runWidth>=minScreenWidth && (!best || len>best.len)){
-          best={start,end:x,row,len,runWidth};
+
+        if(runWidth>=minScreenWidth){
+          const center=(start+x)/2/rw*screenW+shiftPx;
+          const copies=[center-screenW,center,center+screenW]
+            .filter(cx=>cx>18&&cx<screenW-18);
+
+          for(const cx of copies){
+            const y=(row+.5)/rh*screenH;
+            // Prefer broad runs and the readable central map band.
+            const centerPenalty=Math.abs(y-screenH*.50)/(screenH*.50);
+            const edgePenalty=Math.min(cx,screenW-cx)<60?.35:0;
+            const score=runWidth*(1-.24*centerPenalty-edgePenalty);
+            candidates.push({x:cx,y,runWidth,score});
+          }
         }
         start=-1;
       }
     }
   }
 
-  if(!best) return null;
+  candidates.sort((a,b)=>b.score-a.score);
 
-  const center=(best.start+best.end)/2/rw*screenW + earthShiftDeg/360*screenW;
-  const copies=[center-screenW,center,center+screenW].filter(cx=>cx>-100&&cx<screenW+100);
-  if(!copies.length) return null;
+  // De-duplicate candidates that are visually almost identical.
+  const out=[];
+  for(const p of candidates){
+    if(out.some(q=>Math.abs(q.x-p.x)<22&&Math.abs(q.y-p.y)<18)) continue;
+    out.push(p);
+    if(out.length>=maxCount) break;
+  }
+  return out;
+}
 
-  const x=copies.sort((a,b)=>Math.abs(a-screenW/2)-Math.abs(b-screenW/2))[0];
-  const y=(best.row+.5)/rh*screenH;
+function pickReadableLabelPoint(candidates,occupied,boxW,boxH,w,h){
+  const pad=7;
 
-  return{x,y,runWidth:best.runWidth};
+  for(const p of candidates){
+    if(p.x-boxW/2<4 || p.x+boxW/2>w-4 || p.y-boxH/2<4 || p.y+boxH/2>h-4) continue;
+
+    const collides=occupied.some(o=>
+      Math.abs(o.x-p.x)<(o.w+boxW)/2+pad &&
+      Math.abs(o.y-p.y)<(o.h+boxH)/2+pad
+    );
+
+    if(!collides) return p;
+  }
+  return null;
 }
 
 function splitNakshatraLabel(name){
-  if(name.length<=12 || !name.includes(' ')) return [name];
+  if(name.length<=13 || !name.includes(' ')) return [name];
+
+  // Keep familiar compound names balanced on two lines.
   const parts=name.split(' ');
   if(parts.length===2) return parts;
-  const first=parts.shift();
-  return[first,parts.join(' ')];
+
+  let best=[name],bestDiff=Infinity;
+  for(let i=1;i<parts.length;i++){
+    const a=parts.slice(0,i).join(' ');
+    const b=parts.slice(i).join(' ');
+    const diff=Math.abs(a.length-b.length);
+    if(diff<bestDiff){best=[a,b];bestDiff=diff;}
+  }
+  return best;
 }
 
-function drawFieldGlyph(text,color,x,y,size){
-  const visualScale=Math.max(1,Math.sqrt(state.zoom));
-  const localSize=size/visualScale;
+function drawZodiacMarker(glyph,name,color,x,y){
+  const scale=Math.max(1,Math.sqrt(state.zoom));
+  const radius=17/scale;
+  const glyphSize=23/scale;
+  const nameSize=8.5/scale;
 
   ctx.save();
-  ctx.font=`900 ${localSize}px "Segoe UI Symbol",system-ui,sans-serif`;
+
+  // Circular plate keeps symbols legible over land, ocean and overlays.
+  ctx.beginPath();
+  ctx.arc(x,y-radius*.12,radius,0,Math.PI*2);
+  ctx.fillStyle='rgba(2,8,18,.84)';
+  ctx.fill();
+  ctx.strokeStyle=color;
+  ctx.globalAlpha=.95;
+  ctx.lineWidth=1.5/scale;
+  ctx.stroke();
+
+  ctx.globalAlpha=1;
+  ctx.font=`900 ${glyphSize}px "Segoe UI Symbol",system-ui,sans-serif`;
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-  ctx.lineJoin='round';
-  ctx.lineWidth=Math.max(3/visualScale,localSize*.16);
+  ctx.lineWidth=2.2/scale;
   ctx.strokeStyle='rgba(0,0,0,.94)';
-  ctx.shadowColor='rgba(0,0,0,.98)';
-  ctx.shadowBlur=8/visualScale;
-  ctx.strokeText(text,x,y);
+  ctx.strokeText(glyph,x,y-radius*.20);
   ctx.fillStyle=color;
-  ctx.fillText(text,x,y);
+  ctx.fillText(glyph,x,y-radius*.20);
+
+  const nameY=y+radius+nameSize*.75;
+  ctx.font=`800 ${nameSize}px system-ui,sans-serif`;
+  const tw=ctx.measureText(name).width;
+  ctx.fillStyle='rgba(2,8,18,.80)';
+  roundRectPath(ctx,x-tw/2-4/scale,nameY-nameSize*.72,tw+8/scale,nameSize*1.45,4/scale);
+  ctx.fill();
+
+  ctx.fillStyle='rgba(238,248,255,.94)';
+  ctx.fillText(name,x,nameY);
   ctx.restore();
 }
 
 function drawNakshatraLabel(lines,color,x,y,size){
-  const visualScale=Math.max(1,Math.sqrt(state.zoom));
-  const localSize=size/visualScale;
-  const lineHeight=localSize*1.12;
+  const scale=Math.max(1,Math.sqrt(state.zoom));
+  const localSize=size;
+  const lineHeight=localSize*1.16;
 
   ctx.save();
-  ctx.font=`800 ${localSize}px system-ui,sans-serif`;
+  ctx.font=`700 ${localSize}px system-ui,sans-serif`;
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
   const widths=lines.map(line=>ctx.measureText(line).width);
-  const boxW=Math.max(...widths)+12/visualScale;
-  const boxH=lineHeight*lines.length+8/visualScale;
+  const boxW=Math.max(...widths)+12/scale;
+  const boxH=lineHeight*lines.length+8/scale;
 
-  ctx.fillStyle='rgba(2,8,18,.78)';
-  ctx.strokeStyle='rgba(255,255,255,.14)';
-  ctx.lineWidth=.8/visualScale;
-  roundRectPath(ctx,x-boxW/2,y-boxH/2,boxW,boxH,5/visualScale);
+  ctx.fillStyle='rgba(2,8,18,.86)';
+  ctx.strokeStyle='rgba(255,255,255,.16)';
+  ctx.lineWidth=.75/scale;
+  roundRectPath(ctx,x-boxW/2,y-boxH/2,boxW,boxH,4/scale);
   ctx.fill();
   ctx.stroke();
 
-  ctx.shadowColor='rgba(0,0,0,.95)';
-  ctx.shadowBlur=4/visualScale;
+  ctx.shadowColor='rgba(0,0,0,.85)';
+  ctx.shadowBlur=2/scale;
   ctx.fillStyle=color;
 
   lines.forEach((line,i)=>{
@@ -1558,14 +1633,14 @@ function drawZodiacDegreeGrid(w,h){
   for(let d=0;d<30;d++){
     const y=degreeLineY(d,h);
     const major=d%5===0;
-    ctx.strokeStyle=major?'rgba(165,205,226,.23)':'rgba(165,205,226,.10)';
+    ctx.strokeStyle=major?'rgba(165,205,226,.17)':'rgba(165,205,226,.065)';
     ctx.lineWidth=(major?.8:.45)/scale;
     ctx.beginPath();
     ctx.moveTo(0,y);
     ctx.lineTo(w,y);
     ctx.stroke();
 
-    ctx.fillStyle=major?'rgba(190,220,236,.78)':'rgba(154,188,207,.46)';
+    ctx.fillStyle=major?'rgba(190,220,236,.62)':'rgba(154,188,207,.34)';
     ctx.fillText(d+'°',6,y);
   }
   ctx.restore();
@@ -1799,11 +1874,11 @@ function drawPoliticalLabels(w,h,earthShiftDeg){
     const fontSize=baseSize/Math.max(1,Math.sqrt(state.zoom));
 
     ctx.save();
-    ctx.globalAlpha=isAdmin1?.42:.54;
+    ctx.globalAlpha=isAdmin1?.30:.40;
     ctx.font=`${isAdmin1?'500':'600'} ${fontSize}px system-ui,sans-serif`;
     ctx.textAlign='center';
     ctx.textBaseline='middle';
-    ctx.fillStyle=isAdmin1?'rgba(196,214,224,.68)':'rgba(214,229,238,.76)';
+    ctx.fillStyle=isAdmin1?'rgba(196,214,224,.56)':'rgba(214,229,238,.66)';
     ctx.shadowColor='rgba(0,0,0,.68)';
     ctx.shadowBlur=2/Math.max(1,Math.sqrt(state.zoom));
 
