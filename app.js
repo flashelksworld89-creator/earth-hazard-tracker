@@ -247,6 +247,17 @@ function bindControls(){
   ['showDayNight','showZodiac','showNakshatras','showGandanta','showPlanets','showGrid','showPlaceLabels','showTimeZones','showTecAnomaly','showGeomagnetic','showLightning']
     .forEach(id=>document.getElementById(id).addEventListener('change',draw));
   document.getElementById('refreshAtmosBtn').addEventListener('click',loadAtmosphericEnergy);
+  const bottomHeader=document.getElementById('bottomHeader');
+  const collapseHeaderBtn=document.getElementById('collapseHeaderBtn');
+  if(bottomHeader&&collapseHeaderBtn){
+    collapseHeaderBtn.addEventListener('click',()=>{
+      const collapsed=bottomHeader.classList.toggle('collapsed');
+      collapseHeaderBtn.textContent=collapsed?'⌃':'⌄';
+      collapseHeaderBtn.setAttribute('aria-expanded',String(!collapsed));
+      collapseHeaderBtn.setAttribute('aria-label',collapsed?'Expand header':'Collapse header');
+      collapseHeaderBtn.title=collapsed?'Expand header':'Collapse header';
+    });
+  }
 
   document.getElementById('focusSignSelect').addEventListener('change',e=>{
     state.focusSign=e.target.value===''?null:Number(e.target.value);
@@ -1380,56 +1391,63 @@ function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
 
   const equatorRow=Math.max(0,Math.min(rh-1,Math.floor(rh/2)));
   const equatorY=h/2;
-  const occupied=[];
 
   if(showZodiac){
-    drawEquatorRuns(
+    drawRowRuns(
       state.risingSignGrid,
       equatorRow,
       12,
-      (index,x,runWidth)=>{
-        const glyphSize=(23/Math.max(1,Math.sqrt(state.zoom)))*0.8;
-        const radius=(17/Math.max(1,Math.sqrt(state.zoom)))*0.8;
+      (index,x)=>{
+        const scale=Math.max(1,Math.sqrt(state.zoom));
+        const glyphSize=(23/scale)*0.8;
+        const radius=(17/scale)*0.8;
         drawEquatorZodiacMarker(SIGNS[index][1],SIGNS[index][2],x,equatorY,glyphSize,radius);
-        occupied.push({x,y:equatorY,w:Math.max(34,glyphSize*1.7),h:Math.max(28,glyphSize*1.6)});
       },
       24
     );
   }
 
   if(showNak){
-    drawEquatorRuns(
+    // Dedicated readable top band. Keep enough space from the viewport edge
+    // so two-line nakshatra names never clip.
+    const labelRow=Math.max(0,Math.min(rh-1,Math.floor(rh*.14)));
+    const scale=Math.max(1,Math.sqrt(state.zoom));
+    const topY=Math.max(50/scale,h*.085);
+    const occupied=[];
+
+    drawRowRuns(
       state.risingNakGrid,
-      equatorRow,
+      labelRow,
       27,
       (index,x,runWidth)=>{
         const lines=splitNakshatraLabel(NAKSHATRAS[index]);
-        const scale=Math.max(1,Math.sqrt(state.zoom));
         const fontSize=Math.max(7.5,Math.min(9.5,9/scale));
         const longest=Math.max(...lines.map(v=>v.length));
         const boxW=Math.max(42,longest*fontSize*.60+12);
         const boxH=lines.length>1?fontSize*2.55:fontSize*1.7;
 
-        const yOffsets=[32,-32,48,-48];
+        // Two shallow rows keep neighboring long names readable while
+        // preserving a clear top-of-map alignment.
+        const rowOffsets=[0,boxH+5/scale];
         let targetY=null;
-        for(const off of yOffsets){
-          const y=equatorY+off/scale;
-          const collide=occupied.some(o=>
-            Math.abs(o.x-x)<(o.w+boxW)/2+5 &&
-            Math.abs(o.y-y)<(o.h+boxH)/2+5
+        for(const off of rowOffsets){
+          const y=topY+off;
+          const collision=occupied.some(o=>
+            Math.abs(o.x-x)<(o.w+boxW)/2+4 &&
+            Math.abs(o.y-y)<(o.h+boxH)/2+3
           );
-          if(!collide){targetY=y;break;}
+          if(!collision){targetY=y;break;}
         }
-        if(targetY===null)return;
+        if(targetY===null) return;
 
         drawNakshatraLabel(lines,nakColorCss(index),x,targetY,fontSize);
         occupied.push({x,y:targetY,w:boxW,h:boxH});
       },
-      18
+      15
     );
   }
 
-  function drawEquatorRuns(grid,row,count,drawFn,minScreenWidth){
+  function drawRowRuns(grid,row,count,drawFn,minScreenWidth){
     let start=0;
     let current=grid[row*rw];
 
@@ -1439,11 +1457,8 @@ function drawRisingLabels(w,h,showZodiac,showNak,earthShiftDeg){
         const runWidth=(x-start)/rw*w;
         if(current<count && runWidth>=minScreenWidth){
           const center=(start+x)/2/rw*w + earthShiftDeg/360*w;
-          const candidates=[center-w,center,center+w].filter(cx=>cx>16&&cx<w-16);
-
-          for(const cx of candidates){
-            drawFn(current,cx,runWidth);
-          }
+          const candidates=[center-w,center,center+w].filter(cx=>cx>14&&cx<w-14);
+          for(const cx of candidates) drawFn(current,cx,runWidth);
         }
         start=x;
         current=next;
