@@ -967,7 +967,12 @@ function updateGeneratorControls(){
   const method=document.getElementById('dateGeneratorMode')?.value||'off';
   const anchorWrap=document.getElementById('secondAnchorWrap');
   const matchWrap=document.getElementById('matchModeWrap');
-  if(anchorWrap)anchorWrap.style.display=method==='combinedHands'?'grid':'none';
+
+  // Keep the second-hand planet selector visible so the user can always
+  // see and change the long-cycle anchor before switching to Combined Hands.
+  if(anchorWrap)anchorWrap.style.display='grid';
+
+  // Combined Hands uses its own Full/Strong/Partial/Closest scoring system.
   if(matchWrap)matchWrap.style.display=(method==='sunMoon'||method==='navamsaHands')?'grid':'none';
 }
 function resetDateGeneratorSequence(){
