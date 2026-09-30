@@ -33,18 +33,17 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
         <select id="dateGeneratorMode">
           <option value="off">Off</option>
           <option value="sunMoon">Sun/Moon hands</option>
-          <option value="navamsaHands">Navamsa hands · Moon/Sun/Nodes</option>
-          <option value="combinedHands">Combined hands</option>
+          <option value="cycleHands">Sun/Moon + planet cycle</option>
         </select>
       </label>
-      <label id="matchModeWrap" style="display:grid;gap:5px;margin-top:6px">Match
+      <label id="matchModeWrap" style="display:grid;gap:5px;margin-top:6px">Planet match
         <select id="dateMatchMode">
-          <option value="sector">Sector match</option>
-          <option value="degree">Degree match</option>
-          <option value="closest">Closest match</option>
+          <option value="degree">Degree</option>
+          <option value="nakshatra">Nakshatra</option>
+          <option value="sign">Zodiac sign</option>
         </select>
       </label>
-      <label id="secondAnchorWrap" style="display:grid;gap:5px;margin-top:6px">Second-hand anchor
+      <label id="secondAnchorWrap" style="display:grid;gap:5px;margin-top:6px">Second-hand planet
         <select id="secondAnchor">
           <option value="nodes">Rahu or Ketu</option>
           <option value="Mercury">Mercury</option>
@@ -78,7 +77,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div><span class="dot" style="background:#7dd3fc"></span>ASC hour hand — true sidereal longitude</div>
     <div><span class="dot" style="background:#e8f4ff"></span>Minute hand — 0°→30° progress through current sign</div>
     <div><span class="dot" style="background:#f9a8d4"></span>Second hand — 0°→3°20′ progress through current pada</div>
-    <div><span class="dot" style="background:#facc15"></span>D9 ring — all 108 Navamsa sectors, one per 3°20′ pada</div>
+    <div><span class="dot" style="background:#facc15"></span>D9 ring — all 108 Navamsa sectors, displayed independently from date generation</div>
   </div>
   <div class="note">The minute and second hands do not use fixed civil-time rates. They are derived from the actual local Ascendant, so they naturally accelerate or slow as rising signs move at different rates for your detected latitude. Location is requested automatically through the browser; no coordinate entry is required.</div>
 </div>
@@ -453,317 +452,105 @@ async function generateSunMoonDate(){
   useBtn.disabled=false;
 }
 
-function navamsaHandTargets(){
-  if(!userLocation)return null;
-  const d=currentMoment(),aya=lahiri(d);
-  const asc=pos(ascendantSidereal(d,userLocation.lat,userLocation.lon,aya));
-  const signFrac=asc.degree/30;
-  const minuteAngle=signFrac*360;
-  const padaSize=360/108;
-  const secondAngle=(asc.padaDegree/padaSize)*360;
-
-  const hourD9=navamsaPoint(asc.lon);
-  const minuteD9=navamsaPoint(minuteAngle);
-  const secondD9=navamsaPoint(secondAngle);
-  const secondPos=pos(secondAngle);
-
-  return{
-    sourceDate:d,
-    hourAngle:asc.lon,
-    minuteAngle,
-    secondAngle,
-    hourD9,
-    minuteD9,
-    secondD9,
-    secondPos
-  };
-}
-function navamsaHandScore(date,t){
-  const aya=lahiri(date);
-  const moon=bodyLon('Moon',date,aya);
-  const sun=bodyLon('Sun',date,aya);
-  const nodes=meanNodeLons(date,aya);
-
-  const moonD9=navamsaPoint(moon);
-  const sunD9=navamsaPoint(sun);
-  const rahuPos=pos(nodes.rahu);
-  const ketuPos=pos(nodes.ketu);
-
-  const moonD9Ok=moonD9.sign===t.hourD9.sign;
-  const sunD9Ok=sunD9.sign===t.minuteD9.sign;
-
-  // Degree deltas are measured INSIDE the correct D9 sign. A wrong D9 sign
-  // receives a full-sign penalty so "closest" never outranks a correct sector.
-  const moonWithinDelta=Math.abs(moonD9.degree-t.hourD9.degree);
-  const sunWithinDelta=Math.abs(sunD9.degree-t.minuteD9.degree);
-  const moonDegreeDelta=moonD9Ok?moonWithinDelta:30+moonWithinDelta;
-  const sunDegreeDelta=sunD9Ok?sunWithinDelta:30+sunWithinDelta;
-
-  const rahuDelta=angleDiff(nodes.rahu,t.secondAngle);
-  const ketuDelta=angleDiff(nodes.ketu,t.secondAngle);
-  const rahuSignOk=rahuPos.sign===t.secondPos.sign;
-  const rahuNakOk=rahuPos.nak===t.secondPos.nak;
-  const ketuSignOk=ketuPos.sign===t.secondPos.sign;
-  const ketuNakOk=ketuPos.nak===t.secondPos.nak;
-  const nodeOk=rahuSignOk||rahuNakOk||ketuSignOk||ketuNakOk;
-  const matchedNode=(rahuSignOk||rahuNakOk)?'Rahu':((ketuSignOk||ketuNakOk)?'Ketu':(rahuDelta<=ketuDelta?'Rahu':'Ketu'));
-  const nodeDegreeDelta=Math.min(rahuDelta,ketuDelta);
-
-  const sectorOk=moonD9Ok&&sunD9Ok&&nodeOk;
-
-  // Sector correctness dominates the score, then within-D9 degree accuracy.
-  const sectorPenalty=(moonD9Ok?0:120)+(sunD9Ok?0:120)+(nodeOk?0:60);
-  const score=sectorPenalty+moonWithinDelta+sunWithinDelta+nodeDegreeDelta*.25;
-
-  return{
-    date,moon,sun,rahu:nodes.rahu,ketu:nodes.ketu,moonD9,sunD9,
-    moonD9Ok,sunD9Ok,moonWithinDelta,sunWithinDelta,
-    moonDegreeDelta,sunDegreeDelta,nodeDegreeDelta,
-    rahuSignOk,rahuNakOk,ketuSignOk,ketuNakOk,nodeOk,matchedNode,sectorOk,score
-  };
-}
-function refineNavamsaCandidate(center,t,matchMode){
-  let best=navamsaHandScore(center,t);
-  const start=center.getTime()-6*3600000;
-  const end=center.getTime()+6*3600000;
-
-  for(let ms=start;ms<=end;ms+=15*60000){
-    const r=navamsaHandScore(new Date(ms),t);
-    if(matchMode==='sector'){
-      if(r.sectorOk)return r;
-    }else if(r.score<best.score){
-      best=r;
-    }
-  }
-
-  const coarse=best;
-  for(let m=-30;m<=30;m++){
-    const r=navamsaHandScore(new Date(coarse.date.getTime()+m*60000),t);
-    if(matchMode==='sector'){
-      if(r.sectorOk)return r;
-    }else if(r.score<best.score){
-      best=r;
-    }
-  }
-  return best;
-}
-async function generateNavamsaHandsDate(){
-  const main=document.getElementById('generatedDateMain');
-  const detail=document.getElementById('generatedDateDetail');
-  const useBtn=document.getElementById('useGeneratedDateBtn');
-  const matchMode=document.getElementById('dateMatchMode')?.value||'sector';
-
-  const fresh=navamsaHandTargets();
-  if(!fresh){
-    main.textContent='Location required';
-    detail.textContent='Set a location so the clock can calculate the hand positions.';
-    useBtn.disabled=true;
-    return;
-  }
-
-  if(!lastGeneratorTargets || lastGeneratorTargets.kind!=='navamsaHands'){
-    lastGeneratorTargets={kind:'navamsaHands',...fresh,sourceDate:new Date(fresh.sourceDate)};
-    lastGeneratedDate=null;
-  }
-  const t=lastGeneratorTargets;
-  let cursor=lastGeneratedDate
-    ? new Date(lastGeneratedDate.getTime()+24*3600000)
-    : new Date(t.sourceDate.getTime()+3600000);
-
-  main.textContent='Searching…';
-  detail.textContent='Finding the next Navamsa hand match…';
-  useBtn.disabled=true;
-
-  let best=null,selected=null,steps=0;
-  const maxDays=matchMode==='sector'?3650:7300;
-  const stepHours=matchMode==='sector'?3:6;
-
-  for(let h=0;h<maxDays*24;h+=stepHours){
-    const d=new Date(cursor.getTime()+h*3600000);
-    const r=navamsaHandScore(d,t);
-    steps++;
-
-    if(!best||r.score<best.score)best=r;
-
-    if(matchMode==='sector' && r.sectorOk){
-      selected=refineNavamsaCandidate(d,t,'sector');
-      break;
-    }
-
-    if(matchMode==='degree'){
-      const degreeOk=
-        r.moonD9Ok &&
-        r.sunD9Ok &&
-        r.nodeOk &&
-        r.moonWithinDelta<=0.25 &&
-        r.sunWithinDelta<=0.10 &&
-        r.nodeDegreeDelta<=0.50;
-      if(degreeOk){
-        selected=refineNavamsaCandidate(d,t,'degree');
-        break;
-      }
-    }
-
-    if(steps%600===0)await new Promise(r=>setTimeout(r,0));
-  }
-
-  const result=matchMode==='closest'?best:selected;
-  if(!result){
-    main.textContent=matchMode==='degree'?'No degree match found':'No sector match found';
-    detail.textContent='No qualifying Navamsa hand match was found in the search window.';
-    return;
-  }
-
-  lastGeneratedDate=result.date;
-  const tz=activeTimeZone();
-  const dateText=result.date.toLocaleDateString('en-US',{timeZone:tz,month:'long',day:'numeric',year:'numeric'});
-  const timeText=result.date.toLocaleTimeString('en-US',{timeZone:tz,hour:'numeric',minute:'2-digit',hour12:true});
-
-  main.textContent=dateText+' · '+timeText;
-  detail.textContent=
-    'Moon → '+t.hourD9.glyph+' '+t.hourD9.name+
-    ' · Sun → '+t.minuteD9.glyph+' '+t.minuteD9.name+
-    ' · '+result.matchedNode+' → '+GLYPHS[t.secondPos.sign]+' '+SIGNS[t.secondPos.sign]+' / '+t.secondPos.nakName+
-    ' · '+(matchMode==='sector'?'Sector':matchMode==='degree'?'Degree':'Closest')+' match'+
-    (matchMode==='sector'?'':' · D9 Δ '+result.moonWithinDelta.toFixed(2)+'°/'+result.sunWithinDelta.toFixed(2)+'° · node Δ '+result.nodeDegreeDelta.toFixed(2)+'°')+
-    ' · '+tz+'.';
-
-  document.getElementById('generateDateBtn').textContent='Generate next date';
-  useBtn.disabled=false;
-}
 function selectedSecondAnchor(){
   return document.getElementById('secondAnchor')?.value||'nodes';
 }
-function combinedTargets(){
+function cycleTargets(){
   if(!userLocation)return null;
   const d=currentMoment(),aya=lahiri(d);
   const asc=pos(ascendantSidereal(d,userLocation.lat,userLocation.lon,aya));
-  const signFrac=asc.degree/30;
-  const minuteAngle=signFrac*360;
+  const minuteAngle=(asc.degree/30)*360;
   const padaSize=360/108;
   const secondAngle=(asc.padaDegree/padaSize)*360;
-
-  const hourD9=navamsaPoint(asc.lon);
-  const minuteD9=navamsaPoint(minuteAngle);
-  const secondPos=pos(secondAngle);
-
   return{
     sourceDate:d,
-    hourDegreeTarget:asc.lon,
-    minuteDegreeTarget:minuteAngle,
-    hourD9,
-    minuteD9,
-    secondAngle,
-    secondPos,
+    sunTarget:asc.lon,
+    moonTarget:minuteAngle,
+    planetTarget:secondAngle,
+    planetTargetPos:pos(secondAngle),
     secondAnchor:selectedSecondAnchor()
   };
 }
-function combinedScore(date,t){
+function cycleScore(date,t){
   const aya=lahiri(date);
   const sun=bodyLon('Sun',date,aya);
   const moon=bodyLon('Moon',date,aya);
+  const sunDelta=angleDiff(sun,t.sunTarget);
+  const moonDelta=angleDiff(moon,t.moonTarget);
 
-  const sunDegreeDelta=angleDiff(sun,t.hourDegreeTarget);
-  const moonDegreeDelta=angleDiff(moon,t.minuteDegreeTarget);
-
-  const moonD9=navamsaPoint(moon);
-  const sunD9=navamsaPoint(sun);
-
-  const moonD9Ok=moonD9.sign===t.hourD9.sign;
-  const sunD9Ok=sunD9.sign===t.minuteD9.sign;
-
-  let anchorOk=false;
   let anchorName=t.secondAnchor||'nodes';
   let anchorLon=null;
 
   if(anchorName==='nodes' || anchorName==='Rahu' || anchorName==='Ketu'){
     const nodes=meanNodeLons(date,aya);
-    const rahuPos=pos(nodes.rahu);
-    const ketuPos=pos(nodes.ketu);
-
-    const rahuOk=rahuPos.sign===t.secondPos.sign || rahuPos.nak===t.secondPos.nak;
-    const ketuOk=ketuPos.sign===t.secondPos.sign || ketuPos.nak===t.secondPos.nak;
-
     if(anchorName==='Rahu'){
-      anchorOk=rahuOk;
       anchorLon=nodes.rahu;
       anchorName='Rahu';
     }else if(anchorName==='Ketu'){
-      anchorOk=ketuOk;
       anchorLon=nodes.ketu;
       anchorName='Ketu';
     }else{
-      anchorOk=rahuOk||ketuOk;
-      if(rahuOk){anchorName='Rahu';anchorLon=nodes.rahu;}
-      else if(ketuOk){anchorName='Ketu';anchorLon=nodes.ketu;}
-      else{
-        const rd=angleDiff(nodes.rahu,t.secondAngle),kd=angleDiff(nodes.ketu,t.secondAngle);
-        anchorName=rd<=kd?'Rahu':'Ketu';
-        anchorLon=rd<=kd?nodes.rahu:nodes.ketu;
-      }
+      const rd=angleDiff(nodes.rahu,t.planetTarget),kd=angleDiff(nodes.ketu,t.planetTarget);
+      if(rd<=kd){anchorName='Rahu';anchorLon=nodes.rahu;}
+      else{anchorName='Ketu';anchorLon=nodes.ketu;}
     }
   }else{
     anchorLon=bodyLon(anchorName,date,aya);
-    const anchorPos=pos(anchorLon);
-    anchorOk=anchorPos.sign===t.secondPos.sign || anchorPos.nak===t.secondPos.nak;
   }
 
-  const anchorDelta=anchorLon===null?180:angleDiff(anchorLon,t.secondAngle);
+  const anchorPos=pos(anchorLon);
+  const anchorDelta=angleDiff(anchorLon,t.planetTarget);
+  const planetMatchMode=document.getElementById('dateMatchMode')?.value||'degree';
 
-  const sunDegreeOk=sunDegreeDelta<=0.35;
-  const moonDegreeOk=moonDegreeDelta<=1.00;
+  let planetOk=false;
+  if(planetMatchMode==='degree') planetOk=anchorDelta<=1.0;
+  else if(planetMatchMode==='nakshatra') planetOk=anchorPos.nak===t.planetTargetPos.nak;
+  else planetOk=anchorPos.sign===t.planetTargetPos.sign;
 
-  const conditions=[
-    sunDegreeOk,
-    moonDegreeOk,
-    moonD9Ok,
-    sunD9Ok,
-    anchorOk
-  ];
-  const count=conditions.filter(Boolean).length;
+  const sunOk=sunDelta<=0.35;
+  const moonOk=moonDelta<=1.00;
+  const count=[sunOk,moonOk,planetOk].filter(Boolean).length;
 
   let label='Closest Match';
-  if(count===5)label='Full Match';
-  else if(sunDegreeOk&&moonDegreeOk&&count>=4)label='Strong Match';
-  else if((sunDegreeOk||moonDegreeOk)&&count>=3)label='Partial Match';
+  if(sunOk&&moonOk&&planetOk)label='Full Match';
+  else if(sunOk&&moonOk)label='Strong Match';
+  else if((sunOk||moonOk)&&planetOk)label='Partial Match';
 
   const weighted=
-    (sunDegreeOk?3:Math.max(0,3-sunDegreeDelta))+
-    (moonDegreeOk?3:Math.max(0,3-moonDegreeDelta/2))+
-    (moonD9Ok?1.5:0)+
-    (sunD9Ok?1.5:0)+
-    (anchorOk?1:Math.max(0,1-anchorDelta/30));
+    (sunOk?4:Math.max(0,4-sunDelta))+
+    (moonOk?4:Math.max(0,4-moonDelta/2))+
+    (planetOk?2:Math.max(0,2-anchorDelta/15));
 
   return{
-    date,sun,moon,anchorLon,anchorName,anchorDelta,anchorOk,
-    sunDegreeDelta,moonDegreeDelta,
-    moonD9Ok,sunD9Ok,
-    sunDegreeOk,moonDegreeOk,count,label,weighted
+    date,sun,moon,anchorLon,anchorName,anchorDelta,anchorPos,
+    sunDelta,moonDelta,sunOk,moonOk,planetOk,count,label,weighted,planetMatchMode
   };
 }
-function refineCombinedCandidate(center,t){
-  let best=combinedScore(center,t);
-  for(let minutes=-720;minutes<=720;minutes+=10){
-    const r=combinedScore(new Date(center.getTime()+minutes*60000),t);
-    if(r.weighted>best.weighted || (r.weighted===best.weighted && (r.sunDegreeDelta+r.moonDegreeDelta)<(best.sunDegreeDelta+best.moonDegreeDelta))){
+function refineCycleCandidate(center,t){
+  let best=cycleScore(center,t);
+  for(let minutes=-2160;minutes<=2160;minutes+=10){
+    const r=cycleScore(new Date(center.getTime()+minutes*60000),t);
+    if(r.weighted>best.weighted ||
+      (r.weighted===best.weighted && (r.sunDelta+r.moonDelta+r.anchorDelta)<(best.sunDelta+best.moonDelta+best.anchorDelta))){
       best=r;
     }
   }
   const coarse=best;
-  for(let minutes=-20;minutes<=20;minutes++){
-    const r=combinedScore(new Date(coarse.date.getTime()+minutes*60000),t);
-    if(r.weighted>best.weighted || (r.weighted===best.weighted && (r.sunDegreeDelta+r.moonDegreeDelta)<(best.sunDegreeDelta+best.moonDegreeDelta))){
+  for(let minutes=-30;minutes<=30;minutes++){
+    const r=cycleScore(new Date(coarse.date.getTime()+minutes*60000),t);
+    if(r.weighted>best.weighted ||
+      (r.weighted===best.weighted && (r.sunDelta+r.moonDelta+r.anchorDelta)<(best.sunDelta+best.moonDelta+best.anchorDelta))){
       best=r;
     }
   }
   return best;
 }
-async function generateCombinedHandsDate(){
+async function generateCycleHandsDate(){
   const main=document.getElementById('generatedDateMain');
   const detail=document.getElementById('generatedDateDetail');
   const useBtn=document.getElementById('useGeneratedDateBtn');
 
-  const fresh=combinedTargets();
+  const fresh=cycleTargets();
   if(!fresh){
     main.textContent='Location required';
     detail.textContent='Set a location so the clock can calculate the hand positions.';
@@ -771,8 +558,8 @@ async function generateCombinedHandsDate(){
     return;
   }
 
-  if(!lastGeneratorTargets || lastGeneratorTargets.kind!=='combinedHands'){
-    lastGeneratorTargets={kind:'combinedHands',...fresh,sourceDate:new Date(fresh.sourceDate)};
+  if(!lastGeneratorTargets || lastGeneratorTargets.kind!=='cycleHands'){
+    lastGeneratorTargets={kind:'cycleHands',...fresh,sourceDate:new Date(fresh.sourceDate)};
     lastGeneratedDate=null;
   }
   const t=lastGeneratorTargets;
@@ -782,23 +569,21 @@ async function generateCombinedHandsDate(){
     : new Date(t.sourceDate.getTime()+3600000);
 
   main.textContent='Searching…';
-  detail.textContent='Finding the next combined hand recurrence…';
+  detail.textContent='Finding the next Sun/Moon + planet-cycle recurrence…';
   useBtn.disabled=true;
 
   let best=null,selected=null,tested=0;
 
-  // The Sun/hour-hand degree remains the chronological anchor.
-  // Each solar crossing is then scored against all five conditions.
-  for(let year=0;year<60;year++){
-    const crossing=findSunCrossing(cursor,t.hourDegreeTarget);
+  for(let year=0;year<80;year++){
+    const crossing=findSunCrossing(cursor,t.sunTarget);
     if(!crossing)break;
 
-    const candidate=refineCombinedCandidate(crossing,t);
+    const candidate=refineCycleCandidate(crossing,t);
     tested++;
 
     if(!best || candidate.weighted>best.weighted ||
       (candidate.weighted===best.weighted &&
-       (candidate.sunDegreeDelta+candidate.moonDegreeDelta)<(best.sunDegreeDelta+best.moonDegreeDelta))){
+       (candidate.sunDelta+candidate.moonDelta+candidate.anchorDelta)<(best.sunDelta+best.moonDelta+best.anchorDelta))){
       best=candidate;
     }
 
@@ -813,8 +598,8 @@ async function generateCombinedHandsDate(){
 
   const result=selected||best;
   if(!result){
-    main.textContent='No combined match found';
-    detail.textContent='No future combined-hand recurrence was found in the 60-year search window.';
+    main.textContent='No cycle match found';
+    detail.textContent='No future recurrence was found in the search window.';
     return;
   }
 
@@ -823,21 +608,14 @@ async function generateCombinedHandsDate(){
   const dateText=result.date.toLocaleDateString('en-US',{timeZone:tz,month:'long',day:'numeric',year:'numeric'});
   const timeText=result.date.toLocaleTimeString('en-US',{timeZone:tz,hour:'numeric',minute:'2-digit',hour12:true});
 
-  const checks=[
-    'Sun degree '+(result.sunDegreeOk?'✓':'✕'),
-    'Moon degree '+(result.moonDegreeOk?'✓':'✕'),
-    'Moon D9 '+(result.moonD9Ok?'✓':'✕'),
-    'Sun D9 '+(result.sunD9Ok?'✓':'✕'),
-    result.anchorName+' '+(result.anchorOk?'✓':'✕')
-  ];
-
   main.textContent=dateText+' · '+timeText;
   detail.textContent=
-    result.label+' · '+result.count+'/5 conditions · '+
-    checks.join(' · ')+
-    ' · Δ Sun '+result.sunDegreeDelta.toFixed(2)+'° / Moon '+result.moonDegreeDelta.toFixed(2)+'°'+
-    ' · '+result.anchorName+' target '+GLYPHS[t.secondPos.sign]+' '+SIGNS[t.secondPos.sign]+' / '+t.secondPos.nakName+
-    ' · anchor Δ '+result.anchorDelta.toFixed(2)+'°'+
+    result.label+' · '+result.count+'/3 conditions · '+
+    'Sun degree '+(result.sunOk?'✓':'✕')+
+    ' · Moon degree '+(result.moonOk?'✓':'✕')+
+    ' · '+result.anchorName+' '+(result.planetOk?'✓':'✕')+
+    ' · Δ Sun '+result.sunDelta.toFixed(2)+'° / Moon '+result.moonDelta.toFixed(2)+'° / '+result.anchorName+' '+result.anchorDelta.toFixed(2)+'°'+
+    ' · '+result.anchorName+' target '+GLYPHS[t.planetTargetPos.sign]+' '+SIGNS[t.planetTargetPos.sign]+' / '+t.planetTargetPos.nakName+
     ' · '+tested+' solar return'+(tested===1?'':'s')+' checked · '+tz+'.';
 
   document.getElementById('generateDateBtn').textContent='Generate next date';
@@ -846,8 +624,7 @@ async function generateCombinedHandsDate(){
 
 async function generateDateFromHands(){
   const method=document.getElementById('dateGeneratorMode')?.value||'off';
-  if(method==='navamsaHands')return generateNavamsaHandsDate();
-  if(method==='combinedHands')return generateCombinedHandsDate();
+  if(method==='cycleHands')return generateCycleHandsDate();
   return generateSunMoonDate();
 }
 function polar(angle,r){const a=(angle-90)*Math.PI/180;return[450+r*Math.cos(a),450+r*Math.sin(a)]}
@@ -967,19 +744,16 @@ function updateGeneratorControls(){
   const method=document.getElementById('dateGeneratorMode')?.value||'off';
   const anchorWrap=document.getElementById('secondAnchorWrap');
   const matchWrap=document.getElementById('matchModeWrap');
+  const cycle=method==='cycleHands';
 
-  // Keep the second-hand planet selector visible so the user can always
-  // see and change the long-cycle anchor before switching to Combined Hands.
-  if(anchorWrap)anchorWrap.style.display='grid';
-
-  // Combined Hands uses its own Full/Strong/Partial/Closest scoring system.
-  if(matchWrap)matchWrap.style.display=(method==='sunMoon'||method==='navamsaHands')?'grid':'none';
+  if(anchorWrap)anchorWrap.style.display=cycle?'grid':'none';
+  if(matchWrap)matchWrap.style.display=cycle?'grid':'none';
 }
 function resetDateGeneratorSequence(){
   lastGeneratedDate=null;
   lastGeneratorTargets=null;
   document.getElementById('generatedDateMain').textContent='—';
-  document.getElementById('generatedDateDetail').textContent='Choose a method and match type, then generate a date from the current hand positions.';
+  document.getElementById('generatedDateDetail').textContent='Choose a method, then generate a date from the current hand positions.';
   document.getElementById('generateDateBtn').textContent='Generate date + time';
   document.getElementById('useGeneratedDateBtn').disabled=true;
 }
