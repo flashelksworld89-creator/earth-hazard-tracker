@@ -36,7 +36,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
         </select>
       </label>
       <div class="row">
-        <button id="generateDateBtn" type="button">Generate next date</button>
+        <button id="generateDateBtn" type="button">Generate date + time</button>
         <button id="useGeneratedDateBtn" type="button" disabled>Use generated date</button>
       </div>
       <b id="generatedDateMain" style="margin-top:8px">—</b>
@@ -238,16 +238,35 @@ function sunMoonScore(date,sunTarget,moonTarget){
 }
 function refineSunMoonCandidate(center,sunTarget,moonTarget){
   let best=sunMoonScore(center,sunTarget,moonTarget);
-  // Search +/- 36 hours at 30-minute resolution. This allows the Moon to
-  // refine the match while keeping the Sun very close to its target degree.
-  for(let minutes=-2160;minutes<=2160;minutes+=30){
+
+  // The Sun selects the date/year neighborhood. The Moon then determines
+  // the time-of-day by finding the closest Moon longitude while keeping
+  // the Sun close to the hour-hand target.
+  for(let minutes=-2160;minutes<=2160;minutes+=15){
     const d=new Date(center.getTime()+minutes*60000);
     const r=sunMoonScore(d,sunTarget,moonTarget);
-    // Weight the Sun more strongly so the result remains anchored to the hour-hand degree.
-    const weighted=Math.sqrt((r.sunDelta*2.5)**2+r.moonDelta**2);
-    const bestWeighted=Math.sqrt((best.sunDelta*2.5)**2+best.moonDelta**2);
-    if(weighted<bestWeighted)best=r;
+
+    // Reject times where the Sun has drifted too far from its target.
+    if(r.sunDelta>1.6)continue;
+
+    const moonFirst=r.moonDelta + r.sunDelta*.35;
+    const bestMoonFirst=best.moonDelta + best.sunDelta*.35;
+    if(moonFirst<bestMoonFirst)best=r;
   }
+
+  // Final 1-minute refinement around the best time so the displayed clock
+  // time is driven as closely as possible by the Moon target degree.
+  const coarseBest=best;
+  for(let minutes=-30;minutes<=30;minutes++){
+    const d=new Date(coarseBest.date.getTime()+minutes*60000);
+    const r=sunMoonScore(d,sunTarget,moonTarget);
+    if(r.sunDelta>1.6)continue;
+
+    const moonFirst=r.moonDelta + r.sunDelta*.35;
+    const bestMoonFirst=best.moonDelta + best.sunDelta*.35;
+    if(moonFirst<bestMoonFirst)best=r;
+  }
+
   return best;
 }
 function findSunCrossing(start,sunTarget){
@@ -323,14 +342,18 @@ async function generateSunMoonDate(){
 
   lastGeneratedDate=best.date;
   const tz=activeTimeZone();
-  main.textContent=best.date.toLocaleDateString('en-US',{
+  const dateText=best.date.toLocaleDateString('en-US',{
     timeZone:tz,month:'long',day:'numeric',year:'numeric'
   });
+  const timeText=best.date.toLocaleTimeString('en-US',{
+    timeZone:tz,hour:'numeric',minute:'2-digit',hour12:true
+  });
+  main.textContent=dateText+' · '+timeText;
   detail.textContent=
     'Sun target '+deg(sunTarget%30)+' in '+SIGNS[Math.floor(sunTarget/30)]+
-    ' · Moon target '+deg(moonTarget%30)+' in '+SIGNS[Math.floor(moonTarget/30)]+
-    ' · Sun Δ '+best.sunDelta.toFixed(2)+'° · Moon Δ '+best.moonDelta.toFixed(2)+'°'+
-    ' · '+tested+' solar return'+(tested===1?'':'s')+' tested.';
+    ' anchors the date · Moon target '+deg(moonTarget%30)+' in '+SIGNS[Math.floor(moonTarget/30)]+
+    ' sets the time · Sun Δ '+best.sunDelta.toFixed(2)+'° · Moon Δ '+best.moonDelta.toFixed(2)+'°'+
+    ' · '+tested+' solar return'+(tested===1?'':'s')+' tested · '+tz+'.';
   useBtn.disabled=false;
 }
 function polar(angle,r){const a=(angle-90)*Math.PI/180;return[450+r*Math.cos(a),450+r*Math.sin(a)]}
