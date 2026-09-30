@@ -35,6 +35,12 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
           <option value="sunMoon">Sun = hour hand · Moon = minute hand</option>
         </select>
       </label>
+      <label style="display:grid;gap:5px;margin-top:6px">Match
+        <select id="dateMatchMode">
+          <option value="closest">Closest match</option>
+          <option value="exact">Exact match</option>
+        </select>
+      </label>
       <div class="row">
         <button id="generateDateBtn" type="button">Generate date + time</button>
         <button id="useGeneratedDateBtn" type="button" disabled>Use generated date</button>
@@ -334,13 +340,18 @@ async function generateSunMoonDate(){
     : 'Finding the first future Sun–Moon degree match…';
   useBtn.disabled=true;
 
+  const matchMode=document.getElementById('dateMatchMode')?.value||'closest';
+  const exactSunTolerance=0.05;
+  const exactMoonTolerance=0.10;
+  const closestSunTolerance=0.35;
+  const closestMoonTolerance=1.00;
+
   let cursor=searchStart;
   let bestFallback=null;
   let tested=0;
   let selected=null;
 
-  // Step annual Sun returns in chronological order. The first sufficiently
-  // close Moon match is returned, so repeated presses advance to the next date.
+  // Step annual Sun returns in chronological order.
   for(let year=0;year<60;year++){
     const crossing=findSunCrossing(cursor,sunTarget);
     if(!crossing)break;
@@ -350,8 +361,15 @@ async function generateSunMoonDate(){
 
     if(!bestFallback || candidate.score<bestFallback.score) bestFallback=candidate;
 
-    // Chronological qualifying match.
-    if(candidate.sunDelta<=0.35 && candidate.moonDelta<=1.00){
+    const qualifiesExact=
+      candidate.sunDelta<=exactSunTolerance &&
+      candidate.moonDelta<=exactMoonTolerance;
+
+    const qualifiesClosest=
+      candidate.sunDelta<=closestSunTolerance &&
+      candidate.moonDelta<=closestMoonTolerance;
+
+    if(matchMode==='exact' ? qualifiesExact : qualifiesClosest){
       selected=candidate;
       break;
     }
@@ -360,12 +378,12 @@ async function generateSunMoonDate(){
     if(year%4===3)await new Promise(r=>setTimeout(r,0));
   }
 
-  // If no tight match appears in the horizon, return the closest future one
-  // rather than failing, but continue the sequence from that result next press.
-  const result=selected||bestFallback;
+  const result=matchMode==='exact' ? selected : (selected||bestFallback);
   if(!result){
-    main.textContent='No date found';
-    detail.textContent='The search could not resolve another future Sun crossing.';
+    main.textContent='No exact match found';
+    detail.textContent=
+      'No future result within Sun ≤ '+exactSunTolerance.toFixed(2)+'° and Moon ≤ '+
+      exactMoonTolerance.toFixed(2)+'° was found in the 60-year search window.';
     return;
   }
 
@@ -384,6 +402,7 @@ async function generateSunMoonDate(){
     'Sun target '+deg(sunTarget%30)+' in '+SIGNS[Math.floor(sunTarget/30)]+
     ' anchors the date · Moon target '+deg(moonTarget%30)+' in '+SIGNS[Math.floor(moonTarget/30)]+
     ' sets the time · Sun Δ '+result.sunDelta.toFixed(2)+'° · Moon Δ '+result.moonDelta.toFixed(2)+'°'+
+    ' · '+(matchMode==='exact'?'Exact':'Closest')+' mode'+
     ' · '+tested+' solar return'+(tested===1?'':'s')+' checked · '+tz+'.';
 
   document.getElementById('generateDateBtn').textContent='Generate next date';
@@ -483,14 +502,16 @@ document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')s
 document.getElementById('locateBtn').addEventListener('click',startLocation);
 document.getElementById('searchCityBtn').addEventListener('click',searchCity);
 document.getElementById('generateDateBtn').addEventListener('click',generateSunMoonDate);
-document.getElementById('dateGeneratorMode').addEventListener('change',()=>{
+function resetDateGeneratorSequence(){
   lastGeneratedDate=null;
   lastGeneratorTargets=null;
   document.getElementById('generatedDateMain').textContent='—';
   document.getElementById('generatedDateDetail').textContent='Select the Sun–Moon method to generate a calendar date from the current hand positions.';
   document.getElementById('generateDateBtn').textContent='Generate date + time';
   document.getElementById('useGeneratedDateBtn').disabled=true;
-});
+}
+document.getElementById('dateGeneratorMode').addEventListener('change',resetDateGeneratorSequence);
+document.getElementById('dateMatchMode').addEventListener('change',resetDateGeneratorSequence);
 document.getElementById('useGeneratedDateBtn').addEventListener('click',()=>{
   if(!lastGeneratedDate)return;
   selectedTime=new Date(lastGeneratedDate);
