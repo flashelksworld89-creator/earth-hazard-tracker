@@ -34,6 +34,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
           <option value="off">Off</option>
           <option value="sunMoon">Sun/Moon hands</option>
           <option value="cycleHands">Sun/Moon + planet cycle</option>
+          <option value="pairHands">Two-hand planet pair</option>
         </select>
       </label>
       <label id="matchModeWrap" style="display:grid;gap:5px;margin-top:6px">Planet match
@@ -41,6 +42,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
           <option value="degree">Degree</option>
           <option value="nakshatra">Nakshatra</option>
           <option value="sign">Zodiac sign</option>
+          <option value="angle">Angle between planets</option>
         </select>
       </label>
       <label id="secondAnchorWrap" style="display:grid;gap:5px;margin-top:6px">Second-hand planet
@@ -55,6 +57,26 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
           <option value="Ketu">Ketu</option>
         </select>
       </label>
+      <div id="pairPlanetWrap" class="row" style="display:none">
+        <label>Hour-hand planet
+          <select id="hourPairPlanet">
+            <option value="Sun">Sun</option><option value="Moon">Moon</option>
+            <option value="Mercury">Mercury</option><option value="Venus">Venus</option>
+            <option value="Mars">Mars</option><option value="Jupiter">Jupiter</option>
+            <option value="Saturn">Saturn</option><option value="Rahu">Rahu</option>
+            <option value="Ketu">Ketu</option>
+          </select>
+        </label>
+        <label>Minute-hand planet
+          <select id="minutePairPlanet">
+            <option value="Moon">Moon</option><option value="Sun">Sun</option>
+            <option value="Mercury">Mercury</option><option value="Venus">Venus</option>
+            <option value="Mars">Mars</option><option value="Jupiter">Jupiter</option>
+            <option value="Saturn">Saturn</option><option value="Rahu">Rahu</option>
+            <option value="Ketu">Ketu</option>
+          </select>
+        </label>
+      </div>
       <div class="row">
         <button id="generateDateBtn" type="button">Generate date + time</button>
         <button id="useGeneratedDateBtn" type="button" disabled>Use generated date</button>
@@ -210,6 +232,13 @@ function meanNodeLons(d,a){
   const tropicalRahu=norm(125.04452-1934.136261*T+0.0020708*T*T+(T*T*T)/450000);
   const rahu=norm(tropicalRahu-a);
   return{rahu,ketu:norm(rahu+180)};
+}
+function selectedBodyLon(name,d,a){
+  if(name==='Rahu'||name==='Ketu'){
+    const nodes=meanNodeLons(d,a);
+    return name==='Rahu'?nodes.rahu:nodes.ketu;
+  }
+  return bodyLon(name,d,a);
 }
 function sunMeridianState(d,lat,lon){
   try{
@@ -622,9 +651,178 @@ async function generateCycleHandsDate(){
   useBtn.disabled=false;
 }
 
+function pairTargets(){
+  if(!userLocation)return null;
+  const d=currentMoment(),aya=lahiri(d);
+  const asc=pos(ascendantSidereal(d,userLocation.lat,userLocation.lon,aya));
+  const hourTarget=asc.lon;
+  const minuteTarget=(asc.degree/30)*360;
+  return{
+    sourceDate:d,
+    hourTarget,
+    minuteTarget,
+    targetAngle:angleDiff(hourTarget,minuteTarget),
+    hourPlanet:document.getElementById('hourPairPlanet')?.value||'Sun',
+    minutePlanet:document.getElementById('minutePairPlanet')?.value||'Moon',
+    matchMode:document.getElementById('dateMatchMode')?.value||'degree'
+  };
+}
+function pairScore(date,t){
+  const aya=lahiri(date);
+  const hourLon=selectedBodyLon(t.hourPlanet,date,aya);
+  const minuteLon=selectedBodyLon(t.minutePlanet,date,aya);
+  const hourPos=pos(hourLon),minutePos=pos(minuteLon);
+  const hourTargetPos=pos(t.hourTarget),minuteTargetPos=pos(t.minuteTarget);
+  const hourDelta=angleDiff(hourLon,t.hourTarget);
+  const minuteDelta=angleDiff(minuteLon,t.minuteTarget);
+  const pairAngle=angleDiff(hourLon,minuteLon);
+  const angleDelta=Math.abs(pairAngle-t.targetAngle);
+
+  let hourOk=false,minuteOk=false,angleOk=false;
+  if(t.matchMode==='degree'){
+    hourOk=hourDelta<=1.0;
+    minuteOk=minuteDelta<=1.0;
+  }else if(t.matchMode==='nakshatra'){
+    hourOk=hourPos.nak===hourTargetPos.nak;
+    minuteOk=minutePos.nak===minuteTargetPos.nak;
+  }else if(t.matchMode==='sign'){
+    hourOk=hourPos.sign===hourTargetPos.sign;
+    minuteOk=minutePos.sign===minuteTargetPos.sign;
+  }else{
+    angleOk=angleDelta<=1.0;
+  }
+
+  const count=t.matchMode==='angle'
+    ? (angleOk?1:0)
+    : [hourOk,minuteOk].filter(Boolean).length;
+
+  let label='Closest Match';
+  if(t.matchMode==='angle'){
+    if(angleOk)label='Full Match';
+  }else if(hourOk&&minuteOk)label='Full Match';
+  else if(hourOk||minuteOk)label='Partial Match';
+
+  const weighted=t.matchMode==='angle'
+    ? Math.max(0,10-angleDelta)
+    : (hourOk?5:Math.max(0,5-hourDelta/3))+
+      (minuteOk?5:Math.max(0,5-minuteDelta/3));
+
+  return{
+    date,hourLon,minuteLon,hourPos,minutePos,
+    hourDelta,minuteDelta,pairAngle,angleDelta,
+    hourOk,minuteOk,angleOk,count,label,weighted
+  };
+}
+function refinePairCandidate(center,t){
+  let best=pairScore(center,t);
+  for(let minutes=-720;minutes<=720;minutes+=10){
+    const r=pairScore(new Date(center.getTime()+minutes*60000),t);
+    if(r.weighted>best.weighted ||
+       (r.weighted===best.weighted &&
+        (r.hourDelta+r.minuteDelta+r.angleDelta)<(best.hourDelta+best.minuteDelta+best.angleDelta))){
+      best=r;
+    }
+  }
+  const coarse=best;
+  for(let minutes=-20;minutes<=20;minutes++){
+    const r=pairScore(new Date(coarse.date.getTime()+minutes*60000),t);
+    if(r.weighted>best.weighted ||
+       (r.weighted===best.weighted &&
+        (r.hourDelta+r.minuteDelta+r.angleDelta)<(best.hourDelta+best.minuteDelta+best.angleDelta))){
+      best=r;
+    }
+  }
+  return best;
+}
+async function generatePairHandsDate(){
+  const main=document.getElementById('generatedDateMain');
+  const detail=document.getElementById('generatedDateDetail');
+  const useBtn=document.getElementById('useGeneratedDateBtn');
+  const fresh=pairTargets();
+
+  if(!fresh){
+    main.textContent='Location required';
+    detail.textContent='Set a location so the clock can calculate the hand positions.';
+    useBtn.disabled=true;
+    return;
+  }
+  if(fresh.hourPlanet===fresh.minutePlanet){
+    main.textContent='Choose two planets';
+    detail.textContent='Hour-hand and minute-hand planets must be different.';
+    useBtn.disabled=true;
+    return;
+  }
+
+  if(!lastGeneratorTargets || lastGeneratorTargets.kind!=='pairHands'){
+    lastGeneratorTargets={kind:'pairHands',...fresh,sourceDate:new Date(fresh.sourceDate)};
+    lastGeneratedDate=null;
+  }
+  const t=lastGeneratorTargets;
+  const cursor=lastGeneratedDate
+    ? new Date(lastGeneratedDate.getTime()+24*3600000)
+    : new Date(t.sourceDate.getTime()+3600000);
+
+  main.textContent='Searching…';
+  detail.textContent='Finding the next two-hand planetary recurrence…';
+  useBtn.disabled=true;
+
+  let best=null,selected=null,steps=0;
+  const stepHours=(t.hourPlanet==='Moon'||t.minutePlanet==='Moon')?3:6;
+  const horizonDays=36525; // about 100 years
+
+  for(let h=0;h<horizonDays*24;h+=stepHours){
+    const d=new Date(cursor.getTime()+h*3600000);
+    const r=pairScore(d,t);
+    steps++;
+
+    if(!best || r.weighted>best.weighted ||
+      (r.weighted===best.weighted &&
+       (r.hourDelta+r.minuteDelta+r.angleDelta)<(best.hourDelta+best.minuteDelta+best.angleDelta))){
+      best=r;
+    }
+
+    if(r.label==='Full Match'){
+      selected=refinePairCandidate(d,t);
+      break;
+    }
+
+    if(steps%800===0)await new Promise(r=>setTimeout(r,0));
+  }
+
+  const result=selected||best;
+  if(!result){
+    main.textContent='No pair match found';
+    detail.textContent='No future recurrence was found in the search window.';
+    return;
+  }
+
+  lastGeneratedDate=result.date;
+  const tz=activeTimeZone();
+  const dateText=result.date.toLocaleDateString('en-US',{timeZone:tz,month:'long',day:'numeric',year:'numeric'});
+  const timeText=result.date.toLocaleTimeString('en-US',{timeZone:tz,hour:'numeric',minute:'2-digit',hour12:true});
+
+  main.textContent=dateText+' · '+timeText;
+  if(t.matchMode==='angle'){
+    detail.textContent=
+      result.label+' · '+t.hourPlanet+' ↔ '+t.minutePlanet+
+      ' angle '+result.pairAngle.toFixed(2)+'° · target '+t.targetAngle.toFixed(2)+'°'+
+      ' · Δ '+result.angleDelta.toFixed(2)+'° · '+tz+'.';
+  }else{
+    detail.textContent=
+      result.label+' · '+t.hourPlanet+' → hour '+(result.hourOk?'✓':'✕')+
+      ' · '+t.minutePlanet+' → minute '+(result.minuteOk?'✓':'✕')+
+      ' · Δ '+result.hourDelta.toFixed(2)+'° / '+result.minuteDelta.toFixed(2)+'°'+
+      ' · '+(t.matchMode==='degree'?'Degree':t.matchMode==='nakshatra'?'Nakshatra':'Sign')+' mode · '+tz+'.';
+  }
+
+  document.getElementById('generateDateBtn').textContent='Generate next date';
+  useBtn.disabled=false;
+}
+
 async function generateDateFromHands(){
   const method=document.getElementById('dateGeneratorMode')?.value||'off';
   if(method==='cycleHands')return generateCycleHandsDate();
+  if(method==='pairHands')return generatePairHandsDate();
   return generateSunMoonDate();
 }
 function polar(angle,r){const a=(angle-90)*Math.PI/180;return[450+r*Math.cos(a),450+r*Math.sin(a)]}
@@ -744,10 +942,22 @@ function updateGeneratorControls(){
   const method=document.getElementById('dateGeneratorMode')?.value||'off';
   const anchorWrap=document.getElementById('secondAnchorWrap');
   const matchWrap=document.getElementById('matchModeWrap');
+  const pairWrap=document.getElementById('pairPlanetWrap');
   const cycle=method==='cycleHands';
+  const pair=method==='pairHands';
 
   if(anchorWrap)anchorWrap.style.display=cycle?'grid':'none';
-  if(matchWrap)matchWrap.style.display=cycle?'grid':'none';
+  if(matchWrap)matchWrap.style.display=(cycle||pair)?'grid':'none';
+  if(pairWrap)pairWrap.style.display=pair?'grid':'none';
+
+  const label=matchWrap?.childNodes?.[0];
+  if(label&&label.nodeType===3)label.nodeValue=pair?'Pair match ':'Planet match ';
+
+  const angleOption=document.querySelector('#dateMatchMode option[value="angle"]');
+  if(angleOption)angleOption.hidden=!pair;
+  if(!pair && document.getElementById('dateMatchMode')?.value==='angle'){
+    document.getElementById('dateMatchMode').value='degree';
+  }
 }
 function resetDateGeneratorSequence(){
   lastGeneratedDate=null;
@@ -763,6 +973,8 @@ document.getElementById('dateGeneratorMode').addEventListener('change',()=>{
 });
 document.getElementById('dateMatchMode').addEventListener('change',resetDateGeneratorSequence);
 document.getElementById('secondAnchor').addEventListener('change',resetDateGeneratorSequence);
+document.getElementById('hourPairPlanet').addEventListener('change',resetDateGeneratorSequence);
+document.getElementById('minutePairPlanet').addEventListener('change',resetDateGeneratorSequence);
 document.getElementById('useGeneratedDateBtn').addEventListener('click',()=>{
   if(!lastGeneratedDate)return;
   selectedTime=new Date(lastGeneratedDate);
