@@ -32,6 +32,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div class="card"><small>Standard civil time</small><b id="standardTime">—</b><p id="standardTimeDetail">Your normal local clock time.</p></div>
     <div class="card"><small>ASC time · Secondary clock</small><b id="ascTime">—</b><p id="ascTimeDetail">Zodiac hour · sign minute · pada second · solar AM/PM.</p></div>
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
+    <div class="card"><small>Navamsa · D9</small><b id="navamsaMain">—</b><p id="navamsaDetail">Current 3°20′ division of the sidereal Ascendant.</p></div>
     <div class="card"><small>Minute hand · Zodiac + Nakshatra</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
     <div class="card"><small>Second hand · Zodiac + Nakshatra</small><b id="padaProgress">—</b><p id="padaDetail">—</p></div>
     <div class="card"><small>Local sidereal state</small><b id="lst">—</b><p id="timeDetail">—</p></div>
@@ -40,6 +41,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div><span class="dot" style="background:#7dd3fc"></span>ASC hour hand — true sidereal longitude</div>
     <div><span class="dot" style="background:#e8f4ff"></span>Minute hand — 0°→30° progress through current sign</div>
     <div><span class="dot" style="background:#f9a8d4"></span>Second hand — 0°→3°20′ progress through current pada</div>
+    <div><span class="dot" style="background:#facc15"></span>D9 ring — Navamsa sign for each 3°20′ pada sector</div>
   </div>
   <div class="note">The minute and second hands do not use fixed civil-time rates. They are derived from the actual local Ascendant, so they naturally accelerate or slow as rising signs move at different rates for your detected latitude. Location is requested automatically through the browser; no coordinate entry is required.</div>
 </div>
@@ -190,6 +192,17 @@ function pos(lon){
   const nakSize=360/27,padaSize=360/108,sign=Math.floor(lon/30),nak=Math.floor(lon/nakSize),nakDeg=lon%nakSize;
   return{lon,sign,degree:lon%30,nak,nakName:NAK[nak],pada:Math.floor(nakDeg/padaSize)+1,globalPada:Math.floor(lon/padaSize)+1,padaDegree:lon%padaSize};
 }
+function navamsaForLongitude(lon){
+  lon=norm(lon);
+  const rasi=Math.floor(lon/30);
+  const navInSign=Math.min(8,Math.floor((lon%30)/(10/3)));
+  let start;
+  if([0,3,6,9].includes(rasi)) start=rasi;          // movable: starts from itself
+  else if([1,4,7,10].includes(rasi)) start=(rasi+8)%12; // fixed: starts from 9th
+  else start=(rasi+4)%12;                           // dual: starts from 5th
+  const sign=(start+navInSign)%12;
+  return{sign,index:navInSign+1,glyph:GLYPHS[sign],name:SIGNS[sign]};
+}
 function polar(angle,r){const a=(angle-90)*Math.PI/180;return[450+r*Math.cos(a),450+r*Math.sin(a)]}
 function line(angle,r1,r2,color,width,opacity=1){const a=polar(angle,r1),b=polar(angle,r2);return'<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+color+'" stroke-width="'+width+'" opacity="'+opacity+'"/>'}
 function textAt(angle,r,text,size,color,weight='600'){const p=polar(angle,r);return'<text x="'+p[0]+'" y="'+p[1]+'" fill="'+color+'" font-size="'+size+'" font-weight="'+weight+'" text-anchor="middle" dominant-baseline="middle">'+text+'</text>'}
@@ -211,6 +224,7 @@ function draw(){
   if(!userLocation){document.getElementById('status').textContent='Locating…';return}
   const lat=userLocation.lat,lon=userLocation.lon;
   const aya=lahiri(d),asc=pos(ascendantSidereal(d,lat,lon,aya));
+  const navamsa=navamsaForLongitude(asc.lon);
   // Background-only planetary state for aviation/convection correlation work.
   const moonLon=bodyLon('Moon',d,aya),venusLon=bodyLon('Venus',d,aya);
   window.dispatchEvent(new CustomEvent('pada-clock-astro-state',{detail:{timestamp:d.getTime(),lat,lon,ayanamsa:aya,ascendant:asc.lon,moon:moonLon,venus:venusLon}}));
@@ -229,6 +243,12 @@ function draw(){
     const a=i*30;out+=line(a,270,420,'#48baf4',1.7,.8);out+=textAt(a+15,383,GLYPHS[i],27,'#eef8ff','700');out+=textAt(a+15,355,SIGNS[i],10,'#bed9e8','700');
   }
   for(let i=0;i<108;i++){const a=i*(360/108),major=i%9===0,pada=i%1===0;out+=line(a,major?270:300,major?420:330,major?'#7dd3fc':'#4b6578',major?1.4:.55,major?.8:.6)}
+  for(let i=0;i<108;i++){
+    const a=i*(360/108),center=a+(360/108)/2;
+    const d9=navamsaForLongitude(center);
+    if(i%3===1) out+=textAt(center,286,d9.glyph,8,'#facc15','800');
+  }
+  out+='<circle cx="450" cy="450" r="294" fill="none" stroke="rgba(250,204,21,.24)" stroke-width="1.2"/>';
   for(let i=0;i<9;i++){out+=line(i*40,190,265,'#9fb7c8',1,.65);out+=textAt(i*40+20,230,String(i+1),11,'#c8d9e5','700')}
   for(let i=0;i<60;i++){out+=line(i*6,i%5===0?150:165,190,i%5===0?'#8aa8bc':'#4e6575',i%5===0?1:.5,.7)}
   out+='<circle cx="450" cy="450" r="145" fill="#07121d" stroke="rgba(124,185,255,.18)" stroke-width="2"/>';
@@ -244,6 +264,8 @@ function draw(){
     ' · '+(solarHalf.hourAngle===null?'AM/PM fallback from civil time':('solar hour angle '+solarHalf.hourAngle.toFixed(2)+' h'));
   document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
   document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
+  document.getElementById('navamsaMain').textContent=navamsa.glyph+' '+navamsa.name;
+  document.getElementById('navamsaDetail').textContent='D9 division '+navamsa.index+' of '+SIGNS[asc.sign]+' · '+asc.nakName+' Pada '+asc.pada;
   document.getElementById('signProgress').textContent=GLYPHS[minutePos.sign]+' '+SIGNS[minutePos.sign]+' · '+minutePos.nakName+' P'+minutePos.pada;
   document.getElementById('signDetail').textContent='Minute hand position '+deg(minutePos.degree)+' · '+(signFrac*100).toFixed(1)+'% through ASC sign · hand angle '+signMinuteAngle.toFixed(1)+'°';
   document.getElementById('padaProgress').textContent=GLYPHS[secondPos.sign]+' '+SIGNS[secondPos.sign]+' · '+secondPos.nakName+' P'+secondPos.pada;
