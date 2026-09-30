@@ -194,6 +194,13 @@ function startLocation(){
 const norm=v=>((v%360)+360)%360;
 function lahiri(d){const jd=d.getTime()/86400000+2440587.5,T=(jd-2451545)/36525;return(85885.53+5028.796195*T+1.1054348*T*T+.00007964*T*T*T)/3600}
 function bodyLon(name,d,a){const v=A.GeoVector(A.Body[name],d,true),e=A.Ecliptic(v);return norm(Number(e.elon)-a)}
+function meanNodeLons(d,a){
+  const jd=d.getTime()/86400000+2440587.5;
+  const T=(jd-2451545)/36525;
+  const tropicalRahu=norm(125.04452-1934.136261*T+0.0020708*T*T+(T*T*T)/450000);
+  const rahu=norm(tropicalRahu-a);
+  return{rahu,ketu:norm(rahu+180)};
+}
 function sunMeridianState(d,lat,lon){
   try{
     const observer=new A.Observer(lat,lon,0);
@@ -599,7 +606,6 @@ function combinedTargets(){
   const hourD9=navamsaPoint(asc.lon);
   const minuteD9=navamsaPoint(minuteAngle);
   const secondPos=pos(secondAngle);
-  const secondLord=SIGN_LORDS[secondPos.sign];
 
   return{
     sourceDate:d,
@@ -608,15 +614,16 @@ function combinedTargets(){
     hourD9,
     minuteD9,
     secondAngle,
-    secondPos,
-    secondLord
+    secondPos
   };
 }
 function combinedScore(date,t){
   const aya=lahiri(date);
   const sun=bodyLon('Sun',date,aya);
   const moon=bodyLon('Moon',date,aya);
-  const lordLon=bodyLon(t.secondLord,date,aya);
+  const nodes=meanNodeLons(date,aya);
+  const rahuPos=pos(nodes.rahu);
+  const ketuPos=pos(nodes.ketu);
 
   const sunDegreeDelta=angleDiff(sun,t.hourDegreeTarget);
   const moonDegreeDelta=angleDiff(moon,t.minuteDegreeTarget);
@@ -627,9 +634,12 @@ function combinedScore(date,t){
   const moonD9Ok=moonD9.sign===t.hourD9.sign;
   const sunD9Ok=sunD9.sign===t.minuteD9.sign;
 
-  const lordSignOk=Math.floor(norm(lordLon)/30)===t.secondPos.sign;
-  const lordNakOk=Math.floor(norm(lordLon)/(360/27))===t.secondPos.nak;
-  const lordOk=lordSignOk||lordNakOk;
+  const rahuSignOk=rahuPos.sign===t.secondPos.sign;
+  const rahuNakOk=rahuPos.nak===t.secondPos.nak;
+  const ketuSignOk=ketuPos.sign===t.secondPos.sign;
+  const ketuNakOk=ketuPos.nak===t.secondPos.nak;
+  const nodeOk=rahuSignOk||rahuNakOk||ketuSignOk||ketuNakOk;
+  const matchedNode=(rahuSignOk||rahuNakOk)?'Rahu':((ketuSignOk||ketuNakOk)?'Ketu':'Rahu/Ketu');
 
   const sunDegreeOk=sunDegreeDelta<=0.35;
   const moonDegreeOk=moonDegreeDelta<=1.00;
@@ -639,7 +649,7 @@ function combinedScore(date,t){
     moonDegreeOk,
     moonD9Ok,
     sunD9Ok,
-    lordOk
+    nodeOk
   ];
   const count=conditions.filter(Boolean).length;
 
@@ -648,18 +658,19 @@ function combinedScore(date,t){
   else if(sunDegreeOk&&moonDegreeOk&&count>=4)label='Strong Match';
   else if((sunDegreeOk||moonDegreeOk)&&count>=3)label='Partial Match';
 
-  // Degree anchors carry the most weight, then D9, then the ruler condition.
+  // Degree anchors carry the most weight, then D9, then the Rahu/Ketu condition.
   const weighted=
     (sunDegreeOk?3:Math.max(0,3-sunDegreeDelta))+
     (moonDegreeOk?3:Math.max(0,3-moonDegreeDelta/2))+
     (moonD9Ok?1.5:0)+
     (sunD9Ok?1.5:0)+
-    (lordOk?1:0);
+    (nodeOk?1:0);
 
   return{
-    date,sun,moon,lordLon,
+    date,sun,moon,rahu:nodes.rahu,ketu:nodes.ketu,
     sunDegreeDelta,moonDegreeDelta,
-    moonD9Ok,sunD9Ok,lordSignOk,lordNakOk,lordOk,
+    moonD9Ok,sunD9Ok,
+    rahuSignOk,rahuNakOk,ketuSignOk,ketuNakOk,nodeOk,matchedNode,
     sunDegreeOk,moonDegreeOk,count,label,weighted
   };
 }
@@ -750,7 +761,7 @@ async function generateCombinedHandsDate(){
     'Moon degree '+(result.moonDegreeOk?'✓':'✕'),
     'Moon D9 '+(result.moonD9Ok?'✓':'✕'),
     'Sun D9 '+(result.sunD9Ok?'✓':'✕'),
-    t.secondLord+' '+(result.lordOk?'✓':'✕')
+    (result.nodeOk?result.matchedNode:'Rahu/Ketu')+' '+(result.nodeOk?'✓':'✕')
   ];
 
   main.textContent=dateText+' · '+timeText;
@@ -758,6 +769,7 @@ async function generateCombinedHandsDate(){
     result.label+' · '+result.count+'/5 conditions · '+
     checks.join(' · ')+
     ' · Δ Sun '+result.sunDegreeDelta.toFixed(2)+'° / Moon '+result.moonDegreeDelta.toFixed(2)+'°'+
+    ' · Node target '+GLYPHS[t.secondPos.sign]+' '+SIGNS[t.secondPos.sign]+' / '+t.secondPos.nakName+
     ' · '+tested+' solar return'+(tested===1?'':'s')+' checked · '+tz+'.';
 
   document.getElementById('generateDateBtn').textContent='Generate next date';
