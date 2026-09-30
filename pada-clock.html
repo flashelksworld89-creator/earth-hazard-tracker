@@ -32,13 +32,15 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
       <label style="display:grid;gap:5px;margin-top:6px">Method
         <select id="dateGeneratorMode">
           <option value="off">Off</option>
-          <option value="sunMoon">Sun = hour hand · Moon = minute hand</option>
+          <option value="sunMoon">Sun/Moon hands</option>
+          <option value="navamsaHands">Navamsa hands · Moon/Sun/Ruler</option>
         </select>
       </label>
       <label style="display:grid;gap:5px;margin-top:6px">Match
         <select id="dateMatchMode">
+          <option value="sector">Sector match</option>
+          <option value="degree">Degree match</option>
           <option value="closest">Closest match</option>
-          <option value="exact">Exact match</option>
         </select>
       </label>
       <div class="row">
@@ -76,6 +78,7 @@ const A=window.Astronomy;
 const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
 const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
 const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
+const SIGN_LORDS=['Mars','Venus','Mercury','Moon','Sun','Mercury','Venus','Mars','Jupiter','Saturn','Saturn','Jupiter'];
 const svg=document.getElementById('clock');
 let mode='live',selectedTime=new Date(),timer=null,watchId=null,controlsDirty=false,lastGeneratedDate=null,lastGeneratorTargets=null;
 let userLocation=null;
@@ -225,7 +228,19 @@ function navamsaForLongitude(lon){
   const sign=(start+navInSign)%12;
   return{sign,index:navInSign+1,glyph:GLYPHS[sign],name:SIGNS[sign]};
 }
+function navamsaPoint(lon){
+  lon=norm(lon);
+  const d9=navamsaForLongitude(lon);
+  const size=10/3;
+  const within=lon%size;
+  const degree=(within/size)*30;
+  return{...d9,degree,mappedLon:d9.sign*30+degree};
+}
 function angleDiff(a,b){return Math.abs(((a-b+540)%360)-180)}
+function samePadaSector(a,b){
+  const size=10/3;
+  return Math.floor(norm(a)/size)===Math.floor(norm(b)/size);
+}
 function sunMoonTargets(){
   if(!userLocation)return null;
   const d=currentMoment(),aya=lahiri(d);
@@ -302,7 +317,7 @@ async function generateSunMoonDate(){
 
   if(modeSelect.value!=='sunMoon'){
     main.textContent='Select a method';
-    detail.textContent='Choose “Sun = hour hand · Moon = minute hand” first.';
+    detail.textContent='Choose a date-generator method first.';
     useBtn.disabled=true;
     return;
   }
@@ -316,8 +331,9 @@ async function generateSunMoonDate(){
   }
 
   // Keep the same frozen hand targets while stepping through successive dates.
-  if(!lastGeneratorTargets){
+  if(!lastGeneratorTargets || lastGeneratorTargets.kind!=='sunMoon'){
     lastGeneratorTargets={
+      kind:'sunMoon',
       hourTarget:freshTargets.hourTarget,
       minuteTarget:freshTargets.minuteTarget,
       sourceDate:new Date(freshTargets.sourceDate)
@@ -340,9 +356,9 @@ async function generateSunMoonDate(){
     : 'Finding the first future Sun–Moon degree match…';
   useBtn.disabled=true;
 
-  const matchMode=document.getElementById('dateMatchMode')?.value||'closest';
-  const exactSunTolerance=0.05;
-  const exactMoonTolerance=0.10;
+  const matchMode=document.getElementById('dateMatchMode')?.value||'sector';
+  const degreeSunTolerance=0.05;
+  const degreeMoonTolerance=0.10;
   const closestSunTolerance=0.35;
   const closestMoonTolerance=1.00;
 
@@ -361,15 +377,23 @@ async function generateSunMoonDate(){
 
     if(!bestFallback || candidate.score<bestFallback.score) bestFallback=candidate;
 
-    const qualifiesExact=
-      candidate.sunDelta<=exactSunTolerance &&
-      candidate.moonDelta<=exactMoonTolerance;
+    const qualifiesDegree=
+      candidate.sunDelta<=degreeSunTolerance &&
+      candidate.moonDelta<=degreeMoonTolerance;
 
     const qualifiesClosest=
       candidate.sunDelta<=closestSunTolerance &&
       candidate.moonDelta<=closestMoonTolerance;
 
-    if(matchMode==='exact' ? qualifiesExact : qualifiesClosest){
+    const qualifiesSector=
+      samePadaSector(candidate.sun,sunTarget) &&
+      samePadaSector(candidate.moon,moonTarget);
+
+    if(
+      (matchMode==='degree'&&qualifiesDegree) ||
+      (matchMode==='sector'&&qualifiesSector) ||
+      (matchMode==='closest'&&qualifiesClosest)
+    ){
       selected=candidate;
       break;
     }
@@ -378,12 +402,10 @@ async function generateSunMoonDate(){
     if(year%4===3)await new Promise(r=>setTimeout(r,0));
   }
 
-  const result=matchMode==='exact' ? selected : (selected||bestFallback);
+  const result=matchMode==='closest' ? (selected||bestFallback) : selected;
   if(!result){
-    main.textContent='No exact match found';
-    detail.textContent=
-      'No future result within Sun ≤ '+exactSunTolerance.toFixed(2)+'° and Moon ≤ '+
-      exactMoonTolerance.toFixed(2)+'° was found in the 60-year search window.';
+    main.textContent=matchMode==='degree'?'No degree match found':'No sector match found';
+    detail.textContent='No qualifying future Sun/Moon match was found in the 60-year search window.';
     return;
   }
 
@@ -402,13 +424,173 @@ async function generateSunMoonDate(){
     'Sun target '+deg(sunTarget%30)+' in '+SIGNS[Math.floor(sunTarget/30)]+
     ' anchors the date · Moon target '+deg(moonTarget%30)+' in '+SIGNS[Math.floor(moonTarget/30)]+
     ' sets the time · Sun Δ '+result.sunDelta.toFixed(2)+'° · Moon Δ '+result.moonDelta.toFixed(2)+'°'+
-    ' · '+(matchMode==='exact'?'Exact':'Closest')+' mode'+
+    ' · '+(matchMode==='sector'?'Sector':matchMode==='degree'?'Degree':'Closest')+' mode'+
     ' · '+tested+' solar return'+(tested===1?'':'s')+' checked · '+tz+'.';
 
   document.getElementById('generateDateBtn').textContent='Generate next date';
   useBtn.disabled=false;
 }
 
+function navamsaHandTargets(){
+  if(!userLocation)return null;
+  const d=currentMoment(),aya=lahiri(d);
+  const asc=pos(ascendantSidereal(d,userLocation.lat,userLocation.lon,aya));
+  const signFrac=asc.degree/30;
+  const minuteAngle=signFrac*360;
+  const padaSize=360/108;
+  const secondAngle=(asc.padaDegree/padaSize)*360;
+
+  const hourD9=navamsaPoint(asc.lon);
+  const minuteD9=navamsaPoint(minuteAngle);
+  const secondD9=navamsaPoint(secondAngle);
+  const ruler=SIGN_LORDS[secondD9.sign];
+
+  return{
+    sourceDate:d,
+    hourAngle:asc.lon,
+    minuteAngle,
+    secondAngle,
+    hourD9,
+    minuteD9,
+    secondD9,
+    ruler
+  };
+}
+function navamsaHandScore(date,t){
+  const aya=lahiri(date);
+  const moon=bodyLon('Moon',date,aya);
+  const sun=bodyLon('Sun',date,aya);
+  const rulerLon=bodyLon(t.ruler,date,aya);
+
+  const moonD9=navamsaPoint(moon);
+  const sunD9=navamsaPoint(sun);
+
+  const moonDegreeDelta=angleDiff(moonD9.mappedLon,t.hourD9.mappedLon);
+  const sunDegreeDelta=angleDiff(sunD9.mappedLon,t.minuteD9.mappedLon);
+  const rulerDegreeDelta=angleDiff(rulerLon,t.secondD9.mappedLon);
+
+  const sectorOk=
+    moonD9.sign===t.hourD9.sign &&
+    sunD9.sign===t.minuteD9.sign &&
+    Math.floor(rulerLon/30)===t.secondD9.sign;
+
+  return{
+    date,moon,sun,rulerLon,moonD9,sunD9,
+    moonDegreeDelta,sunDegreeDelta,rulerDegreeDelta,sectorOk,
+    score:moonDegreeDelta+sunDegreeDelta+rulerDegreeDelta*.7
+  };
+}
+function refineNavamsaCandidate(center,t,matchMode){
+  let best=navamsaHandScore(center,t);
+  const start=center.getTime()-6*3600000;
+  const end=center.getTime()+6*3600000;
+
+  for(let ms=start;ms<=end;ms+=15*60000){
+    const r=navamsaHandScore(new Date(ms),t);
+    if(matchMode==='sector'){
+      if(r.sectorOk)return r;
+    }else if(r.score<best.score){
+      best=r;
+    }
+  }
+
+  const coarse=best;
+  for(let m=-30;m<=30;m++){
+    const r=navamsaHandScore(new Date(coarse.date.getTime()+m*60000),t);
+    if(matchMode==='sector'){
+      if(r.sectorOk)return r;
+    }else if(r.score<best.score){
+      best=r;
+    }
+  }
+  return best;
+}
+async function generateNavamsaHandsDate(){
+  const main=document.getElementById('generatedDateMain');
+  const detail=document.getElementById('generatedDateDetail');
+  const useBtn=document.getElementById('useGeneratedDateBtn');
+  const matchMode=document.getElementById('dateMatchMode')?.value||'sector';
+
+  const fresh=navamsaHandTargets();
+  if(!fresh){
+    main.textContent='Location required';
+    detail.textContent='Set a location so the clock can calculate the hand positions.';
+    useBtn.disabled=true;
+    return;
+  }
+
+  if(!lastGeneratorTargets || lastGeneratorTargets.kind!=='navamsaHands'){
+    lastGeneratorTargets={kind:'navamsaHands',...fresh,sourceDate:new Date(fresh.sourceDate)};
+    lastGeneratedDate=null;
+  }
+  const t=lastGeneratorTargets;
+  let cursor=lastGeneratedDate
+    ? new Date(lastGeneratedDate.getTime()+3600000)
+    : new Date(t.sourceDate.getTime()+3600000);
+
+  main.textContent='Searching…';
+  detail.textContent='Finding the next Navamsa hand match…';
+  useBtn.disabled=true;
+
+  let best=null,selected=null,steps=0;
+  const maxDays=matchMode==='sector'?3650:7300;
+  const stepHours=matchMode==='sector'?3:6;
+
+  for(let h=0;h<maxDays*24;h+=stepHours){
+    const d=new Date(cursor.getTime()+h*3600000);
+    const r=navamsaHandScore(d,t);
+    steps++;
+
+    if(!best||r.score<best.score)best=r;
+
+    if(matchMode==='sector' && r.sectorOk){
+      selected=refineNavamsaCandidate(d,t,'sector');
+      break;
+    }
+
+    if(matchMode==='degree'){
+      const degreeOk=
+        r.moonDegreeDelta<=0.25 &&
+        r.sunDegreeDelta<=0.10 &&
+        r.rulerDegreeDelta<=0.50;
+      if(degreeOk){
+        selected=refineNavamsaCandidate(d,t,'degree');
+        break;
+      }
+    }
+
+    if(steps%600===0)await new Promise(r=>setTimeout(r,0));
+  }
+
+  const result=matchMode==='closest'?best:selected;
+  if(!result){
+    main.textContent=matchMode==='degree'?'No degree match found':'No sector match found';
+    detail.textContent='No qualifying Navamsa hand match was found in the search window.';
+    return;
+  }
+
+  lastGeneratedDate=result.date;
+  const tz=activeTimeZone();
+  const dateText=result.date.toLocaleDateString('en-US',{timeZone:tz,month:'long',day:'numeric',year:'numeric'});
+  const timeText=result.date.toLocaleTimeString('en-US',{timeZone:tz,hour:'numeric',minute:'2-digit',hour12:true});
+
+  main.textContent=dateText+' · '+timeText;
+  detail.textContent=
+    'Moon → '+t.hourD9.glyph+' '+t.hourD9.name+
+    ' · Sun → '+t.minuteD9.glyph+' '+t.minuteD9.name+
+    ' · '+t.ruler+' → '+t.secondD9.glyph+' '+t.secondD9.name+
+    ' · '+(matchMode==='sector'?'Sector':matchMode==='degree'?'Degree':'Closest')+' match'+
+    (matchMode==='sector'?'':' · Δ '+result.moonDegreeDelta.toFixed(2)+'°/'+result.sunDegreeDelta.toFixed(2)+'°/'+result.rulerDegreeDelta.toFixed(2)+'°')+
+    ' · '+tz+'.';
+
+  document.getElementById('generateDateBtn').textContent='Generate next date';
+  useBtn.disabled=false;
+}
+async function generateDateFromHands(){
+  const method=document.getElementById('dateGeneratorMode')?.value||'off';
+  if(method==='navamsaHands')return generateNavamsaHandsDate();
+  return generateSunMoonDate();
+}
 function polar(angle,r){const a=(angle-90)*Math.PI/180;return[450+r*Math.cos(a),450+r*Math.sin(a)]}
 function line(angle,r1,r2,color,width,opacity=1){const a=polar(angle,r1),b=polar(angle,r2);return'<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+color+'" stroke-width="'+width+'" opacity="'+opacity+'"/>'}
 function textAt(angle,r,text,size,color,weight='600'){const p=polar(angle,r);return'<text x="'+p[0]+'" y="'+p[1]+'" fill="'+color+'" font-size="'+size+'" font-weight="'+weight+'" text-anchor="middle" dominant-baseline="middle">'+text+'</text>'}
@@ -501,12 +683,12 @@ document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')
 document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';controlsDirty=false;syncInputs(selectedTime);draw()});
 document.getElementById('locateBtn').addEventListener('click',startLocation);
 document.getElementById('searchCityBtn').addEventListener('click',searchCity);
-document.getElementById('generateDateBtn').addEventListener('click',generateSunMoonDate);
+document.getElementById('generateDateBtn').addEventListener('click',generateDateFromHands);
 function resetDateGeneratorSequence(){
   lastGeneratedDate=null;
   lastGeneratorTargets=null;
   document.getElementById('generatedDateMain').textContent='—';
-  document.getElementById('generatedDateDetail').textContent='Select the Sun–Moon method to generate a calendar date from the current hand positions.';
+  document.getElementById('generatedDateDetail').textContent='Choose a method and match type, then generate a date from the current hand positions.';
   document.getElementById('generateDateBtn').textContent='Generate date + time';
   document.getElementById('useGeneratedDateBtn').disabled=true;
 }
