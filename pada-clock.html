@@ -865,6 +865,7 @@ function draw(){
   const signMinuteAngle=signFrac*360;
   const padaSize=360/108,padaFrac=asc.padaDegree/padaSize,secondAngle=padaFrac*360;
   const minutePos=pos(signMinuteAngle);
+  const minuteD9=navamsaPoint(signMinuteAngle);
   const secondPos=pos(secondAngle);
   const solarHalf=sunMeridianState(d,lat,lon);
   const ascHour=asc.sign+1;
@@ -899,8 +900,13 @@ function draw(){
   document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
   document.getElementById('navamsaMain').textContent=navamsa.glyph+' '+navamsa.name;
   document.getElementById('navamsaDetail').textContent='D9 division '+navamsa.index+' of '+SIGNS[asc.sign]+' · '+asc.nakName+' Pada '+asc.pada;
-  document.getElementById('signProgress').textContent=GLYPHS[minutePos.sign]+' '+SIGNS[minutePos.sign]+' · '+minutePos.nakName+' P'+minutePos.pada;
-  document.getElementById('signDetail').textContent='Minute hand position '+deg(minutePos.degree)+' · '+(signFrac*100).toFixed(1)+'% through ASC sign · hand angle '+signMinuteAngle.toFixed(1)+'°';
+  document.getElementById('signProgress').textContent=
+    GLYPHS[minutePos.sign]+' '+SIGNS[minutePos.sign]+' · '+minutePos.nakName+' P'+minutePos.pada+
+    ' · D9 '+minuteD9.glyph+' '+minuteD9.name;
+  document.getElementById('signDetail').textContent=
+    'Minute hand position '+deg(minutePos.degree)+
+    ' · Navamsa '+minuteD9.glyph+' '+minuteD9.name+' '+deg(minuteD9.degree)+
+    ' · '+(signFrac*100).toFixed(1)+'% through ASC sign · hand angle '+signMinuteAngle.toFixed(1)+'°';
   document.getElementById('padaProgress').textContent=GLYPHS[secondPos.sign]+' '+SIGNS[secondPos.sign]+' · '+secondPos.nakName+' P'+secondPos.pada;
   document.getElementById('padaDetail').textContent='Second hand position '+deg(secondPos.degree)+' · '+(padaFrac*100).toFixed(1)+'% through current ASC pada · hand angle '+secondAngle.toFixed(1)+'°';
   const lst=norm(A.SiderealTime(d)*15+lon)/15;
