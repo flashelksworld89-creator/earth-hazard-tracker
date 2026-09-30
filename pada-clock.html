@@ -27,6 +27,22 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div class="row"><button id="liveBtn" type="button">Use live time</button><button id="setBtn" type="button">Use selected time</button></div>
     <div class="row"><button id="minus" type="button">− 1 minute</button><button id="plus" type="button">+ 1 minute</button></div>
 
+    <div class="card">
+      <small>Date generator</small>
+      <label style="display:grid;gap:5px;margin-top:6px">Method
+        <select id="dateGeneratorMode">
+          <option value="off">Off</option>
+          <option value="sunMoon">Sun = hour hand · Moon = minute hand</option>
+        </select>
+      </label>
+      <div class="row">
+        <button id="generateDateBtn" type="button">Generate next date</button>
+        <button id="useGeneratedDateBtn" type="button" disabled>Use generated date</button>
+      </div>
+      <b id="generatedDateMain" style="margin-top:8px">—</b>
+      <p id="generatedDateDetail">Select the Sun–Moon method to generate a calendar date from the current hand positions.</p>
+    </div>
+
   </div>
   <div class="cards">
     <div class="card"><small>Standard civil time</small><b id="standardTime">—</b><p id="standardTimeDetail">Your normal local clock time.</p></div>
@@ -55,7 +71,7 @@ const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio',
 const GLYPHS=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
 const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
 const svg=document.getElementById('clock');
-let mode='live',selectedTime=new Date(),timer=null,watchId=null,controlsDirty=false;
+let mode='live',selectedTime=new Date(),timer=null,watchId=null,controlsDirty=false,lastGeneratedDate=null;
 let userLocation=null;
 try{
   const saved=JSON.parse(localStorage.getItem('geoClockLocation')||'null');
@@ -203,6 +219,120 @@ function navamsaForLongitude(lon){
   const sign=(start+navInSign)%12;
   return{sign,index:navInSign+1,glyph:GLYPHS[sign],name:SIGNS[sign]};
 }
+function angleDiff(a,b){return Math.abs(((a-b+540)%360)-180)}
+function sunMoonTargets(){
+  if(!userLocation)return null;
+  const d=currentMoment(),aya=lahiri(d);
+  const asc=pos(ascendantSidereal(d,userLocation.lat,userLocation.lon,aya));
+  const hourTarget=asc.lon;
+  const minuteTarget=(asc.degree/30)*360;
+  return{hourTarget,minuteTarget,sourceDate:d};
+}
+function sunMoonScore(date,sunTarget,moonTarget){
+  const aya=lahiri(date);
+  const sun=bodyLon('Sun',date,aya);
+  const moon=bodyLon('Moon',date,aya);
+  const sunDelta=angleDiff(sun,sunTarget);
+  const moonDelta=angleDiff(moon,moonTarget);
+  return{date,sun,moon,sunDelta,moonDelta,score:Math.sqrt(sunDelta*sunDelta+moonDelta*moonDelta)};
+}
+function refineSunMoonCandidate(center,sunTarget,moonTarget){
+  let best=sunMoonScore(center,sunTarget,moonTarget);
+  // Search +/- 36 hours at 30-minute resolution. This allows the Moon to
+  // refine the match while keeping the Sun very close to its target degree.
+  for(let minutes=-2160;minutes<=2160;minutes+=30){
+    const d=new Date(center.getTime()+minutes*60000);
+    const r=sunMoonScore(d,sunTarget,moonTarget);
+    // Weight the Sun more strongly so the result remains anchored to the hour-hand degree.
+    const weighted=Math.sqrt((r.sunDelta*2.5)**2+r.moonDelta**2);
+    const bestWeighted=Math.sqrt((best.sunDelta*2.5)**2+best.moonDelta**2);
+    if(weighted<bestWeighted)best=r;
+  }
+  return best;
+}
+function findSunCrossing(start,sunTarget){
+  // Daily stepping finds the next annual crossing, then binary-refines it.
+  let a=new Date(start),aya=lahiri(a),prev=norm(bodyLon('Sun',a,aya)-sunTarget);
+  for(let i=0;i<380;i++){
+    const b=new Date(a.getTime()+86400000);
+    const cur=norm(bodyLon('Sun',b,lahiri(b))-sunTarget);
+    if(prev>300&&cur<60){
+      let lo=a.getTime(),hi=b.getTime();
+      for(let j=0;j<32;j++){
+        const mid=Math.floor((lo+hi)/2),m=new Date(mid);
+        const v=norm(bodyLon('Sun',m,lahiri(m))-sunTarget);
+        if(v>180)lo=mid;else hi=mid;
+      }
+      return new Date(hi);
+    }
+    a=b;prev=cur;
+  }
+  return null;
+}
+async function generateSunMoonDate(){
+  const modeSelect=document.getElementById('dateGeneratorMode');
+  const main=document.getElementById('generatedDateMain');
+  const detail=document.getElementById('generatedDateDetail');
+  const useBtn=document.getElementById('useGeneratedDateBtn');
+
+  if(modeSelect.value!=='sunMoon'){
+    main.textContent='Select a method';
+    detail.textContent='Choose “Sun = hour hand · Moon = minute hand” first.';
+    useBtn.disabled=true;
+    return;
+  }
+  const targets=sunMoonTargets();
+  if(!targets){
+    main.textContent='Location required';
+    detail.textContent='Set a location so the clock can calculate the hand positions.';
+    useBtn.disabled=true;
+    return;
+  }
+
+  const sunTarget=targets.hourTarget,moonTarget=targets.minuteTarget;
+  const start=new Date(targets.sourceDate.getTime()+3600000);
+  main.textContent='Searching…';
+  detail.textContent='Testing future solar returns against the Moon target.';
+  useBtn.disabled=true;
+
+  let cursor=start,best=null,tested=0;
+  // 40 years spans more than two Metonic cycles, which is enough to find
+  // a close recurrence for most Sun/Moon longitude pairs.
+  for(let year=0;year<40;year++){
+    const crossing=findSunCrossing(cursor,sunTarget);
+    if(!crossing)break;
+    const candidate=refineSunMoonCandidate(crossing,sunTarget,moonTarget);
+    tested++;
+    if(!best||candidate.score<best.score)best=candidate;
+
+    // Stop early on a tight simultaneous match.
+    if(candidate.sunDelta<=0.20&&candidate.moonDelta<=0.50){
+      best=candidate;
+      break;
+    }
+
+    cursor=new Date(crossing.getTime()+300*86400000);
+    if(year%4===3)await new Promise(r=>setTimeout(r,0));
+  }
+
+  if(!best){
+    main.textContent='No date found';
+    detail.textContent='The search could not resolve a future Sun crossing.';
+    return;
+  }
+
+  lastGeneratedDate=best.date;
+  const tz=activeTimeZone();
+  main.textContent=best.date.toLocaleDateString('en-US',{
+    timeZone:tz,month:'long',day:'numeric',year:'numeric'
+  });
+  detail.textContent=
+    'Sun target '+deg(sunTarget%30)+' in '+SIGNS[Math.floor(sunTarget/30)]+
+    ' · Moon target '+deg(moonTarget%30)+' in '+SIGNS[Math.floor(moonTarget/30)]+
+    ' · Sun Δ '+best.sunDelta.toFixed(2)+'° · Moon Δ '+best.moonDelta.toFixed(2)+'°'+
+    ' · '+tested+' solar return'+(tested===1?'':'s')+' tested.';
+  useBtn.disabled=false;
+}
 function polar(angle,r){const a=(angle-90)*Math.PI/180;return[450+r*Math.cos(a),450+r*Math.sin(a)]}
 function line(angle,r1,r2,color,width,opacity=1){const a=polar(angle,r1),b=polar(angle,r2);return'<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+color+'" stroke-width="'+width+'" opacity="'+opacity+'"/>'}
 function textAt(angle,r,text,size,color,weight='600'){const p=polar(angle,r);return'<text x="'+p[0]+'" y="'+p[1]+'" fill="'+color+'" font-size="'+size+'" font-weight="'+weight+'" text-anchor="middle" dominant-baseline="middle">'+text+'</text>'}
@@ -295,6 +425,15 @@ document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')
 document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';controlsDirty=false;syncInputs(selectedTime);draw()});
 document.getElementById('locateBtn').addEventListener('click',startLocation);
 document.getElementById('searchCityBtn').addEventListener('click',searchCity);
+document.getElementById('generateDateBtn').addEventListener('click',generateSunMoonDate);
+document.getElementById('useGeneratedDateBtn').addEventListener('click',()=>{
+  if(!lastGeneratedDate)return;
+  selectedTime=new Date(lastGeneratedDate);
+  mode='fixed';
+  controlsDirty=false;
+  syncInputs(selectedTime);
+  draw();
+});
 document.getElementById('citySearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchCity();}});
 ['date','hour12','minute12','ampm'].forEach(id=>{
   const el=document.getElementById(id);
