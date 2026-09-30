@@ -525,7 +525,7 @@ async function generateNavamsaHandsDate(){
   }
   const t=lastGeneratorTargets;
   let cursor=lastGeneratedDate
-    ? new Date(lastGeneratedDate.getTime()+3600000)
+    ? new Date(lastGeneratedDate.getTime()+24*3600000)
     : new Date(t.sourceDate.getTime()+3600000);
 
   main.textContent='Searching…';
