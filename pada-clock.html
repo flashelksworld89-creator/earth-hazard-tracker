@@ -37,7 +37,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
           <option value="combinedHands">Combined hands</option>
         </select>
       </label>
-      <label style="display:grid;gap:5px;margin-top:6px">Match
+      <label id="matchModeWrap" style="display:grid;gap:5px;margin-top:6px">Match
         <select id="dateMatchMode">
           <option value="sector">Sector match</option>
           <option value="degree">Degree match</option>
@@ -61,7 +61,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
         <button id="useGeneratedDateBtn" type="button" disabled>Use generated date</button>
       </div>
       <b id="generatedDateMain" style="margin-top:8px">—</b>
-      <p id="generatedDateDetail">Select the Sun–Moon method to generate a calendar date from the current hand positions.</p>
+      <p id="generatedDateDetail">Choose a generator method to calculate dates from the current hand positions.</p>
     </div>
 
   </div>
@@ -70,15 +70,15 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div class="card"><small>ASC time · Secondary clock</small><b id="ascTime">—</b><p id="ascTimeDetail">Zodiac hour · sign minute · pada second · solar AM/PM.</p></div>
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
     <div class="card"><small>Navamsa · D9</small><b id="navamsaMain">—</b><p id="navamsaDetail">Current 3°20′ division of the sidereal Ascendant.</p></div>
-    <div class="card"><small>Minute hand · Zodiac + Nakshatra</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
-    <div class="card"><small>Second hand · Zodiac + Nakshatra</small><b id="padaProgress">—</b><p id="padaDetail">—</p></div>
+    <div class="card"><small>Minute hand · Zodiac · Nakshatra · D9</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
+    <div class="card"><small>Second hand · Zodiac · Nakshatra · D9</small><b id="padaProgress">—</b><p id="padaDetail">—</p></div>
     <div class="card"><small>Local sidereal state</small><b id="lst">—</b><p id="timeDetail">—</p></div>
   </div>
   <div class="legend">
     <div><span class="dot" style="background:#7dd3fc"></span>ASC hour hand — true sidereal longitude</div>
     <div><span class="dot" style="background:#e8f4ff"></span>Minute hand — 0°→30° progress through current sign</div>
     <div><span class="dot" style="background:#f9a8d4"></span>Second hand — 0°→3°20′ progress through current pada</div>
-    <div><span class="dot" style="background:#facc15"></span>D9 ring — Navamsa sign for each 3°20′ pada sector</div>
+    <div><span class="dot" style="background:#facc15"></span>D9 ring — all 108 Navamsa sectors, one per 3°20′ pada</div>
   </div>
   <div class="note">The minute and second hands do not use fixed civil-time rates. They are derived from the actual local Ascendant, so they naturally accelerate or slow as rising signs move at different rates for your detected latitude. Location is requested automatically through the browser; no coordinate entry is required.</div>
 </div>
@@ -965,8 +965,10 @@ document.getElementById('searchCityBtn').addEventListener('click',searchCity);
 document.getElementById('generateDateBtn').addEventListener('click',generateDateFromHands);
 function updateGeneratorControls(){
   const method=document.getElementById('dateGeneratorMode')?.value||'off';
-  const wrap=document.getElementById('secondAnchorWrap');
-  if(wrap)wrap.style.display=method==='combinedHands'?'grid':'none';
+  const anchorWrap=document.getElementById('secondAnchorWrap');
+  const matchWrap=document.getElementById('matchModeWrap');
+  if(anchorWrap)anchorWrap.style.display=method==='combinedHands'?'grid':'none';
+  if(matchWrap)matchWrap.style.display=(method==='sunMoon'||method==='navamsaHands')?'grid':'none';
 }
 function resetDateGeneratorSequence(){
   lastGeneratedDate=null;
