@@ -239,21 +239,24 @@ function pos(lon){
 function navamsaForLongitude(lon){
   lon=norm(lon);
   const rasi=Math.floor(lon/30);
-  const navInSign=Math.min(8,Math.floor((lon%30)/(10/3)));
+  const signDegree=lon-rasi*30;
+  const size=10/3;
+  const navInSign=Math.min(8,Math.floor((signDegree+1e-10)/size));
   let start;
-  if([0,3,6,9].includes(rasi)) start=rasi;          // movable: starts from itself
-  else if([1,4,7,10].includes(rasi)) start=(rasi+8)%12; // fixed: starts from 9th
-  else start=(rasi+4)%12;                           // dual: starts from 5th
+  if([0,3,6,9].includes(rasi)) start=rasi;               // movable: starts from itself
+  else if([1,4,7,10].includes(rasi)) start=(rasi+8)%12;  // fixed: starts from 9th
+  else start=(rasi+4)%12;                                // dual: starts from 5th
   const sign=(start+navInSign)%12;
-  return{sign,index:navInSign+1,glyph:GLYPHS[sign],name:SIGNS[sign]};
+  return{sign,index:navInSign+1,sourceSign:rasi,sourceIndex:navInSign,glyph:GLYPHS[sign],name:SIGNS[sign]};
 }
 function navamsaPoint(lon){
   lon=norm(lon);
   const d9=navamsaForLongitude(lon);
   const size=10/3;
-  const within=lon%size;
+  const signDegree=lon-d9.sourceSign*30;
+  const within=Math.max(0,Math.min(size,signDegree-d9.sourceIndex*size));
   const degree=(within/size)*30;
-  return{...d9,degree,mappedLon:d9.sign*30+degree};
+  return{...d9,degree,mappedLon:norm(d9.sign*30+degree)};
 }
 function angleDiff(a,b){return Math.abs(((a-b+540)%360)-180)}
 function samePadaSector(a,b){
@@ -486,29 +489,37 @@ function navamsaHandScore(date,t){
   const rahuPos=pos(nodes.rahu);
   const ketuPos=pos(nodes.ketu);
 
-  const moonDegreeDelta=angleDiff(moonD9.mappedLon,t.hourD9.mappedLon);
-  const sunDegreeDelta=angleDiff(sunD9.mappedLon,t.minuteD9.mappedLon);
+  const moonD9Ok=moonD9.sign===t.hourD9.sign;
+  const sunD9Ok=sunD9.sign===t.minuteD9.sign;
+
+  // Degree deltas are measured INSIDE the correct D9 sign. A wrong D9 sign
+  // receives a full-sign penalty so "closest" never outranks a correct sector.
+  const moonWithinDelta=Math.abs(moonD9.degree-t.hourD9.degree);
+  const sunWithinDelta=Math.abs(sunD9.degree-t.minuteD9.degree);
+  const moonDegreeDelta=moonD9Ok?moonWithinDelta:30+moonWithinDelta;
+  const sunDegreeDelta=sunD9Ok?sunWithinDelta:30+sunWithinDelta;
+
   const rahuDelta=angleDiff(nodes.rahu,t.secondAngle);
   const ketuDelta=angleDiff(nodes.ketu,t.secondAngle);
-  const nodeDegreeDelta=Math.min(rahuDelta,ketuDelta);
-
   const rahuSignOk=rahuPos.sign===t.secondPos.sign;
   const rahuNakOk=rahuPos.nak===t.secondPos.nak;
   const ketuSignOk=ketuPos.sign===t.secondPos.sign;
   const ketuNakOk=ketuPos.nak===t.secondPos.nak;
   const nodeOk=rahuSignOk||rahuNakOk||ketuSignOk||ketuNakOk;
   const matchedNode=(rahuSignOk||rahuNakOk)?'Rahu':((ketuSignOk||ketuNakOk)?'Ketu':(rahuDelta<=ketuDelta?'Rahu':'Ketu'));
+  const nodeDegreeDelta=Math.min(rahuDelta,ketuDelta);
 
-  const sectorOk=
-    moonD9.sign===t.hourD9.sign &&
-    sunD9.sign===t.minuteD9.sign &&
-    nodeOk;
+  const sectorOk=moonD9Ok&&sunD9Ok&&nodeOk;
+
+  // Sector correctness dominates the score, then within-D9 degree accuracy.
+  const sectorPenalty=(moonD9Ok?0:120)+(sunD9Ok?0:120)+(nodeOk?0:60);
+  const score=sectorPenalty+moonWithinDelta+sunWithinDelta+nodeDegreeDelta*.25;
 
   return{
     date,moon,sun,rahu:nodes.rahu,ketu:nodes.ketu,moonD9,sunD9,
+    moonD9Ok,sunD9Ok,moonWithinDelta,sunWithinDelta,
     moonDegreeDelta,sunDegreeDelta,nodeDegreeDelta,
-    rahuSignOk,rahuNakOk,ketuSignOk,ketuNakOk,nodeOk,matchedNode,sectorOk,
-    score:moonDegreeDelta+sunDegreeDelta+nodeDegreeDelta*.7
+    rahuSignOk,rahuNakOk,ketuSignOk,ketuNakOk,nodeOk,matchedNode,sectorOk,score
   };
 }
 function refineNavamsaCandidate(center,t,matchMode){
@@ -581,8 +592,11 @@ async function generateNavamsaHandsDate(){
 
     if(matchMode==='degree'){
       const degreeOk=
-        r.moonDegreeDelta<=0.25 &&
-        r.sunDegreeDelta<=0.10 &&
+        r.moonD9Ok &&
+        r.sunD9Ok &&
+        r.nodeOk &&
+        r.moonWithinDelta<=0.25 &&
+        r.sunWithinDelta<=0.10 &&
         r.nodeDegreeDelta<=0.50;
       if(degreeOk){
         selected=refineNavamsaCandidate(d,t,'degree');
@@ -611,7 +625,7 @@ async function generateNavamsaHandsDate(){
     ' · Sun → '+t.minuteD9.glyph+' '+t.minuteD9.name+
     ' · '+result.matchedNode+' → '+GLYPHS[t.secondPos.sign]+' '+SIGNS[t.secondPos.sign]+' / '+t.secondPos.nakName+
     ' · '+(matchMode==='sector'?'Sector':matchMode==='degree'?'Degree':'Closest')+' match'+
-    (matchMode==='sector'?'':' · Δ '+result.moonDegreeDelta.toFixed(2)+'°/'+result.sunDegreeDelta.toFixed(2)+'°/'+result.nodeDegreeDelta.toFixed(2)+'°')+
+    (matchMode==='sector'?'':' · D9 Δ '+result.moonWithinDelta.toFixed(2)+'°/'+result.sunWithinDelta.toFixed(2)+'° · node Δ '+result.nodeDegreeDelta.toFixed(2)+'°')+
     ' · '+tz+'.';
 
   document.getElementById('generateDateBtn').textContent='Generate next date';
@@ -867,6 +881,7 @@ function draw(){
   const minutePos=pos(signMinuteAngle);
   const minuteD9=navamsaPoint(signMinuteAngle);
   const secondPos=pos(secondAngle);
+  const secondD9=navamsaPoint(secondAngle);
   const solarHalf=sunMeridianState(d,lat,lon);
   const ascHour=asc.sign+1;
   const ascMinute=Math.min(59,Math.floor(signFrac*60));
@@ -880,9 +895,12 @@ function draw(){
   for(let i=0;i<108;i++){
     const a=i*(360/108),center=a+(360/108)/2;
     const d9=navamsaForLongitude(center);
-    if(i%3===1) out+=textAt(center,286,d9.glyph,8,'#facc15','800');
+    out+=line(a,278,300,'#8b7a2f',.45,.55);
+    out+=textAt(center,288,d9.glyph,6.6,'#facc15','800');
   }
-  out+='<circle cx="450" cy="450" r="294" fill="none" stroke="rgba(250,204,21,.24)" stroke-width="1.2"/>';
+  const activeD9Center=(asc.globalPada-1)*(360/108)+(360/108)/2;
+  out+='<circle cx="450" cy="450" r="300" fill="none" stroke="rgba(250,204,21,.34)" stroke-width="1.2"/>';
+  out+=textAt(activeD9Center,310,'D9',8,'#facc15','800');
   for(let i=0;i<9;i++){out+=line(i*40,190,265,'#9fb7c8',1,.65);out+=textAt(i*40+20,230,String(i+1),11,'#c8d9e5','700')}
   for(let i=0;i<60;i++){out+=line(i*6,i%5===0?150:165,190,i%5===0?'#8aa8bc':'#4e6575',i%5===0?1:.5,.7)}
   out+='<circle cx="450" cy="450" r="145" fill="#07121d" stroke="rgba(124,185,255,.18)" stroke-width="2"/>';
@@ -899,7 +917,11 @@ function draw(){
   document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
   document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
   document.getElementById('navamsaMain').textContent=navamsa.glyph+' '+navamsa.name;
-  document.getElementById('navamsaDetail').textContent='D9 division '+navamsa.index+' of '+SIGNS[asc.sign]+' · '+asc.nakName+' Pada '+asc.pada;
+  const hourD9Point=navamsaPoint(asc.lon);
+  document.getElementById('navamsaDetail').textContent=
+    'D9 division '+navamsa.index+' of '+SIGNS[asc.sign]+
+    ' · '+deg(hourD9Point.degree)+' in '+navamsa.name+
+    ' · '+asc.nakName+' Pada '+asc.pada;
   document.getElementById('signProgress').textContent=
     GLYPHS[minutePos.sign]+' '+SIGNS[minutePos.sign]+' · '+minutePos.nakName+' P'+minutePos.pada+
     ' · D9 '+minuteD9.glyph+' '+minuteD9.name;
@@ -907,8 +929,13 @@ function draw(){
     'Minute hand position '+deg(minutePos.degree)+
     ' · Navamsa '+minuteD9.glyph+' '+minuteD9.name+' '+deg(minuteD9.degree)+
     ' · '+(signFrac*100).toFixed(1)+'% through ASC sign · hand angle '+signMinuteAngle.toFixed(1)+'°';
-  document.getElementById('padaProgress').textContent=GLYPHS[secondPos.sign]+' '+SIGNS[secondPos.sign]+' · '+secondPos.nakName+' P'+secondPos.pada;
-  document.getElementById('padaDetail').textContent='Second hand position '+deg(secondPos.degree)+' · '+(padaFrac*100).toFixed(1)+'% through current ASC pada · hand angle '+secondAngle.toFixed(1)+'°';
+  document.getElementById('padaProgress').textContent=
+    GLYPHS[secondPos.sign]+' '+SIGNS[secondPos.sign]+' · '+secondPos.nakName+' P'+secondPos.pada+
+    ' · D9 '+secondD9.glyph+' '+secondD9.name;
+  document.getElementById('padaDetail').textContent=
+    'Second hand position '+deg(secondPos.degree)+
+    ' · Navamsa '+secondD9.glyph+' '+secondD9.name+' '+deg(secondD9.degree)+
+    ' · '+(padaFrac*100).toFixed(1)+'% through current ASC pada · hand angle '+secondAngle.toFixed(1)+'°';
   const lst=norm(A.SiderealTime(d)*15+lon)/15;
   document.getElementById('lst').textContent=lst.toFixed(4)+' h';
   document.getElementById('timeDetail').textContent=d.toLocaleString()+' · '+lat.toFixed(4)+'°, '+lon.toFixed(4)+'°';
@@ -928,13 +955,19 @@ function selectedFromInputs(){
   return Number.isFinite(x.getTime())?x:null;
 }
 function start(){if(timer)clearInterval(timer);timer=setInterval(draw,1000);draw()}
-document.getElementById('liveBtn').addEventListener('click',()=>{mode='live';controlsDirty=false;syncInputs(new Date());draw()});
+document.getElementById('liveBtn').addEventListener('click',()=>{mode='live';controlsDirty=false;updateGeneratorControls();
+syncInputs(new Date());draw()});
 document.getElementById('setBtn').addEventListener('click',()=>{const x=selectedFromInputs();if(x){selectedTime=x;mode='fixed';controlsDirty=false;draw()}});
 document.getElementById('minus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()-60000);mode='fixed';controlsDirty=false;syncInputs(selectedTime);draw()});
 document.getElementById('plus').addEventListener('click',()=>{if(mode==='live')selectedTime=new Date();else selectedTime=currentMoment();selectedTime=new Date(selectedTime.getTime()+60000);mode='fixed';controlsDirty=false;syncInputs(selectedTime);draw()});
 document.getElementById('locateBtn').addEventListener('click',startLocation);
 document.getElementById('searchCityBtn').addEventListener('click',searchCity);
 document.getElementById('generateDateBtn').addEventListener('click',generateDateFromHands);
+function updateGeneratorControls(){
+  const method=document.getElementById('dateGeneratorMode')?.value||'off';
+  const wrap=document.getElementById('secondAnchorWrap');
+  if(wrap)wrap.style.display=method==='combinedHands'?'grid':'none';
+}
 function resetDateGeneratorSequence(){
   lastGeneratedDate=null;
   lastGeneratorTargets=null;
@@ -943,7 +976,10 @@ function resetDateGeneratorSequence(){
   document.getElementById('generateDateBtn').textContent='Generate date + time';
   document.getElementById('useGeneratedDateBtn').disabled=true;
 }
-document.getElementById('dateGeneratorMode').addEventListener('change',resetDateGeneratorSequence);
+document.getElementById('dateGeneratorMode').addEventListener('change',()=>{
+  updateGeneratorControls();
+  resetDateGeneratorSequence();
+});
 document.getElementById('dateMatchMode').addEventListener('change',resetDateGeneratorSequence);
 document.getElementById('secondAnchor').addEventListener('change',resetDateGeneratorSequence);
 document.getElementById('useGeneratedDateBtn').addEventListener('click',()=>{
