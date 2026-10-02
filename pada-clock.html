@@ -11,9 +11,9 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
 @media(max-width:1050px){.layout{grid-template-columns:1fr}}@media(max-width:650px){header,.hero{flex-direction:column;align-items:stretch}.row{grid-template-columns:1fr}}
 </style></head><body>
 <script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/pada-clock.html'));</script>
-<header><a href="/">◉ 108 PADA ASCENDANT CLOCK</a><nav><a href="/">Earth Tracker</a><a class="active" href="/pada-clock.html">108 Pada Clock</a><a href="/geo-clock.html">Geo Clock</a><a href="/weather.html">Landfall Cyclones</a><a href="/convective.html">Severe Convection</a></nav></header>
+<header><a href="/">◉ 108 PADA ASCENDANT CLOCK</a><nav><a href="/">Earth Tracker</a><a class="active" href="/pada-clock.html">108 Pada Clock</a><a href="/weather.html">Landfall Cyclones</a><a href="/convective.html">Severe Convection</a></nav></header>
 <main>
-<section class="hero"><div><span class="eyebrow">LOCAL SIDEREAL TIME · LAHIRI ASCENDANT · RISING-SIGN PROGRESS</span><h1>108 Pada Ascendant Clock</h1><p>The hour hand is the actual local Ascendant moving through the 12 zodiac signs. The minute hand measures progress through the current 30° rising sign. The second hand measures progress through the current 3°20′ pada. Moon and Venus calculations remain available in the background for tracker analytics but are not drawn on this clock.</p></div><span id="status" class="status">Live</span></section>
+<section class="hero"><div><span class="eyebrow">LOCAL SIDEREAL TIME · LAHIRI ASCENDANT · RISING-SIGN PROGRESS</span><h1>108 Pada Ascendant Clock</h1><p>The hour hand is the actual local Ascendant moving through the 12 zodiac signs. The Descendant hand stays exactly 180° opposite the Ascendant. The minute hand measures progress through the current 30° rising sign. The second hand measures progress through the current 3°20′ pada. Moon and Venus calculations remain available in the background for tracker analytics but are not drawn on this clock.</p></div><span id="status" class="status">Live</span></section>
 <section class="layout">
 <div class="panel clock-card"><div class="clock-wrap"><svg id="clock" viewBox="0 0 900 900" role="img" aria-label="108 Pada Ascendant Clock"></svg></div></div>
 <div class="panel">
@@ -90,6 +90,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
     <div class="card"><small>Standard civil time</small><b id="standardTime">—</b><p id="standardTimeDetail">Your normal local clock time.</p></div>
     <div class="card"><small>ASC time · Secondary clock</small><b id="ascTime">—</b><p id="ascTimeDetail">Zodiac hour · sign minute · pada second · solar AM/PM.</p></div>
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
+    <div class="card"><small>Descendant · DSC hand</small><b id="dscMain">—</b><p id="dscDetail">Exactly opposite the Ascendant.</p></div>
     <div class="card"><small>Navamsa · D9</small><b id="navamsaMain">—</b><p id="navamsaDetail">Current 3°20′ division of the sidereal Ascendant.</p></div>
     <div class="card"><small>Minute hand · Zodiac · Nakshatra · D9</small><b id="signProgress">—</b><p id="signDetail">—</p></div>
     <div class="card"><small>Second hand · Zodiac · Nakshatra · D9</small><b id="padaProgress">—</b><p id="padaDetail">—</p></div>
@@ -97,6 +98,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
   </div>
   <div class="legend">
     <div><span class="dot" style="background:#7dd3fc"></span>ASC hour hand — true sidereal longitude</div>
+    <div><span class="dot" style="background:#fb7185"></span>DSC hand — exactly 180° opposite the ASC</div>
     <div><span class="dot" style="background:#e8f4ff"></span>Minute hand — 0°→30° progress through current sign</div>
     <div><span class="dot" style="background:#f9a8d4"></span>Second hand — 0°→3°20′ progress through current pada</div>
     <div><span class="dot" style="background:#facc15"></span>D9 ring — all 108 Navamsa sectors, displayed independently from date generation</div>
@@ -846,6 +848,7 @@ function draw(){
   if(!userLocation){document.getElementById('status').textContent='Locating…';return}
   const lat=userLocation.lat,lon=userLocation.lon;
   const aya=lahiri(d),asc=pos(ascendantSidereal(d,lat,lon,aya));
+  const dsc=pos(norm(asc.lon+180));
   const navamsa=navamsaForLongitude(asc.lon);
   // Background-only planetary state for aviation/convection correlation work.
   const moonLon=bodyLon('Moon',d,aya),venusLon=bodyLon('Venus',d,aya);
@@ -879,7 +882,8 @@ function draw(){
   for(let i=0;i<9;i++){out+=line(i*40,190,265,'#9fb7c8',1,.65);out+=textAt(i*40+20,230,String(i+1),11,'#c8d9e5','700')}
   for(let i=0;i<60;i++){out+=line(i*6,i%5===0?150:165,190,i%5===0?'#8aa8bc':'#4e6575',i%5===0?1:.5,.7)}
   out+='<circle cx="450" cy="450" r="145" fill="#07121d" stroke="rgba(124,185,255,.18)" stroke-width="2"/>';
-  out+=hand(asc.lon,175,'#7dd3fc',7,'HOUR');
+  out+=hand(asc.lon,175,'#7dd3fc',7,'ASC');
+  out+=hand(dsc.lon,175,'#fb7185',5.5,'DSC');
   out+=hand(signMinuteAngle,162,'#e8f4ff',5,'MIN');
   out+=hand(secondAngle,150,'#f9a8d4',3.5,'SEC');
   out+='<circle cx="450" cy="450" r="8" fill="#eef8ff"/><text x="450" y="435" fill="#eef8ff" font-size="18" font-weight="800" text-anchor="middle">LOCAL ASC</text><text x="450" y="458" fill="#7dd3fc" font-size="10" text-anchor="middle">SIGN + PADA MOTION</text>';
@@ -891,6 +895,8 @@ function draw(){
     ' · '+(solarHalf.hourAngle===null?'AM/PM fallback from civil time':('solar hour angle '+solarHalf.hourAngle.toFixed(2)+' h'));
   document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
   document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
+  document.getElementById('dscMain').textContent=SIGNS[dsc.sign]+' '+deg(dsc.degree);
+  document.getElementById('dscDetail').textContent=dsc.nakName+' · Pada '+dsc.pada+' · '+deg(angleDiff(dsc.lon,asc.lon))+' from ASC';
   document.getElementById('navamsaMain').textContent=navamsa.glyph+' '+navamsa.name;
   const hourD9Point=navamsaPoint(asc.lon);
   document.getElementById('navamsaDetail').textContent=
