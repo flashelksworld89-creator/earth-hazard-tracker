@@ -88,7 +88,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
   </div>
   <div class="cards">
     <div class="card"><small>Standard civil time</small><b id="standardTime">—</b><p id="standardTimeDetail">Your normal local clock time.</p></div>
-    <div class="card"><small>ASC time · Secondary clock</small><b id="ascTime">—</b><p id="ascTimeDetail">Zodiac hour · sign minute · pada second · solar AM/PM.</p></div>
+    <div class="card"><small>DSC time · Secondary clock</small><b id="dscTime">—</b><p id="dscTimeDetail">Descendant zodiac hour · DSC sign minute · DSC pada second · solar AM/PM.</p></div>
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
     <div class="card"><small>Descendant · DSC hand</small><b id="dscMain">—</b><p id="dscDetail">Exactly opposite the Ascendant.</p></div>
     <div class="card"><small>Navamsa · D9</small><b id="navamsaMain">—</b><p id="navamsaDetail">Current 3°20′ division of the sidereal Ascendant.</p></div>
@@ -861,10 +861,12 @@ function draw(){
   const secondPos=pos(secondAngle);
   const secondD9=navamsaPoint(secondAngle);
   const solarHalf=sunMeridianState(d,lat,lon);
-  const ascHour=asc.sign+1;
-  const ascMinute=Math.min(59,Math.floor(signFrac*60));
-  const ascSecond=Math.min(59,Math.floor(padaFrac*60));
-  const ascTimeText=String(ascHour).padStart(2,'0')+':'+String(ascMinute).padStart(2,'0')+':'+String(ascSecond).padStart(2,'0')+' '+solarHalf.label;
+  const dscSignFrac=dsc.degree/30;
+  const dscPadaFrac=dsc.padaDegree/padaSize;
+  const dscHour=dsc.sign+1;
+  const dscMinute=Math.min(59,Math.floor(dscSignFrac*60));
+  const dscSecond=Math.min(59,Math.floor(dscPadaFrac*60));
+  const dscTimeText=String(dscHour).padStart(2,'0')+':'+String(dscMinute).padStart(2,'0')+':'+String(dscSecond).padStart(2,'0')+' '+solarHalf.label;
   let out='<rect width="900" height="900" fill="#04101b"/><circle cx="450" cy="450" r="420" fill="#06121e" stroke="rgba(124,185,255,.25)" stroke-width="2"/>';
   for(let i=0;i<12;i++){
     const a=i*30;out+=line(a,270,420,'#48baf4',1.7,.8);out+=textAt(a+15,383,GLYPHS[i],27,'#eef8ff','700');out+=textAt(a+15,355,SIGNS[i],10,'#bed9e8','700');
@@ -890,8 +892,10 @@ function draw(){
   svg.innerHTML=out;
   document.getElementById('standardTime').textContent=d.toLocaleTimeString([], {timeZone:activeTimeZone(),hour:'2-digit',minute:'2-digit',second:'2-digit'});
   document.getElementById('standardTimeDetail').textContent=d.toLocaleDateString([], {timeZone:activeTimeZone()})+' · '+activeTimeZone()+' civil time';
-  document.getElementById('ascTime').textContent=ascTimeText;
-  document.getElementById('ascTimeDetail').textContent=GLYPHS[asc.sign]+' '+SIGNS[asc.sign]+' · '+asc.nakName+' P'+asc.pada+
+  document.getElementById('dscTime').textContent=dscTimeText;
+  document.getElementById('dscTimeDetail').textContent=
+    GLYPHS[dsc.sign]+' '+SIGNS[dsc.sign]+' · '+dsc.nakName+' P'+dsc.pada+
+    ' · '+(dscSignFrac*100).toFixed(1)+'% through DSC sign'+
     ' · '+(solarHalf.hourAngle===null?'AM/PM fallback from civil time':('solar hour angle '+solarHalf.hourAngle.toFixed(2)+' h'));
   document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
   document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
