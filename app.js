@@ -219,6 +219,10 @@ function bindControls(){
     state.playing=false;
     state.offsetMs=0;
     state.frozenDateMs=null;
+    state.risingCacheKey='';
+    state.risingSignGrid=null;
+    state.risingNakGrid=null;
+    state.risingGandantaGrid=null;
     document.getElementById('playBtn').textContent='▶ Play';
     refreshAstronomy();
     syncDateTimeInputs(currentDate());
@@ -414,6 +418,10 @@ function setCompassDate(target){
   state.frozenDateMs=t;
   state.epochAstro=t;
   state.epochReal=performance.now();
+  state.risingCacheKey='';
+  state.risingSignGrid=null;
+  state.risingNakGrid=null;
+  state.risingGandantaGrid=null;
   const play=document.getElementById('playBtn');
   if(play)play.textContent='▶ Play';
   refreshAstronomy();
@@ -512,7 +520,10 @@ function draw(){
   ctx.clearRect(0,0,w,h);
   drawBackground(w,h);
 
-  const frameDate = currentDate();
+  // Use one authoritative astronomy timestamp for the entire rendered frame.
+  // This prevents Earth rotation, rising zones, Sun shading and planet glyphs
+  // from being calculated from slightly different moments during fast playback.
+  const frameDate = state.astro?.date ? new Date(state.astro.date) : currentDate();
   const phase = normalize360(greenwichSiderealDegrees(frameDate));
   // Full eastward Earth rotation: one complete wrap per sidereal day.
   const earthShiftDeg = normalize180(phase + state.panDeg);
@@ -543,7 +554,7 @@ function draw(){
     drawZodiacDegreeGrid(w,h);
 
     if(document.getElementById('showPlanets').checked){
-      drawProjectedPlanets(w,h,earthShiftDeg);
+      drawProjectedPlanets(w,h,earthShiftDeg,frameDate);
     }
 
     drawObserverMarker(w,h,earthShiftDeg,frameDate);
@@ -1705,9 +1716,10 @@ function drawZodiacDegreeGrid(w,h){
   ctx.restore();
 }
 
-function drawProjectedPlanets(w,h,earthShiftDeg){
+function drawProjectedPlanets(w,h,earthShiftDeg,frameDate){
   if(!state.astro?.placements?.length) return;
   if(!state.risingSignGrid) return;
+  if(!(frameDate instanceof Date) || !Number.isFinite(frameDate.getTime())) return;
 
   const occupied=new Map();
 
@@ -2960,7 +2972,8 @@ function drawEdgeFade(w,h){
 
 function updateText(){
   const {date,placements}=state.astro;
-  document.getElementById('timeText').textContent=date.toLocaleString();
+  document.getElementById('timeText').textContent=
+    date.toLocaleString()+' · map layers synchronized to this timestamp';
   updateFocusSummary();
   document.getElementById('planetList').innerHTML=placements.map(p=>{
     const ni=Math.min(26,Math.floor(normalize360(p.lon)/NAK_SIZE));
