@@ -52,8 +52,15 @@
         </div>
         <div class="location-grid">
           <label><span>Date</span><input id="dateInput" type="date" min="1900-01-01" max="2100-12-31" /></label>
-          <label><span>Time (UTC)</span><input id="timeInput" type="time" step="60" /></label>
+          <label><span>Time</span><input id="timeInput" type="time" step="60" /></label>
         </div>
+        <label style="display:grid;gap:4px;margin-top:7px">
+          <span>Time basis</span>
+          <select id="dateTimeBasis">
+            <option value="utc">UTC</option>
+            <option value="local">Selected location local time</option>
+          </select>
+        </label>
         <div class="row">
           <button id="applyDateTimeBtn" type="button">Go to date/time</button>
           <button data-years="-1" type="button">−1Y</button>
@@ -232,6 +239,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
-  <script type="module" src="/app.js?build=20260925g"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tz-lookup@6.1.25/tz.js"></script>
+  <script type="module" src="/app.js?build=20261002a"></script>
 </body>
 </html>
