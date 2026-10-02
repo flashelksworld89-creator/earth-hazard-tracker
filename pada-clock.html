@@ -89,6 +89,7 @@ main{width:min(1500px,calc(100% - 24px));margin:18px auto 60px}.hero,.panel{back
   <div class="cards">
     <div class="card"><small>Standard civil time</small><b id="standardTime">—</b><p id="standardTimeDetail">Your normal local clock time.</p></div>
     <div class="card"><small>DSC time · Secondary clock</small><b id="dscTime">—</b><p id="dscTimeDetail">Descendant zodiac hour · DSC sign minute · DSC pada second · solar AM/PM.</p></div>
+    <div class="card"><small>DSC time · Tertiary clock</small><b id="dscTertiaryTime">—</b><p id="dscTertiaryDetail">Full Descendant longitude mapped continuously across 24 hours.</p></div>
     <div class="card"><small>Ascendant · Hour hand</small><b id="ascMain">—</b><p id="ascDetail">—</p></div>
     <div class="card"><small>Descendant · DSC hand</small><b id="dscMain">—</b><p id="dscDetail">Exactly opposite the Ascendant.</p></div>
     <div class="card"><small>Navamsa · D9</small><b id="navamsaMain">—</b><p id="navamsaDetail">Current 3°20′ division of the sidereal Ascendant.</p></div>
@@ -867,6 +868,16 @@ function draw(){
   const dscMinute=Math.min(59,Math.floor(dscSignFrac*60));
   const dscSecond=Math.min(59,Math.floor(dscPadaFrac*60));
   const dscTimeText=String(dscHour).padStart(2,'0')+':'+String(dscMinute).padStart(2,'0')+':'+String(dscSecond).padStart(2,'0')+' '+solarHalf.label;
+
+  // Tertiary DSC time: map the full 0°–360° Descendant longitude to 0–24h.
+  const dscDayHours=(dsc.lon/360)*24;
+  const dscTertiaryHour=Math.floor(dscDayHours)%24;
+  const dscTertiaryMinute=Math.floor((dscDayHours-dscTertiaryHour)*60);
+  const dscTertiarySecond=Math.floor((((dscDayHours-dscTertiaryHour)*60)-dscTertiaryMinute)*60);
+  const dscTertiaryText=
+    String(dscTertiaryHour).padStart(2,'0')+':'+
+    String(dscTertiaryMinute).padStart(2,'0')+':'+
+    String(dscTertiarySecond).padStart(2,'0');
   let out='<rect width="900" height="900" fill="#04101b"/><circle cx="450" cy="450" r="420" fill="#06121e" stroke="rgba(124,185,255,.25)" stroke-width="2"/>';
   for(let i=0;i<12;i++){
     const a=i*30;out+=line(a,270,420,'#48baf4',1.7,.8);out+=textAt(a+15,383,GLYPHS[i],27,'#eef8ff','700');out+=textAt(a+15,355,SIGNS[i],10,'#bed9e8','700');
@@ -897,6 +908,11 @@ function draw(){
     GLYPHS[dsc.sign]+' '+SIGNS[dsc.sign]+' · '+dsc.nakName+' P'+dsc.pada+
     ' · '+(dscSignFrac*100).toFixed(1)+'% through DSC sign'+
     ' · '+(solarHalf.hourAngle===null?'AM/PM fallback from civil time':('solar hour angle '+solarHalf.hourAngle.toFixed(2)+' h'));
+
+  document.getElementById('dscTertiaryTime').textContent=dscTertiaryText;
+  document.getElementById('dscTertiaryDetail').textContent=
+    'DSC '+GLYPHS[dsc.sign]+' '+SIGNS[dsc.sign]+' '+deg(dsc.degree)+
+    ' · longitude '+dsc.lon.toFixed(4)+'° → 24-hour cycle';
   document.getElementById('ascMain').textContent=SIGNS[asc.sign]+' '+deg(asc.degree);
   document.getElementById('ascDetail').textContent=asc.nakName+' · Pada '+asc.pada+' · Global Pada '+asc.globalPada;
   document.getElementById('dscMain').textContent=SIGNS[dsc.sign]+' '+deg(dsc.degree);
