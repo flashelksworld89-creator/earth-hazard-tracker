@@ -166,8 +166,53 @@ async function init(){
   requestAnimationFrame(loop);
 }
 
+function timeZoneForCoordinates(lat,lon){
+  try{
+    if(typeof window.tzlookup==='function') return window.tzlookup(lat,lon);
+    if(typeof tzlookup==='function') return tzlookup(lat,lon);
+  }catch(_){}
+  return null;
+}
+function partsInZone(date,timeZone){
+  const parts=new Intl.DateTimeFormat('en-US',{
+    timeZone,year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'
+  }).formatToParts(date);
+  const out={};
+  for(const p of parts) if(p.type!=='literal') out[p.type]=p.value;
+  return {
+    year:Number(out.year),month:Number(out.month),day:Number(out.day),
+    hour:Number(out.hour),minute:Number(out.minute),second:Number(out.second)
+  };
+}
+function zonedLocalToDate(year,month,day,hour,minute,timeZone){
+  let guess=Date.UTC(year,month-1,day,hour,minute,0,0);
+  for(let i=0;i<5;i++){
+    const p=partsInZone(new Date(guess),timeZone);
+    const represented=Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second,0);
+    const desired=Date.UTC(year,month-1,day,hour,minute,0,0);
+    const delta=desired-represented;
+    guess+=delta;
+    if(Math.abs(delta)<1000) break;
+  }
+  return new Date(guess);
+}
+function selectedDateTimeBasis(){
+  return document.getElementById('dateTimeBasis')?.value||'utc';
+}
+function selectedInputTimeZone(){
+  if(selectedDateTimeBasis()!=='local') return 'UTC';
+  if(!state.observer) return null;
+  return timeZoneForCoordinates(state.observer.lat,state.observer.lng);
+}
+
 function bindControls(){
   syncDateTimeInputs(currentDate());
+  document.getElementById('dateTimeBasis')?.addEventListener('change',()=>{
+    dateInputsDirty=false;
+    syncDateTimeInputs(currentDate());
+  });
+
   ['dateInput','timeInput'].forEach(id=>{
     const el=document.getElementById(id);
     ['input','change','focus'].forEach(evt=>el.addEventListener(evt,()=>{dateInputsDirty=true;}));
@@ -205,10 +250,29 @@ function bindControls(){
       status.textContent='Supported entry range: 1900–2100 UTC';
       return;
     }
-    const target=new Date(Date.UTC(y,m-1,d,hh,mm,0,0));
-    if(!Number.isFinite(target.getTime())){
-      status.textContent='Invalid UTC date/time';
-      return;
+    let target;
+    const basis=selectedDateTimeBasis();
+    if(basis==='local'){
+      if(!state.observer){
+        status.textContent='Set the location first, then use local time.';
+        return;
+      }
+      const zone=selectedInputTimeZone();
+      if(!zone){
+        status.textContent='Could not resolve the selected location time zone.';
+        return;
+      }
+      target=zonedLocalToDate(y,m,d,hh,mm,zone);
+      if(!Number.isFinite(target.getTime())){
+        status.textContent='Invalid local date/time for '+zone;
+        return;
+      }
+    }else{
+      target=new Date(Date.UTC(y,m-1,d,hh,mm,0,0));
+      if(!Number.isFinite(target.getTime())){
+        status.textContent='Invalid UTC date/time';
+        return;
+      }
     }
     dateInputsDirty=false;
     setCompassDate(target);
@@ -432,11 +496,32 @@ function syncDateTimeInputs(date){
   const timeInput=document.getElementById('timeInput');
   const status=document.getElementById('dateEntryStatus');
   if(!dateInput||!timeInput)return;
-  const y=date.getUTCFullYear(),m=String(date.getUTCMonth()+1).padStart(2,'0'),d=String(date.getUTCDate()).padStart(2,'0');
-  const hh=String(date.getUTCHours()).padStart(2,'0'),mm=String(date.getUTCMinutes()).padStart(2,'0');
+
+  const basis=selectedDateTimeBasis();
+  const zone=selectedInputTimeZone();
+
+  let y,m,d,hh,mm;
+  if(basis==='local'&&zone){
+    const p=partsInZone(date,zone);
+    y=p.year;m=String(p.month).padStart(2,'0');d=String(p.day).padStart(2,'0');
+    hh=String(p.hour).padStart(2,'0');mm=String(p.minute).padStart(2,'0');
+  }else{
+    y=date.getUTCFullYear();m=String(date.getUTCMonth()+1).padStart(2,'0');d=String(date.getUTCDate()).padStart(2,'0');
+    hh=String(date.getUTCHours()).padStart(2,'0');mm=String(date.getUTCMinutes()).padStart(2,'0');
+  }
+
   dateInput.value=y+'-'+m+'-'+d;
   timeInput.value=hh+':'+mm;
-  if(status)status.textContent='UTC · '+y+'-'+m+'-'+d+' '+hh+':'+mm;
+
+  if(status){
+    if(basis==='local'){
+      status.textContent=zone
+        ? zone+' local · converted internally to UTC'
+        : 'Set location to use local time';
+    }else{
+      status.textContent='UTC · '+y+'-'+m+'-'+d+' '+hh+':'+mm;
+    }
+  }
 }
 
 function currentDate(){
@@ -1817,6 +1902,7 @@ function applyObserver(lat,lng){
   document.getElementById('longitudeInput').value=wrappedLng.toFixed(4);
   document.getElementById('locationStatus').textContent=
     `${clampedLat.toFixed(4)}°, ${wrappedLng.toFixed(4)}°`;
+  if(selectedDateTimeBasis()==='local'&&!dateInputsDirty) syncDateTimeInputs(currentDate());
   draw();
   return true;
 }
