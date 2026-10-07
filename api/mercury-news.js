@@ -54,6 +54,151 @@ const CATEGORIES={
   'Consumer Products / Recalls':['recall','product recall','consumer product','safety warning','defect','product safety']
 };
 
+const SUBCATEGORIES={
+  'Science / Research / Discovery':{
+    'Genetics / Genomics':['genetics','genome','genomic','dna','gene editing','crispr','hereditary'],
+    'Neuroscience / Brain Research':['neuroscience','brain','neuron','cognitive','memory','alzheimers','dementia'],
+    'Physics / Quantum Research':['physics','quantum','particle','cern','boson','neutrino'],
+    'Chemistry / Molecular Science':['chemistry','molecule','molecular','catalyst'],
+    'Biology / Evolution':['biology','evolution','species','cell biology','microbiology','ecology'],
+    'Archaeology / Anthropology':['archaeology','archaeological','ancient remains','fossil','anthropology','excavation'],
+    'Materials Science':['materials science','superconductor','alloy','polymer','nanomaterial','graphene'],
+    'Earth / Geological Science':['geology','geological','tectonic','seismology','geoscience','mineral'],
+    'Ocean / Marine Science':['oceanography','marine biology','deep sea','coral','ocean science'],
+    'Climate Science':['climate study','climate research','atmospheric science','climate model'],
+    'Medical / Biomedical Research':['biomedical','clinical trial','medical research','disease research','drug discovery']
+  },
+  'Technology / Software':{
+    'Consumer Technology':['smartphone','laptop','device','consumer electronics','wearable'],
+    'Software / Platforms':['software','platform','operating system','app','developer','cloud service'],
+    'Semiconductors / Chips':['chip','semiconductor','processor','gpu','foundry'],
+    'Computing Infrastructure':['data center','server','cloud computing','supercomputer'],
+    'Robotics / Automation':['robot','robotics','automation','autonomous system'],
+    'Open Source / Developer Tools':['open source','github','programming language','developer tools']
+  },
+  'Artificial Intelligence / Robotics':{
+    'Generative AI':['generative ai','large language model','llm','chatbot','text generation','image generation'],
+    'AI Models / Research':['ai model','machine learning model','deep learning','neural network'],
+    'AI Regulation / Governance':['ai regulation','ai law','ai safety','ai governance'],
+    'AI Business / Investment':['ai company','ai startup','ai investment','ai funding'],
+    'Robotics / Autonomous Systems':['robotics','robot','autonomous vehicle','autonomous system']
+  },
+  'Medicine / Health':{
+    'Cancer / Oncology':['cancer','tumor','oncology','chemotherapy'],
+    'Cardiovascular Health':['heart disease','cardiac','cardiovascular','stroke'],
+    'Neurology / Mental Health':['mental health','depression','anxiety','neurological','psychiatric'],
+    'Surgery / Trauma Care':['surgery','surgeon','trauma','operation'],
+    'Pharmaceuticals / Drug Development':['drug approval','pharmaceutical','medication','therapy','clinical trial'],
+    'Maternal / Reproductive Health':['pregnancy','maternal','fertility','ivf','reproductive health']
+  },
+  'Disease / Outbreaks / Public Health':{
+    'Respiratory Disease':['flu','influenza','covid','coronavirus','respiratory virus'],
+    'Vector-Borne Disease':['malaria','dengue','mosquito','zika'],
+    'Food / Waterborne Disease':['foodborne','salmonella','e coli','cholera'],
+    'Vaccination / Immunization':['vaccine','vaccination','immunization'],
+    'Public Health Policy':['public health policy','health emergency','health department','quarantine']
+  },
+  'Economy / Growth / Recession':{
+    'GDP / Economic Growth':['gdp','economic growth','growth forecast'],
+    'Inflation / Cost of Living':['inflation','cost of living','consumer prices'],
+    'Recession / Slowdown':['recession','slowdown','contraction'],
+    'Consumer Spending':['consumer spending','retail sales','household spending'],
+    'Productivity / Output':['productivity','industrial output','manufacturing output']
+  },
+  'Markets / Investing':{
+    'Equities / Stock Markets':['stocks','stock market','shares','equities'],
+    'Bonds / Fixed Income':['bonds','treasury yields','fixed income'],
+    'Commodities':['commodities','gold prices','silver prices','copper prices'],
+    'Cryptocurrency / Digital Assets':['bitcoin','crypto','cryptocurrency','ethereum','digital assets'],
+    'Investor Sentiment':['investor sentiment','market rally','market selloff','risk appetite']
+  },
+  'Government / Policy / Legislation':{
+    'Executive Action':['executive order','presidential action','decree'],
+    'Legislation / Bills':['bill','legislation','lawmakers','senate vote','house vote'],
+    'Regulation':['regulation','regulatory rule','agency rule'],
+    'Budget / Spending':['budget','government spending','appropriations'],
+    'Administrative Policy':['policy change','agency policy','cabinet decision']
+  },
+  'Courts / Legal Decisions':{
+    'Supreme / Constitutional Courts':['supreme court','constitutional court'],
+    'Criminal Trials':['criminal trial','indictment','prosecutor','jury'],
+    'Civil Litigation':['lawsuit','civil case','damages','settlement'],
+    'Appeals / Rulings':['appeal','ruling','verdict','judgment']
+  },
+  'War / Military Conflict':{
+    'Ground Combat':['ground offensive','troops','battle','combat','front line'],
+    'Air / Missile Strikes':['airstrike','air strike','missile strike','bombing'],
+    'Naval Conflict':['naval','warship','navy','maritime attack'],
+    'Ceasefire / Negotiations':['ceasefire','truce','peace talks'],
+    'Weapons / Defense Systems':['weapons','air defense','drone','missile system']
+  },
+  'Crime / Public Safety':{
+    'Homicide / Violent Crime':['murder','homicide','shooting','stabbing'],
+    'Organized Crime':['organized crime','gang','cartel','mafia'],
+    'Terrorism / Extremist Violence':['terror','terrorism','extremist attack'],
+    'Police / Law Enforcement':['police','law enforcement','manhunt','raid'],
+    'Fraud / Financial Crime':['fraud','embezzlement','money laundering','scam']
+  },
+  'Severe Weather':{
+    'Hurricanes / Tropical Cyclones':['hurricane','typhoon','cyclone'],
+    'Tornadoes / Severe Storms':['tornado','severe storm','supercell'],
+    'Flooding':['flood','flash flood'],
+    'Wildfire':['wildfire','brush fire'],
+    'Heat / Cold Extremes':['heatwave','heat wave','cold snap','extreme cold'],
+    'Winter Storms':['blizzard','snowstorm','winter storm']
+  },
+  'Natural Disasters':{
+    'Earthquakes':['earthquake','aftershock','seismic'],
+    'Volcanoes':['volcano','volcanic eruption'],
+    'Tsunamis':['tsunami'],
+    'Landslides':['landslide','mudslide'],
+    'Avalanches':['avalanche']
+  },
+  'Climate / Environment':{
+    'Emissions / Carbon':['emissions','carbon dioxide','greenhouse gas'],
+    'Pollution':['pollution','air quality','contamination'],
+    'Conservation / Wildlife':['conservation','wildlife','endangered species','habitat'],
+    'Drought / Water Scarcity':['drought','water scarcity','reservoir'],
+    'Climate Policy':['climate policy','climate agreement','net zero']
+  },
+  'Energy / Oil / Gas':{
+    'Oil Markets':['oil prices','crude oil','opec'],
+    'Natural Gas':['natural gas','lng','gas supply'],
+    'Renewable Energy':['solar power','wind power','renewable energy'],
+    'Energy Infrastructure':['pipeline','refinery','energy grid'],
+    'Fuel Prices':['gas prices','fuel prices']
+  },
+  'Transportation / Aviation':{
+    'Commercial Aviation':['airline','airport','flight','passenger aircraft'],
+    'Aviation Accidents':['plane crash','aircraft crash','aviation accident'],
+    'Rail / Trains':['train','rail','railway','derailment'],
+    'Shipping / Maritime':['shipping','cargo ship','port','maritime'],
+    'Road / Automotive':['vehicle','car crash','highway','automotive']
+  },
+  'Social Media / Online Culture':{
+    'Viral Trends / Memes':['viral','meme','online trend','viral challenge'],
+    'Influencers / Creators':['influencer','creator','streamer','content creator'],
+    'Platform Controversies':['tiktok','instagram','youtube','x platform','facebook','platform ban','account suspension'],
+    'Online Movements / Campaigns':['hashtag campaign','online campaign','digital movement','boycott'],
+    'Fandom / Internet Communities':['fandom','online community','fan community']
+  },
+  'Space / Astronomy':{
+    'Launches / Rockets':['rocket launch','launch vehicle','space launch'],
+    'Moon Missions':['moon mission','lunar mission'],
+    'Mars / Planetary Missions':['mars mission','planetary mission'],
+    'Satellites':['satellite','earth observation satellite'],
+    'Astronomy / Telescopes':['astronomy','telescope','exoplanet','galaxy']
+  },
+  'Sports':{
+    'Football / Soccer':['football','soccer','fifa'],
+    'Basketball':['basketball','nba','wnba'],
+    'Baseball':['baseball','mlb'],
+    'Combat Sports':['boxing','mma','ufc'],
+    'Motorsport':['formula 1','nascar','motorsport'],
+    'Olympics / International Competition':['olympics','olympic','world championship']
+  }
+};
+
 const MARS_THEMES={
   'War / Military Action':['war','military','troops','battle','combat','airstrike','air strike','missile','invasion','artillery','armed forces'],
   'Weapons / Defense':['weapon','weapons','arms','defense system','defence system','drone strike','munition','ammunition','fighter jet'],
@@ -109,7 +254,7 @@ export default async function handler(req,res){
     const planet=cleanPlanet(req.query?.planet);
     if(!from||!to) return res.status(400).json({error:'from and to dates are required'});
     const now=new Date();
-    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
+    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],subcategories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
 
     const feeds=FEEDS.map(f=>({
       ...f,
@@ -128,15 +273,29 @@ export default async function handler(req,res){
       .filter(a=>a.publishedAt>=from && a.publishedAt<to)
       .sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt))
       .slice(0,160)
-      .map(a=>({...a,newsCategory:classify(a.title+' '+a.description)}));
-    const counts=new Map();
-    for(const a of articles) counts.set(a.newsCategory,(counts.get(a.newsCategory)||0)+1);
+      .map(a=>{
+        const text=a.title+' '+a.description;
+        const newsCategory=classify(text);
+        const newsSubcategory=classifySubcategory(newsCategory,text);
+        return {...a,newsCategory,newsSubcategory};
+      });
+    const counts=new Map(),subCounts=new Map();
+    for(const a of articles){
+      counts.set(a.newsCategory,(counts.get(a.newsCategory)||0)+1);
+      if(a.newsSubcategory){
+        const key=a.newsCategory+'|||'+a.newsSubcategory;
+        subCounts.set(key,(subCounts.get(key)||0)+1);
+      }
+    }
     const categories=[...counts.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
+    const subcategories=[...subCounts.entries()].map(([key,count])=>{
+      const [category,name]=key.split('|||');return{category,name,count};
+    }).sort((a,b)=>b.count-a.count);
     const leaderEvidence=planet==='Sun'?buildLeaderEvidence(articles):[];
     const subjects=buildOrganicSubjects(articles);
     const sourceCounts=countSources(articles);
     return res.status(200).json({
-      from,to,planet,future:false,count:articles.length,categories,subjects,articles,leaderEvidence,
+      from,to,planet,future:false,count:articles.length,categories,subcategories,subjects,articles,leaderEvidence,
       sourceCounts,
       sourceCoverage:{
         googleNews:{available:true,label:'Google News RSS'},
@@ -241,6 +400,17 @@ function classify(text){
   let best='Other / Unclassified',score=0;
   for(const [name,terms] of Object.entries(CATEGORIES)){
     let n=0; for(const term of terms) if(t.includes(term)) n++;
+    if(n>score){score=n;best=name}
+  }
+  return best;
+}
+function classifySubcategory(category,text){
+  const defs=SUBCATEGORIES[category];
+  if(!defs)return'';
+  const t=' '+String(text||'').toLowerCase()+' ';
+  let best='',score=0;
+  for(const [name,terms] of Object.entries(defs)){
+    let n=0;for(const term of terms)if(t.includes(term))n++;
     if(n>score){score=n;best=name}
   }
   return best;
