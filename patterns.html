@@ -728,7 +728,9 @@ function renderSignSummary(){
 function renderHistoricalEvents(p,data,area){
   const stats=data.historicalStats||{};
   const roots=(data.historicalEventTypes||[]).slice(0,12);
+  const detailed=(data.detailedEventCodes||[]).slice(0,12);
   const actors=(stats.topActors||[]).slice(0,8);
+  const actorPairs=(stats.topActorPairs||[]).slice(0,8);
   const locations=(stats.topLocations||[]).slice(0,8);
   const quality=data.archiveQuality||{};
   const days=Math.max(1/24,daysBetween(p.start,p.end));
@@ -737,8 +739,16 @@ function renderHistoricalEvents(p,data,area){
     ? '<div class="headline-group"><h3>Top CAMEO event types</h3><div class="subcategory-list">'+roots.map(x=>
         '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
     : '';
+  const detailedHtml=detailed.length
+    ? '<div class="headline-group"><h3>Detailed CAMEO event codes</h3><div class="subcategory-list">'+detailed.map(x=>
+        '<div class="subcategory-row"><b>CAMEO '+esc(x.code)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
+    : '';
   const actorHtml=actors.length
     ? '<div class="headline-group"><h3>Most frequent actors</h3><div class="subcategory-list">'+actors.map(x=>
+        '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
+    : '';
+  const pairHtml=actorPairs.length
+    ? '<div class="headline-group"><h3>Top actor → action → actor pairs</h3><div class="subcategory-list">'+actorPairs.map(x=>
         '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
     : '';
   const locHtml=locations.length
@@ -758,7 +768,7 @@ function renderHistoricalEvents(p,data,area){
         '<div class="metric-card"><small>Avg tone</small><b>'+Number(stats.avgTone||0).toFixed(2)+'</b></div>'+
       '</div>'+
       (quality.reason?'<div class="note">'+esc(quality.reason)+'</div>':'')+
-      rootHtml+actorHtml+locHtml+
+      detailedHtml+rootHtml+pairHtml+actorHtml+locHtml+
     '</div>';
   document.getElementById('newsStatus').textContent=(Number(stats.events)||0)+' historical coded events';
   if(document.getElementById('summaryStatus')?.dataset.loading==='1')renderSignSummary();
@@ -773,6 +783,7 @@ function renderResearchMetrics(p,data){
   const headlineRate=headlines/days;
   const eventRate=events/days;
   const anomalies=quality.analysisEligible===false?[]:categoryAnomalies(p,data).slice(0,3);
+  const subLifts=quality.analysisEligible===false?[]:subcategoryAnomalies(p,data).slice(0,5);
   const anomalyHtml=anomalies.length
     ? '<div class="headline-group"><h3>Largest category deviations vs loaded '+state.planet+' baseline</h3><div class="subcategory-list">'+anomalies.map(x=>{
         const cls=x.ratio>=1?'anomaly-up':'anomaly-down';
@@ -790,8 +801,53 @@ function renderResearchMetrics(p,data){
       '<div class="metric-card"><small>Raw → balanced sample</small><b>'+Number(data.rawCount||0)+' → '+headlines+'</b></div>'+
     '</div>'+
     (quality.reason?'<div class="note">'+esc(quality.reason)+'</div>':'')+
-    anomalyHtml+'</div>';
+    anomalyHtml+
+    renderTransitFingerprint(p,data,subLifts)+'</div>';
 }
+function subcategoryAnomalies(p,data){
+  const currentDays=Math.max(1/24,daysBetween(p.start,p.end));
+  const baseline=new Map();
+  let baselineWindows=0;
+  for(const other of state.periods){
+    if(other.id===p.id)continue;
+    const d=state.news.get(other.id);
+    if(!d||d.archiveQuality?.analysisEligible===false)continue;
+    baselineWindows++;
+    const days=Math.max(1/24,daysBetween(other.start,other.end));
+    for(const s of d.subcategories||[]){
+      const key=(s.category||'')+'|||'+(s.name||'');
+      const x=baseline.get(key)||{rate:0,windows:0};
+      x.rate+=(Number(s.count)||0)/days;x.windows++;baseline.set(key,x);
+    }
+  }
+  if(baselineWindows<3)return[];
+  return (data.subcategories||[]).map(s=>{
+    const key=(s.category||'')+'|||'+(s.name||'');
+    const b=baseline.get(key);
+    const currentRate=(Number(s.count)||0)/currentDays;
+    const baseRate=b&&b.windows?b.rate/b.windows:0;
+    const ratio=baseRate>0?currentRate/baseRate:(currentRate>0?2:1);
+    return{name:s.name,category:s.category,count:Number(s.count)||0,currentRate,baseRate,ratio};
+  }).filter(x=>x.count>0).sort((a,b)=>b.ratio-a.ratio||b.currentRate-a.currentRate);
+}
+function renderTransitFingerprint(p,data,subLifts){
+  const events=(data.eventClusters||[]).slice(0,3);
+  const top=subLifts[0];
+  const distinctive=top
+    ? '<div class="trend-peak"><div class="small">MOST DISTINCTIVE PATTERN</div><div class="detail-title">'+esc(top.name)+'</div>'+
+      '<div class="detail-sub">'+esc(top.category||'')+' · '+top.count+' matches · '+top.ratio.toFixed(2)+'× same-planet baseline</div></div>'
+    : '<div class="note">Load more comparable transit windows to calculate a detailed transit fingerprint.</div>';
+  const lifts=subLifts.length
+    ? '<div class="headline-group"><h3>Detailed subcategory lift</h3><div class="subcategory-list">'+subLifts.map(x=>
+      '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.ratio.toFixed(2)+'×</span></div>').join('')+'</div></div>'
+    : '';
+  const drivers=events.length
+    ? '<div class="headline-group"><h3>Primary event drivers</h3><div class="headline-links">'+events.map(e=>
+      '<div class="headline-link"><b>'+esc(e.title||'Event cluster')+'</b><span>'+Number(e.headlineCount||0)+' headlines · '+Number(e.sourceCount||0)+' sources · '+esc(e.topCategory||'')+'</span></div>').join('')+'</div></div>'
+    : '';
+  return '<div class="headline-groups"><div class="panel-head"><strong>TRANSIT FINGERPRINT</strong><span class="status">Specific to this window</span></div>'+distinctive+lifts+drivers+'</div>';
+}
+
 function categoryAnomalies(p,data){
   const currentDays=Math.max(1/24,daysBetween(p.start,p.end));
   const baseline=new Map();
