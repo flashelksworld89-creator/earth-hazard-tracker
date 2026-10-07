@@ -400,7 +400,7 @@ export default async function handler(req,res){
     const planet=cleanPlanet(req.query?.planet);
     if(!from||!to) return res.status(400).json({error:'from and to dates are required'});
     const now=new Date();
-    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,eventCount:0,eventClusters:[],articles:[],categories:[],subcategories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
+    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,rawCount:0,publisherCount:0,archiveQuality:{level:'future',analysisEligible:false,reason:'Future window'},eventCount:0,eventClusters:[],articles:[],categories:[],subcategories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
 
     const feeds=FEEDS.map(f=>({
       ...f,
@@ -415,14 +415,15 @@ export default async function handler(req,res){
       const gdeltSettled=await Promise.allSettled(FEEDS.slice(0,6).map(f=>fetchGdeltFeed(f,from,to)));
       for(const r of gdeltSettled) if(r.status==='fulfilled') items.push(...r.value);
     }
-    const analysisArticles=dedupe(items)
-      .filter(a=>a.publishedAt>=from && a.publishedAt<to)
-      .map(a=>{
-        const text=a.title+' '+a.description;
-        const newsCategory=classify(text);
-        const newsSubcategory=classifySubcategory(newsCategory,text);
-        return {...a,newsCategory,newsSubcategory};
-      });
+    const rawArticles=dedupe(items)
+      .filter(a=>a.publishedAt>=from && a.publishedAt<to);
+    const balancedArticles=balanceByPublisher(rawArticles);
+    const analysisArticles=balancedArticles.map(a=>{
+      const text=a.title+' '+a.description;
+      const newsCategory=classify(text);
+      const newsSubcategory=classifySubcategory(newsCategory,text);
+      return {...a,newsCategory,newsSubcategory};
+    });
     const eventClusters=clusterEvents(analysisArticles);
     const articleCluster=new Map();
     for(const cluster of eventClusters)for(const id of cluster.articleIds)articleCluster.set(id,cluster.id);
@@ -445,8 +446,15 @@ export default async function handler(req,res){
     const leaderEvidence=planet==='Sun'?buildLeaderEvidence(analysisArticles):[];
     const subjects=buildOrganicSubjects(analysisArticles);
     const sourceCounts=countSources(analysisArticles);
+    const publisherCount=countPublishers(analysisArticles);
+    const archiveQuality=assessArchiveQuality({
+      articleCount:analysisArticles.length,
+      publisherCount,
+      gdeltAvailable:gdeltCoverage.available
+    });
     return res.status(200).json({
-      from,to,planet,future:false,count:analysisArticles.length,eventCount:eventClusters.length,eventClusters:eventClusters.slice(0,100),categories,subcategories,subjects,articles,leaderEvidence,
+      from,to,planet,future:false,count:analysisArticles.length,rawCount:rawArticles.length,publisherCount,archiveQuality,
+      eventCount:eventClusters.length,eventClusters:eventClusters.slice(0,100),categories,subcategories,subjects,articles,leaderEvidence,
       sourceCounts,
       sourceCoverage:{
         googleNews:{available:true,label:'Google News RSS'},
@@ -602,6 +610,43 @@ function buildOrganicSubjects(articles){
     if(selected.length>=15)break;
   }
   return selected;
+}
+function balanceByPublisher(articles){
+  if(articles.length<=24)return articles;
+  const publishers=new Map();
+  for(const a of articles){
+    const key=publisherKey(a);
+    if(!publishers.has(key))publishers.set(key,[]);
+    publishers.get(key).push(a);
+  }
+  const publisherCount=Math.max(1,publishers.size);
+  const cap=Math.max(3,Math.min(10,Math.ceil(articles.length/Math.max(8,publisherCount))));
+  const out=[];
+  for(const rows of publishers.values()){
+    rows.sort((a,b)=>new Date(b.publishedAtFull||b.publishedAt)-new Date(a.publishedAtFull||a.publishedAt));
+    out.push(...rows.slice(0,cap));
+  }
+  return out.sort((a,b)=>new Date(b.publishedAtFull||b.publishedAt)-new Date(a.publishedAtFull||a.publishedAt));
+}
+function publisherKey(a){
+  const src=String(a.source||'').trim().toLowerCase();
+  if(src)return src;
+  try{return new URL(a.url||'').hostname.replace(/^www\./,'').toLowerCase()}catch{return'unknown'}
+}
+function countPublishers(articles){
+  return new Set(articles.map(publisherKey).filter(Boolean)).size;
+}
+function assessArchiveQuality({articleCount,publisherCount,gdeltAvailable}){
+  if(articleCount<8||publisherCount<3){
+    return{level:'limited',analysisEligible:false,reason:'Too few articles or independent publishers for reliable comparison'};
+  }
+  if(gdeltAvailable&&articleCount>=24&&publisherCount>=8){
+    return{level:'strong',analysisEligible:true,reason:'Multiple archives and broad publisher diversity'};
+  }
+  if(articleCount>=16&&publisherCount>=5){
+    return{level:'moderate',analysisEligible:true,reason:gdeltAvailable?'Usable multi-source coverage':'Usable publisher diversity, but GDELT DOC is unavailable for this older window'};
+  }
+  return{level:'limited',analysisEligible:false,reason:gdeltAvailable?'Coverage is too sparse for anomaly comparison':'Older archive coverage is too sparse for anomaly comparison'};
 }
 function countSources(articles){
   const m={};
