@@ -84,6 +84,11 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .summary-rank .pct{color:#8fdcff;font-variant-numeric:tabular-nums}
 .summary-card .summary-runner{margin-top:6px;color:#b9cbd5;font-size:10px}
 .summary-card.loading{opacity:.72}
+.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+.metric-card{padding:9px;border:1px solid rgba(124,185,255,.12);border-radius:9px;background:#06111f}
+.metric-card small{display:block;color:#91a8bf;font-size:8px;text-transform:uppercase}
+.metric-card b{display:block;margin-top:4px;font-size:13px}
+.anomaly-up{color:#fbbf24}.anomaly-down{color:#93c5fd}
 .subcategory-list{display:grid;gap:6px;margin-top:10px}
 .subcategory-row{display:grid;grid-template-columns:minmax(160px,1fr) 44px;gap:8px;align-items:center;padding:7px 8px;border-radius:7px;background:rgba(255,255,255,.025);font-size:10px}
 .subcategory-row b{font-size:10px;color:#eaf7ff}
@@ -448,12 +453,14 @@ function renderNews(p,data){
   const leaderBlock=state.planet==='Sun'?renderLeaderEvidence(data.leaderEvidence||[]):'';
   const subjectBlock=renderOrganicSubjects(data);
   const sourceBlock=renderSourceCoverage(data);
+  const metricsBlock=renderResearchMetrics(p,data);
   const subcategoryBlock=renderSubcategoryBreakdown(data);
   const topCategoryBlock=renderTopCategoryHeadlines(data);
   const nakHeadlineBlock=renderNakshatraHeadlines(p,data);
   area.innerHTML=
     '<div class="small">Headline categories during this '+state.planet+'-in-'+SIGNS[p.sign]+' interval</div>'+
     sourceBlock+
+    metricsBlock+
     subjectBlock+
     bars+
     subcategoryBlock+
@@ -542,6 +549,51 @@ function renderSignSummary(){
   }).join('');
 }
 
+function renderResearchMetrics(p,data){
+  const days=Math.max(1/24,daysBetween(p.start,p.end));
+  const headlines=Number(data.count)||0;
+  const events=Number(data.eventCount)||0;
+  const headlineRate=headlines/days;
+  const eventRate=events/days;
+  const anomalies=categoryAnomalies(p,data).slice(0,3);
+  const anomalyHtml=anomalies.length
+    ? '<div class="headline-group"><h3>Largest category deviations vs loaded '+state.planet+' baseline</h3><div class="subcategory-list">'+anomalies.map(x=>{
+        const cls=x.ratio>=1?'anomaly-up':'anomaly-down';
+        const pct=((x.ratio-1)*100);
+        return '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span class="'+cls+'">'+(pct>=0?'+':'')+pct.toFixed(0)+'%</span></div>';
+      }).join('')+'</div></div>'
+    : '<div class="note">Load more transit windows with the 12-sign summary to build a stronger same-planet anomaly baseline.</div>';
+  return '<div class="headline-groups"><div class="panel-head"><strong>RESEARCH METRICS</strong><span class="status">Duration-normalized</span></div>'+
+    '<div class="metric-grid">'+
+      '<div class="metric-card"><small>Headlines / 24h</small><b>'+headlineRate.toFixed(1)+'</b></div>'+
+      '<div class="metric-card"><small>Unique events / 24h</small><b>'+eventRate.toFixed(1)+'</b></div>'+
+      '<div class="metric-card"><small>Unique event clusters</small><b>'+events+'</b></div>'+
+    '</div>'+anomalyHtml+'</div>';
+}
+function categoryAnomalies(p,data){
+  const currentDays=Math.max(1/24,daysBetween(p.start,p.end));
+  const baseline=new Map();
+  let baselineWindows=0;
+  for(const other of state.periods){
+    if(other.id===p.id)continue;
+    const d=state.news.get(other.id);
+    if(!d)continue;
+    baselineWindows++;
+    const days=Math.max(1/24,daysBetween(other.start,other.end));
+    for(const c of d.categories||[]){
+      const x=baseline.get(c.name)||{rate:0,windows:0};
+      x.rate+=(Number(c.count)||0)/days;x.windows++;baseline.set(c.name,x);
+    }
+  }
+  if(baselineWindows<3)return[];
+  return (data.categories||[]).filter(c=>c.name!=='Other / Unclassified').map(c=>{
+    const b=baseline.get(c.name);
+    const currentRate=(Number(c.count)||0)/currentDays;
+    const baseRate=b&&b.windows?b.rate/b.windows:0;
+    return{name:c.name,currentRate,baseRate,ratio:baseRate>0?currentRate/baseRate:(currentRate>0?2:1)};
+  }).sort((a,b)=>Math.abs(b.ratio-1)-Math.abs(a.ratio-1));
+}
+
 function renderSourceCoverage(data){
   const counts=data.sourceCounts||{};
   const cov=data.sourceCoverage||{};
@@ -598,8 +650,13 @@ function renderNakshatraHeadlines(p,data){
         const d=new Date(a.publishedAtFull||((a.publishedAt||'')+'T12:00:00Z')).getTime();
         return Number.isFinite(d)&&d>=start&&d<end;
       }).slice(0,5);
+      const durationDays=Math.max(1/24,(end-start)/86400000);
+      const eventIds=new Set(matches.map(a=>a.eventClusterId).filter(Boolean));
+      const rate=(matches.length/durationDays).toFixed(1);
+      const eventRate=(eventIds.size/durationDays).toFixed(1);
       return '<div class="nak-window"><div class="nak-window-head"><b>'+esc(NAK[w.nak])+(windows.filter(x=>x.nak===w.nak).length>1?' · passage '+(windows.slice(0,index+1).filter(x=>x.nak===w.nak).length):'')+'</b>'+
         '<span>'+fmtDateTime(w.start)+' → '+fmtDateTime(w.end)+'</span></div>'+
+        '<div class="small" style="margin-bottom:7px">'+matches.length+' displayed headlines · '+rate+' headlines/24h · '+eventIds.size+' unique displayed events · '+eventRate+' events/24h</div>'+
         '<div class="headline-links">'+(matches.length?matches.map(renderHeadlineLink).join(''):'<div class="small">No retrieved headline fell inside this nakshatra window.</div>')+'</div></div>';
     }).join('')+'</div>';
 }
