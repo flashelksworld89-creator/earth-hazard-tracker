@@ -92,11 +92,19 @@ const SUBCATEGORIES={
     'Maternal / Reproductive Health':['pregnancy','maternal','fertility','ivf','reproductive health']
   },
   'Disease / Outbreaks / Public Health':{
-    'Respiratory Disease':['flu','influenza','covid','coronavirus','respiratory virus'],
-    'Vector-Borne Disease':['malaria','dengue','mosquito','zika'],
-    'Food / Waterborne Disease':['foodborne','salmonella','e coli','cholera'],
-    'Vaccination / Immunization':['vaccine','vaccination','immunization'],
-    'Public Health Policy':['public health policy','health emergency','health department','quarantine']
+    'Pandemics / Epidemics':['pandemic','epidemic','global outbreak','public health emergency of international concern','pheic'],
+    'Disease Spread / Transmission':['transmission','community spread','person-to-person','human-to-human','spread of','infection rate','transmissibility','r0','reproduction number'],
+    'Outbreak Detection / Emergence':['outbreak detected','new outbreak','emerging disease','new strain','new variant','cluster of cases','first case','index case'],
+    'Respiratory Disease':['flu','influenza','covid','coronavirus','respiratory virus','rsv'],
+    'Vector-Borne Disease':['malaria','dengue','mosquito','zika','chikungunya','west nile'],
+    'Food / Waterborne Disease':['foodborne','salmonella','e coli','cholera','listeria','norovirus'],
+    'Vaccination / Immunization':['vaccine','vaccination','immunization','booster dose','vaccine rollout'],
+    'Cures / Breakthrough Treatments':['cure','breakthrough treatment','effective treatment','new therapy','treatment breakthrough','remission','curative'],
+    'Antivirals / Antibiotics':['antiviral','antibiotic','antimicrobial','antiretroviral','new drug treatment'],
+    'Drug Resistance':['drug resistance','antibiotic resistance','antimicrobial resistance','resistant strain','multidrug resistant'],
+    'Mortality / Case Growth':['death toll','mortality rate','case count','cases rise','cases surge','infection surge','fatality rate','hospitalizations rise'],
+    'Containment / Quarantine Measures':['quarantine','lockdown','containment measure','isolation order','travel restriction'],
+    'Public Health Policy':['public health policy','health emergency','health department','public health agency','cdc guidance','who guidance']
   },
   'Economy / Growth / Recession':{
     'GDP / Economic Growth':['gdp','economic growth','growth forecast'],
