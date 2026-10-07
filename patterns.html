@@ -153,7 +153,8 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 </section>
 
 <section class="panel summary-panel">
-<div class="panel-head"><strong>12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Collecting completed transits…</span></div>
+<div class="panel-head"><strong>12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button id="loadSummaryBtn" type="button" style="min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer">Load 12-sign news summary</button></div>
 <div class="detail-sub">Each zodiac receives the primary news category found across all completed/current <span id="summaryPlanetDesc">Mercury</span> passages through that sign since the selected start date. Counts are based on categorized headlines actually retrieved for those transit windows.</div>
 <div id="summaryGrid" class="summary-grid"><div class="empty">Building 12-sign summary…</div></div>
 </section>
@@ -181,6 +182,7 @@ const NAK_SIZE=360/27;
 const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
 const state={periods:[],selected:null,news:new Map(),summaryRun:0,planet:'Mercury'};
+const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 
 for(let i=0;i<12;i++){
   const o=document.createElement('option');o.value=String(i);o.textContent=SG[i]+' '+SIGNS[i];document.getElementById('signFilter').appendChild(o);
@@ -194,30 +196,37 @@ document.getElementById('planetSelect').onchange=()=>{
 };
 document.getElementById('signFilter').onchange=renderTimeline;
 document.getElementById('periodFilter').onchange=renderTimeline;
+document.getElementById('loadSummaryBtn').onclick=()=>buildSignSummary(true);
 build();
 
 async function build(){
-  document.getElementById('timelineStatus').textContent='Calculating '+state.planet+' transits…';
+  const buildPlanet=state.planet;
+  document.getElementById('timelineStatus').textContent='Calculating '+buildPlanet+' transits…';
   document.getElementById('currentPlanetLabel').textContent='Current '+state.planet;
   document.getElementById('summaryPlanetName').textContent=state.planet.toUpperCase();
   document.getElementById('summaryPlanetDesc').textContent=state.planet;
   document.getElementById('timelinePlanetName').textContent=state.planet.toUpperCase();
   const start=new Date(document.getElementById('startDate').value+'T00:00:00Z');
   const end=new Date(Date.UTC(Number(document.getElementById('endYear').value),11,31,23,59,59));
-  state.periods=buildSignPeriods(start,end);
+  document.getElementById('summaryStatus').textContent='Ready to load historical news';
+  document.getElementById('summaryGrid').innerHTML='<div class="empty">Press “Load 12-sign news summary” when you want to collect historical headlines. The transit timeline remains available immediately.</div>';
+  await yieldUI();
+  const periods=await buildSignPeriodsAsync(start,end,buildPlanet);
+  if(buildPlanet!==state.planet)return;
+  state.periods=periods;
   summarize();
   renderTimeline();
-  buildSignSummary();
   const now=Date.now();
   const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
   if(current) selectPeriod(current.id);
   document.getElementById('timelineStatus').textContent=state.periods.length+' sign-transit periods';
 }
 
-function buildSignPeriods(start,end){
+async function buildSignPeriodsAsync(start,end,planet){
   const periods=[];
-  const step=6*3600000;
+  const step=planet==='Sun'?12*3600000:6*3600000;
   let t=new Date(start),lon=trackedLon(t),sign=Math.floor(lon/30),periodStart=new Date(t);
+  let iterations=0;
   for(let ms=t.getTime()+step;ms<=end.getTime()+step;ms+=step){
     const d=new Date(Math.min(ms,end.getTime()));
     const l=trackedLon(d),s=Math.floor(l/30);
@@ -227,10 +236,16 @@ function buildSignPeriods(start,end){
       periodStart=new Date(boundary);
       sign=s;
     }
+    if(++iterations%180===0){
+      document.getElementById('timelineStatus').textContent='Calculating '+planet+' transits… '+fmtDate(d);
+      await yieldUI();
+      if(planet!==state.planet)return[];
+    }
     if(d.getTime()===end.getTime())break;
   }
   return periods;
 }
+
 function refineSignBoundary(a,b,oldSign){
   let lo=a.getTime(),hi=b.getTime();
   for(let i=0;i<28;i++){
@@ -241,7 +256,7 @@ function refineSignBoundary(a,b,oldSign){
 }
 function makePeriod(start,end,sign){
   const sample=[];
-  const step=6*3600000;
+  const step=state.planet==='Sun'?12*3600000:6*3600000;
   for(let ms=start.getTime();ms<=end.getTime();ms+=step) sample.push(new Date(ms));
   if(!sample.length||sample[sample.length-1].getTime()!==end.getTime())sample.push(new Date(end));
 
@@ -392,18 +407,20 @@ function renderNews(p,data){
     leaderBlock+
     '<div class="news-list">'+(stories||'<div class="empty">No headlines were returned for this historical window.</div>')+'</div>';
   document.getElementById('newsStatus').textContent=(data.count||0)+' categorized headlines';
-  renderSignSummary();
+  if(document.getElementById('summaryStatus')?.dataset.loading==='1')renderSignSummary();
 }
-async function buildSignSummary(){
+async function buildSignSummary(userInitiated=false){
+  if(!userInitiated)return;
   const run=++state.summaryRun;
   const eligible=state.periods.filter(p=>p.start.getTime()<=Date.now());
   const status=document.getElementById('summaryStatus');
-  if(status)status.textContent='0 / '+eligible.length+' transit windows loaded';
+  if(status){status.dataset.loading='1';status.textContent='0 / '+eligible.length+' transit windows loaded';}
   renderSignSummary();
+  await yieldUI();
 
   let completed=0;
   const queue=eligible.slice();
-  const workers=Array.from({length:2},async()=>{
+  const workers=Array.from({length:1},async()=>{
     while(queue.length && run===state.summaryRun){
       const p=queue.shift();
       if(!p)break;
@@ -412,18 +429,19 @@ async function buildSignSummary(){
           const from=isoDay(p.start);
           const endCap=new Date(Math.min(p.end.getTime(),Date.now()+86400000));
           const to=isoDay(new Date(endCap.getTime()+86400000));
-          const r=await fetch('/api/mercury-news?planet='+encodeURIComponent(state.planet)+'&from='+from+'&to='+to);
+          const r=await fetch('/api/mercury-news?planet='+encodeURIComponent(state.planet)+'&from='+from+'&to='+to,{cache:'force-cache'});
           if(r.ok)state.news.set(p.id,await r.json());
         }catch(_){}
       }
       completed++;
       if(status)status.textContent=completed+' / '+eligible.length+' transit windows loaded';
-      renderSignSummary();
+      if(completed%3===0||completed===eligible.length)renderSignSummary();
+      await yieldUI();
     }
   });
   await Promise.all(workers);
   if(run!==state.summaryRun)return;
-  if(status)status.textContent='Summary complete · '+eligible.length+' transit windows';
+  if(status){status.textContent='Summary complete · '+eligible.length+' transit windows';status.dataset.loading='0';}
   renderSignSummary();
 }
 
