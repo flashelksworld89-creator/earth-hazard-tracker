@@ -204,6 +204,144 @@ const SUBCATEGORIES={
     'Combat Sports':['boxing','mma','ufc'],
     'Motorsport':['formula 1','nascar','motorsport'],
     'Olympics / International Competition':['olympics','olympic','world championship']
+  },
+  'Diplomacy / International Relations':{
+    'Peace Talks / Ceasefires':['peace talks','ceasefire','truce','peace agreement'],
+    'Summits / State Visits':['summit','state visit','bilateral meeting','leaders meeting'],
+    'Sanctions / Diplomatic Pressure':['sanctions','diplomatic pressure','expulsion','embassy closure'],
+    'Treaties / Alliances':['treaty','alliance','security pact','bilateral agreement']
+  },
+  'Elections / Political Campaigns':{
+    'National Elections':['presidential election','general election','national election'],
+    'Primaries / Party Contests':['primary election','party primary','leadership contest'],
+    'Polling / Voter Opinion':['polling','opinion poll','approval poll','voter survey'],
+    'Campaign Events / Debates':['campaign rally','debate','campaign event','candidate forum']
+  },
+  'Banking / Interest Rates / Monetary Policy':{
+    'Central Bank Decisions':['central bank','federal reserve','rate decision','monetary policy meeting'],
+    'Interest Rate Changes':['rate hike','rate cut','interest rates'],
+    'Banking Stability':['bank failure','bank crisis','liquidity crisis','deposit outflow'],
+    'Credit / Lending Conditions':['credit conditions','lending standards','loan demand']
+  },
+  'Jobs / Labor / Unions':{
+    'Employment / Unemployment':['employment','unemployment','jobs report'],
+    'Layoffs / Hiring':['layoffs','job cuts','hiring','recruitment'],
+    'Wages / Pay':['wages','pay growth','salary'],
+    'Strikes / Labor Action':['strike','walkout','labor action','union protest']
+  },
+  'Trade / Tariffs / Supply Chains':{
+    'Tariffs / Trade Barriers':['tariff','trade barrier','duties'],
+    'Trade Agreements':['trade deal','trade agreement','free trade agreement'],
+    'Imports / Exports':['imports','exports','export controls'],
+    'Supply Chain / Logistics':['supply chain','logistics','shipping disruption','port disruption']
+  },
+  'Corporate Business / Mergers':{
+    'Mergers / Acquisitions':['merger','acquisition','takeover'],
+    'Earnings / Revenue':['earnings','revenue','quarterly results','profit'],
+    'Bankruptcy / Restructuring':['bankruptcy','restructuring','insolvency'],
+    'IPO / Fundraising':['ipo','initial public offering','fundraising','venture funding']
+  },
+  'Cybersecurity / Hacking / Data Breaches':{
+    'Ransomware':['ransomware'],
+    'Data Breaches':['data breach','leaked data','stolen data'],
+    'Cyber Espionage':['cyber espionage','state-sponsored hacking','nation-state hacking'],
+    'Malware / Vulnerabilities':['malware','zero-day','vulnerability','exploit']
+  },
+  'Telecommunications / Internet':{
+    'Mobile / 5G Networks':['5g','mobile network','wireless carrier'],
+    'Broadband / Fiber':['broadband','fiber internet','fiber network'],
+    'Internet / Network Outages':['internet outage','network outage','service outage'],
+    'Satellite Internet':['satellite internet','starlink']
+  },
+  'Communication / Messaging / Information':{
+    'Public Statements / Speeches':['speech','statement','press conference','address'],
+    'Leaks / Disclosures':['leak','leaked document','whistleblower'],
+    'Misinformation / Disinformation':['misinformation','disinformation','false claims'],
+    'Censorship / Information Control':['censorship','information control','content restriction']
+  },
+  'Documents / Contracts / Agreements':{
+    'Contracts / Commercial Agreements':['contract','commercial agreement','signed agreement'],
+    'Legal Filings':['court filing','legal filing','motion filed'],
+    'Settlements':['settlement','settlement agreement'],
+    'Treaties / Memoranda':['memorandum','mou','treaty document']
+  },
+  'Nuclear / Power Infrastructure':{
+    'Nuclear Plants / Reactors':['nuclear plant','reactor','nuclear facility'],
+    'Power Grid / Blackouts':['power grid','blackout','grid failure'],
+    'Electricity Infrastructure':['substation','transmission line','electricity infrastructure'],
+    'Nuclear Safety / Incidents':['radiation','nuclear incident','reactor shutdown']
+  },
+  'Immigration / Borders / Refugees':{
+    'Border Enforcement':['border patrol','border security','border enforcement'],
+    'Asylum / Refugees':['asylum','refugee','refugees'],
+    'Deportation / Removal':['deportation','deported','removal order'],
+    'Migration Flows':['migration','migrant arrivals','migrant crossings']
+  },
+  'Education':{
+    'K-12 Schools':['elementary school','high school','school district','teacher'],
+    'Higher Education':['university','college','campus'],
+    'Student Policy / Protests':['student protest','campus protest','student policy'],
+    'Curriculum / Standards':['curriculum','academic standards','education standards']
+  },
+  'Housing / Real Estate':{
+    'Home Prices / Sales':['home prices','home sales','housing market'],
+    'Rent / Tenants':['rent','rental market','tenant'],
+    'Mortgages':['mortgage','mortgage rates'],
+    'Commercial Real Estate':['commercial real estate','office property','retail property']
+  },
+  'Agriculture / Food Supply':{
+    'Crops / Harvests':['crop','harvest','grain','wheat','corn','soybean'],
+    'Livestock':['livestock','cattle','poultry','swine'],
+    'Food Prices / Shortages':['food prices','food shortage','food supply'],
+    'Farm Policy':['farm bill','agriculture policy','farm subsidy']
+  },
+  'Media / Journalism / Information':{
+    'News Organizations':['newspaper','news outlet','media company'],
+    'Journalists / Press Freedom':['journalist','reporter','press freedom'],
+    'Broadcast / Television':['broadcast network','television network','tv news'],
+    'Digital Publishing':['digital news','publisher','news website']
+  },
+  'Entertainment / Celebrity':{
+    'Film / Television':['film','movie','television','tv series','box office'],
+    'Music':['music','album','concert','singer','rapper'],
+    'Celebrity News':['celebrity','actor','actress','star'],
+    'Awards / Festivals':['award show','oscars','grammys','festival']
+  },
+  'Religion / Faith Institutions':{
+    'Christianity / Churches':['church','pope','bishop','christian'],
+    'Islam / Mosques':['mosque','imam','islamic'],
+    'Judaism / Synagogues':['synagogue','rabbi','jewish'],
+    'Religious Freedom / Policy':['religious freedom','faith policy','religious law']
+  },
+  'Protests / Civil Unrest':{
+    'Political Protests':['political protest','anti-government protest'],
+    'Labor Protests / Strikes':['labor protest','workers protest','strike'],
+    'Student Protests':['student protest','campus protest'],
+    'Riots / Violent Unrest':['riot','violent protest','civil unrest']
+  },
+  'Human Rights / Social Issues':{
+    'Civil Rights':['civil rights','discrimination'],
+    'Gender / Equality':['gender equality','women rights','lgbtq'],
+    'Humanitarian Crisis':['humanitarian crisis','aid crisis','displacement'],
+    'Speech / Civil Liberties':['free speech','freedom of expression','civil liberties']
+  },
+  'Deaths / Major Public Figures':{
+    'Political Leaders':['president dies','prime minister dies','former president dies'],
+    'Entertainment Figures':['actor dies','singer dies','celebrity dies'],
+    'Business / Cultural Figures':['ceo dies','founder dies','artist dies'],
+    'Obituaries / Memorials':['obituary','memorial','funeral']
+  },
+  'Accidents / Industrial Disasters':{
+    'Factory / Industrial Accidents':['industrial accident','factory explosion','plant accident'],
+    'Chemical / Hazardous Spills':['chemical spill','toxic leak','hazardous spill'],
+    'Building / Bridge Collapse':['building collapse','bridge collapse','structural collapse'],
+    'Rail / Transport Accidents':['derailment','transport accident','train crash']
+  },
+  'Consumer Products / Recalls':{
+    'Product Recalls':['product recall','recall notice'],
+    'Safety Defects':['safety defect','defect','safety warning'],
+    'Food / Drug Recalls':['food recall','drug recall','medicine recall'],
+    'Vehicle Recalls':['vehicle recall','car recall','automotive recall']
   }
 };
 
@@ -277,18 +415,19 @@ export default async function handler(req,res){
       const gdeltSettled=await Promise.allSettled(FEEDS.slice(0,6).map(f=>fetchGdeltFeed(f,from,to)));
       for(const r of gdeltSettled) if(r.status==='fulfilled') items.push(...r.value);
     }
-    const articles=dedupe(items)
+    const analysisArticles=dedupe(items)
       .filter(a=>a.publishedAt>=from && a.publishedAt<to)
-      .sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt))
-      .slice(0,160)
       .map(a=>{
         const text=a.title+' '+a.description;
         const newsCategory=classify(text);
         const newsSubcategory=classifySubcategory(newsCategory,text);
         return {...a,newsCategory,newsSubcategory};
       });
+    const articles=[...analysisArticles]
+      .sort((a,b)=>new Date(b.publishedAtFull||b.publishedAt)-new Date(a.publishedAtFull||a.publishedAt))
+      .slice(0,160);
     const counts=new Map(),subCounts=new Map();
-    for(const a of articles){
+    for(const a of analysisArticles){
       counts.set(a.newsCategory,(counts.get(a.newsCategory)||0)+1);
       if(a.newsSubcategory){
         const key=a.newsCategory+'|||'+a.newsSubcategory;
@@ -299,11 +438,11 @@ export default async function handler(req,res){
     const subcategories=[...subCounts.entries()].map(([key,count])=>{
       const [category,name]=key.split('|||');return{category,name,count};
     }).sort((a,b)=>b.count-a.count);
-    const leaderEvidence=planet==='Sun'?buildLeaderEvidence(articles):[];
-    const subjects=buildOrganicSubjects(articles);
-    const sourceCounts=countSources(articles);
+    const leaderEvidence=planet==='Sun'?buildLeaderEvidence(analysisArticles):[];
+    const subjects=buildOrganicSubjects(analysisArticles);
+    const sourceCounts=countSources(analysisArticles);
     return res.status(200).json({
-      from,to,planet,future:false,count:articles.length,categories,subcategories,subjects,articles,leaderEvidence,
+      from,to,planet,future:false,count:analysisArticles.length,categories,subcategories,subjects,articles,leaderEvidence,
       sourceCounts,
       sourceCoverage:{
         googleNews:{available:true,label:'Google News RSS'},
@@ -331,8 +470,15 @@ async function fetchFeed(feed){
   }).filter(x=>x.title&&x.url&&x.publishedAt);
 }
 async function fetchGdeltFeed(feed,from,to){
-  const start=from.replace(/-/g,'')+'000000';
-  const end=to.replace(/-/g,'')+'235959';
+  const now=new Date();
+  const cutoff=new Date(now.getTime()-366*86400000);
+  const requestedStart=new Date(from+'T00:00:00Z');
+  const requestedEnd=new Date(to+'T23:59:59Z');
+  const effectiveStart=requestedStart<cutoff?cutoff:requestedStart;
+  const effectiveEnd=requestedEnd>now?now:requestedEnd;
+  if(effectiveEnd<=effectiveStart)return[];
+  const start=gdeltStamp(effectiveStart);
+  const end=gdeltStamp(effectiveEnd);
   const url='https://api.gdeltproject.org/api/v2/doc/doc?query='+encodeURIComponent('('+feed.q+')')+
     '&mode=ArtList&format=json&maxrecords=75&sort=DateDesc&startdatetime='+start+'&enddatetime='+end;
   const r=await fetch(url,{headers:{'Accept':'application/json','User-Agent':'PlanetTransitNewsTracker/1.0'}});
@@ -352,6 +498,10 @@ async function fetchGdeltFeed(feed,from,to){
       publishedAtFull:Number.isFinite(d.getTime())?d.toISOString():''
     };
   }).filter(x=>x.title&&x.url&&x.publishedAt);
+}
+function gdeltStamp(d){
+  const p=n=>String(n).padStart(2,'0');
+  return d.getUTCFullYear()+p(d.getUTCMonth()+1)+p(d.getUTCDate())+p(d.getUTCHours())+p(d.getUTCMinutes())+p(d.getUTCSeconds());
 }
 function parseGdeltDate(v){
   const s=String(v||'');
