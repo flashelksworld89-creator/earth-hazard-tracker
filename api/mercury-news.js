@@ -1,24 +1,57 @@
 const FEEDS=[
-  {name:'World',q:'world OR international'},
-  {name:'Politics',q:'politics OR government OR election OR congress OR parliament'},
-  {name:'Economy',q:'economy OR markets OR business OR trade OR inflation'},
-  {name:'Technology',q:'technology OR AI OR cyber OR internet OR software'},
-  {name:'Conflict',q:'war OR military OR attack OR ceasefire'},
-  {name:'Science',q:'science OR space OR research OR discovery'},
-  {name:'Health',q:'health OR medicine OR disease OR hospital'},
-  {name:'Climate',q:'climate OR weather OR wildfire OR flood OR earthquake OR hurricane'}
+  {name:'World',q:'world OR international OR diplomacy OR conflict'},
+  {name:'Politics',q:'politics OR government OR election OR congress OR parliament OR court'},
+  {name:'Economy',q:'economy OR markets OR business OR trade OR inflation OR jobs OR banking'},
+  {name:'Technology',q:'technology OR AI OR cyber OR internet OR software OR telecommunications'},
+  {name:'Science Health',q:'science OR space OR research OR health OR medicine OR disease'},
+  {name:'Climate Energy',q:'climate OR weather OR disaster OR energy OR oil OR power grid'},
+  {name:'Society',q:'immigration OR protest OR education OR housing OR human rights OR religion'},
+  {name:'Culture',q:'sports OR entertainment OR celebrity OR media OR social media'}
 ];
 
 const CATEGORIES={
-  'War / Conflict':['war','attack','strike','missile','military','troops','bomb','invasion','ceasefire','combat','shooting'],
-  'Politics / Government':['election','president','government','congress','parliament','minister','court','law','policy','campaign'],
-  'Economy / Markets':['economy','market','stocks','trade','tariff','inflation','jobs','bank','interest rate','currency','business'],
-  'Technology / AI':['technology','artificial intelligence',' ai ','chip','cyber','software','internet','robot','data center'],
-  'Science / Space':['science','space','nasa','research','satellite','astronomy','discovery','moon','mars mission'],
-  'Health':['health','virus','disease','hospital','vaccine','outbreak','medical','drug'],
-  'Climate / Disaster':['climate','weather','hurricane','typhoon','flood','wildfire','earthquake','volcano','storm','tornado'],
-  'Crime / Public Safety':['police','crime','arrest','killed','shooting','security','terror','explosion'],
-  'Culture / Entertainment':['film','music','celebrity','sports','festival','award','entertainment']
+  'War / Military Conflict':['war','military','troops','invasion','airstrike','air strike','missile','bombing','battle','combat','ceasefire','armed forces'],
+  'Diplomacy / International Relations':['summit','diplomatic','diplomacy','treaty','negotiation','negotiations','sanctions','embassy','ambassador','alliance','bilateral','foreign minister'],
+  'Elections / Political Campaigns':['election','elections','vote','voting','candidate','campaign','polling','primary election','ballot'],
+  'Government / Policy / Legislation':['government','congress','parliament','senate','house bill','legislation','lawmakers','executive order','regulation','policy','cabinet','minister'],
+  'Courts / Legal Decisions':['court','judge','lawsuit','trial','supreme court','indictment','verdict','appeal','prosecutor','legal ruling'],
+  'Crime / Public Safety':['police','crime','arrest','shooting','homicide','murder','terror','explosion','security alert','manhunt'],
+  'Economy / Growth / Recession':['economy','economic growth','gdp','recession','consumer spending','productivity','economic outlook'],
+  'Markets / Investing':['stocks','stock market','shares','bonds','commodities','wall street','market rally','market selloff','investors'],
+  'Banking / Interest Rates / Monetary Policy':['central bank','federal reserve','interest rate','rates decision','monetary policy','banking','liquidity','fed chair'],
+  'Jobs / Labor / Unions':['jobs report','employment','unemployment','layoffs','labor','union','strike','wages','workers'],
+  'Trade / Tariffs / Supply Chains':['trade','tariff','imports','exports','supply chain','shipping disruption','trade deal','customs'],
+  'Corporate Business / Mergers':['merger','acquisition','bankruptcy','earnings','company results','corporate','takeover','ipo','chief executive'],
+  'Technology / Software':['technology','software','computer','platform','app','semiconductor','chip','cloud computing','tech company'],
+  'Artificial Intelligence / Robotics':['artificial intelligence',' ai ','machine learning','robot','robotics','chatbot','large language model','generative ai'],
+  'Cybersecurity / Hacking / Data Breaches':['cyber','hack','hacking','ransomware','data breach','malware','cyberattack','security breach'],
+  'Telecommunications / Internet':['internet','telecom','telecommunications','network outage','mobile network','broadband','social platform','communications network'],
+  'Communication / Messaging / Information':['speech','announcement','statement','message','leak','leaked document','press conference','censorship','misinformation','disinformation','publishing'],
+  'Documents / Contracts / Agreements':['contract','agreement','signed','memorandum','filing','court filing','regulatory filing','treaty document','settlement','paperwork'],
+  'Science / Research / Discovery':['science','scientific','research','study finds','discovery','physics','biology','laboratory'],
+  'Space / Astronomy':['space','nasa','spacecraft','satellite','rocket launch','astronomy','moon mission','mars mission','asteroid'],
+  'Medicine / Health':['healthcare','hospital','medical','medicine','treatment','drug approval','surgery','doctor','patient'],
+  'Disease / Outbreaks / Public Health':['virus','disease','outbreak','epidemic','pandemic','vaccine','public health','infection'],
+  'Natural Disasters':['earthquake','volcano','tsunami','landslide','avalanche','natural disaster'],
+  'Severe Weather':['hurricane','typhoon','tornado','flood','storm','blizzard','heatwave','heat wave','wildfire'],
+  'Climate / Environment':['climate','environment','emissions','conservation','pollution','drought','warming','environmental'],
+  'Energy / Oil / Gas':['oil','natural gas','opec','pipeline','energy prices','fuel','petroleum','gas prices'],
+  'Nuclear / Power Infrastructure':['nuclear plant','reactor','power grid','electric grid','blackout','power outage','electricity infrastructure'],
+  'Transportation / Aviation':['airline','aircraft','flight','airport','train','rail','shipping','ship','transportation','crash'],
+  'Immigration / Borders / Refugees':['immigration','migrant','migration','border','asylum','refugee','deportation'],
+  'Education':['school','university','college','student','education','teacher','campus'],
+  'Housing / Real Estate':['housing','home prices','mortgage','rent','real estate','construction','property market'],
+  'Agriculture / Food Supply':['agriculture','farm','crop','food supply','livestock','harvest','food shortage','grain'],
+  'Media / Journalism / Information':['journalist','journalism','newspaper','news outlet','broadcast','media company','press freedom'],
+  'Social Media / Online Culture':['social media','viral','influencer','online trend','tiktok','instagram','youtube','x platform'],
+  'Entertainment / Celebrity':['film','movie','television','music','celebrity','actor','singer','award show','entertainment'],
+  'Sports':['sports','championship','tournament','athlete','football','basketball','baseball','soccer','olympics'],
+  'Religion / Faith Institutions':['religion','church','mosque','temple','pope','bishop','faith','religious'],
+  'Protests / Civil Unrest':['protest','protests','demonstration','riot','civil unrest','march','mass movement'],
+  'Human Rights / Social Issues':['human rights','civil rights','discrimination','humanitarian','equality','social justice'],
+  'Deaths / Major Public Figures':['dies','died','death of','dead at','obituary','funeral','former president dies','celebrity dies'],
+  'Accidents / Industrial Disasters':['industrial accident','factory explosion','chemical spill','building collapse','bridge collapse','accident','derailment'],
+  'Consumer Products / Recalls':['recall','product recall','consumer product','safety warning','defect','product safety']
 };
 
 export default async function handler(req,res){
@@ -68,7 +101,7 @@ async function fetchFeed(feed){
 }
 function classify(text){
   const t=' '+String(text||'').toLowerCase()+' ';
-  let best='General',score=0;
+  let best='Other / Unclassified',score=0;
   for(const [name,terms] of Object.entries(CATEGORIES)){
     let n=0; for(const term of terms) if(t.includes(term)) n++;
     if(n>score){score=n;best=name}
