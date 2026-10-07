@@ -1,3 +1,6 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
 const FEEDS=[
   {name:'World',q:'world OR international OR diplomacy OR conflict'},
   {name:'Politics',q:'politics OR government OR election OR congress OR parliament OR court'},
@@ -401,6 +404,10 @@ export default async function handler(req,res){
     if(!from||!to) return res.status(400).json({error:'from and to dates are required'});
     const now=new Date();
     if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,rawCount:0,publisherCount:0,archiveQuality:{level:'future',analysisEligible:false,reason:'Future window'},eventCount:0,eventClusters:[],articles:[],categories:[],subcategories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
+    if(to<='2014-01-01'){
+      const historical=await buildHistoricalEventResponse(from,to,planet);
+      return res.status(200).json(historical);
+    }
 
     const feeds=FEEDS.map(f=>({
       ...f,
@@ -464,6 +471,92 @@ export default async function handler(req,res){
   }catch(e){
     return res.status(500).json({error:'Transit news aggregation failed',detail:e?.message||String(e)});
   }
+}
+
+const HIST_ROOT_TO_CATEGORY={
+  '01':'Communication / Messaging / Information','02':'Diplomacy / International Relations',
+  '03':'Diplomacy / International Relations','04':'Diplomacy / International Relations',
+  '05':'Diplomacy / International Relations','06':'Corporate Business / Mergers',
+  '07':'Human Rights / Social Issues','08':'Diplomacy / International Relations',
+  '09':'Courts / Legal Decisions','10':'Diplomacy / International Relations',
+  '11':'Diplomacy / International Relations','12':'Diplomacy / International Relations',
+  '13':'War / Military Conflict','14':'Protests / Civil Unrest',
+  '15':'War / Military Conflict','16':'Diplomacy / International Relations',
+  '17':'War / Military Conflict','18':'War / Military Conflict',
+  '19':'War / Military Conflict','20':'War / Military Conflict'
+};
+
+async function buildHistoricalEventResponse(from,to,planet){
+  const start=new Date(from+'T00:00:00Z'),end=new Date(to+'T00:00:00Z');
+  const years=[];for(let y=start.getUTCFullYear();y<=end.getUTCFullYear();y++)years.push(y);
+  const missingYears=[],days=[];
+  for(const year of years){
+    try{
+      const file=path.join(process.cwd(),'data','gdelt-history',year+'.json');
+      const payload=JSON.parse(await fs.readFile(file,'utf8'));
+      for(const [day,row] of Object.entries(payload.days||{})){
+        const iso=day.slice(0,4)+'-'+day.slice(4,6)+'-'+day.slice(6,8);
+        if(iso>=from&&iso<to)days.push({day:iso,...row});
+      }
+    }catch(_){missingYears.push(year)}
+  }
+  const rootCounts=new Map(),rootMentions=new Map(),actors=new Map(),locations=new Map(),categoryCounts=new Map();
+  let events=0,mentions=0,sources=0,articles=0,goldWeighted=0,toneWeighted=0;
+  for(const d of days){
+    events+=Number(d.events)||0;mentions+=Number(d.mentions)||0;sources+=Number(d.sources)||0;articles+=Number(d.articles)||0;
+    goldWeighted+=(Number(d.avgGoldstein)||0)*(Number(d.events)||0);
+    toneWeighted+=(Number(d.avgTone)||0)*(Number(d.events)||0);
+    for(const r of d.roots||[]){
+      rootCounts.set(r.code,(rootCounts.get(r.code)||0)+(Number(r.count)||0));
+      rootMentions.set(r.code,(rootMentions.get(r.code)||0)+(Number(r.mentions)||0));
+      const cat=HIST_ROOT_TO_CATEGORY[r.code]||'Other / Unclassified';
+      categoryCounts.set(cat,(categoryCounts.get(cat)||0)+(Number(r.count)||0));
+    }
+    for(const x of d.topActors||[])actors.set(x.name,(actors.get(x.name)||0)+(Number(x.count)||0));
+    for(const x of d.topLocations||[])locations.set(x.name,(locations.get(x.name)||0)+(Number(x.count)||0));
+  }
+  const rootNames={
+    '01':'Make Public Statement','02':'Appeal / Request','03':'Express Intent to Cooperate','04':'Consult',
+    '05':'Diplomatic Cooperation','06':'Material Cooperation','07':'Provide Aid','08':'Yield / Concede',
+    '09':'Investigate','10':'Demand','11':'Disapprove','12':'Reject','13':'Threaten','14':'Protest',
+    '15':'Exhibit Force / Military Posture','16':'Reduce Relations','17':'Coerce','18':'Assault','19':'Fight',
+    '20':'Unconventional Mass Violence'
+  };
+  const historicalEventTypes=[...rootCounts.entries()].map(([code,count])=>({
+    code,name:rootNames[code]||code,count,mentions:rootMentions.get(code)||0
+  })).sort((a,b)=>b.count-a.count);
+  const categories=[...categoryCounts.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
+  const subcategories=historicalEventTypes.map(x=>({
+    category:HIST_ROOT_TO_CATEGORY[x.code]||'Other / Unclassified',name:x.name,count:x.count
+  }));
+  const topActors=[...actors.entries()].sort((a,b)=>b[1]-a[1]).slice(0,15).map(([name,count])=>({name,count}));
+  const topLocations=[...locations.entries()].sort((a,b)=>b[1]-a[1]).slice(0,15).map(([name,count])=>({name,count}));
+  const complete=missingYears.length===0;
+  return{
+    from,to,planet,future:false,mode:'historical-events',
+    count:events,rawCount:events,publisherCount:0,eventCount:events,eventClusters:[],articles:[],
+    categories,subcategories,subjects:[],leaderEvidence:[],
+    historicalEventTypes,
+    historicalStats:{
+      events,mentions,sources,articles,
+      avgGoldstein:events?goldWeighted/events:0,
+      avgTone:events?toneWeighted/events:0,
+      topActors,topLocations
+    },
+    archiveQuality:{
+      level:complete&&events?'strong':'limited',
+      analysisEligible:complete&&events>0,
+      reason:complete
+        ? 'GDELT 1.0 historical event index; event-coded data rather than a headline archive'
+        : 'Historical GDELT index is not yet built for: '+missingYears.join(', ')
+    },
+    sourceCounts:{'GDELT 1.0 Events':events},
+    sourceCoverage:{
+      historical:{available:complete,label:'GDELT 1.0 Event Database',missingYears},
+      googleNews:{available:false,label:'Google News RSS'},
+      gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Historical event mode'}
+    }
+  };
 }
 
 async function fetchFeed(feed){
