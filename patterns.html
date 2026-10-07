@@ -190,6 +190,21 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <div class="stat"><small>Inconjunct events</small><b id="statInconj">—</b><span>within 3° of 150°</span></div>
 </section>
 
+<section class="panel">
+<div class="panel-head"><strong>CALCULATION VERIFICATION</strong><span id="verifyStatus" class="status">Waiting for ephemeris</span></div>
+<div class="detail-grid">
+<div><small>Planet</small><b id="verifyPlanet">—</b></div>
+<div><small>Calculation path</small><b id="verifyMethod">—</b></div>
+<div><small>Sidereal reference</small><b>Lahiri ayanamsa</b></div>
+<div><small>Current longitude</small><b id="verifyLon">—</b></div>
+<div><small>Current sign / nakshatra</small><b id="verifySignNak">—</b></div>
+<div><small>Motion</small><b id="verifyMotion">—</b></div>
+<div><small>Timeline range</small><b id="verifyRange">—</b></div>
+<div><small>Ingress refinement</small><b>Binary-refined boundaries</b></div>
+</div>
+<div class="note">This panel shows the astronomical state actually used by the selected planet before any news data is attached.</div>
+</section>
+
 <section class="panel trend-search">
 <div class="panel-head"><strong>TREND SEARCH</strong><span id="trendStatus" class="status">Search categories, subcategories or subjects</span></div>
 <div class="trend-controls">
@@ -211,12 +226,12 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <section class="layout">
 <div class="panel">
 <div class="panel-head"><strong><span id="timelinePlanetName">MERCURY</span> SIGN TRANSIT TIMELINE</strong><span id="timelineStatus" class="status">Calculating…</span></div>
-<div id="transitList" class="transit-list"><div class="empty">Building Mercury ephemeris…</div></div>
+<div id="transitList" class="transit-list"><div class="empty">Building selected-planet ephemeris…</div></div>
 </div>
 
 <div class="panel">
 <div class="panel-head"><strong>TRANSIT + NEWS DETAIL</strong><span id="newsStatus" class="status">Select a transit</span></div>
-<div id="detail"><div class="empty">Choose a Mercury transit period to inspect its nakshatras, planetary aspects and news categories.</div></div>
+<div id="detail"><div class="empty">Choose a transit period to inspect its nakshatras, planetary aspects and news categories.</div></div>
 </div>
 </section>
 </main>
@@ -260,14 +275,18 @@ async function build(){
   document.getElementById('summaryPlanetName').textContent=state.planet.toUpperCase();
   document.getElementById('summaryPlanetDesc').textContent=state.planet;
   document.getElementById('timelinePlanetName').textContent=state.planet.toUpperCase();
+  document.getElementById('transitList').innerHTML='<div class="empty">Building '+esc(buildPlanet)+' ephemeris…</div>';
+  document.getElementById('detail').innerHTML='<div class="empty">Choose a '+esc(buildPlanet)+' transit period to inspect its nakshatras, planetary aspects and news categories.</div>';
   const start=new Date(document.getElementById('startDate').value+'T00:00:00Z');
   const end=new Date(Date.UTC(Number(document.getElementById('endYear').value),11,31,23,59,59));
+  updateVerification(start,end);
   document.getElementById('summaryStatus').textContent='Ready to load historical news';
   document.getElementById('summaryGrid').innerHTML='<div class="empty">Press “Load 12-sign news summary” when you want to collect historical headlines. The transit timeline remains available immediately.</div>';
   await yieldUI();
   const periods=await buildSignPeriodsAsync(start,end,buildPlanet);
   if(buildPlanet!==state.planet)return;
   state.periods=periods;
+  updateVerification(start,end);
   summarize();
   renderTimeline();
   const now=Date.now();
@@ -387,6 +406,25 @@ function trackedMotion(d){
   const before=trackedLon(new Date(d.getTime()-h)),after=trackedLon(new Date(d.getTime()+h));
   const signed=((after-before+540)%360)-180;
   return signed<0?'Retrograde':'Direct';
+}
+function updateVerification(start,end){
+  const now=new Date();
+  const lon=trackedLon(now);
+  const si=Math.floor(lon/30);
+  const ni=Math.min(26,Math.floor(lon/NAK_SIZE));
+  const isNode=state.planet==='Rahu'||state.planet==='Ketu';
+  document.getElementById('verifyPlanet').textContent=(GLYPH[state.planet]||'')+' '+state.planet;
+  document.getElementById('verifyMethod').textContent=isNode?'Mean lunar node + Lahiri':'Astronomy Engine geocentric + Lahiri';
+  document.getElementById('verifyLon').textContent=lon.toFixed(6)+'° ('+fmtDegree(lon)+')';
+  document.getElementById('verifySignNak').textContent=SG[si]+' '+SIGNS[si]+' · '+NAK[ni];
+  document.getElementById('verifyMotion').textContent=trackedMotion(now);
+  document.getElementById('verifyRange').textContent=isoDay(start)+' → '+isoDay(end);
+  if(isNode){
+    const n=meanNodes(now);
+    document.getElementById('verifyStatus').textContent='Calculated for '+state.planet+' · node separation '+angleDiff(n.rahu,n.ketu).toFixed(3)+'°';
+  }else{
+    document.getElementById('verifyStatus').textContent='Calculated for '+state.planet;
+  }
 }
 function summarize(){
   document.getElementById('statPeriods').textContent=state.periods.length;
