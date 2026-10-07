@@ -509,7 +509,7 @@ async function buildHistoricalEventResponse(from,to,planet){
       }
     }catch(_){missingYears.push(year)}
   }
-  const rootCounts=new Map(),rootMentions=new Map(),actors=new Map(),locations=new Map(),categoryCounts=new Map();
+  const rootCounts=new Map(),rootMentions=new Map(),eventCodeCounts=new Map(),eventCodeMentions=new Map(),actors=new Map(),actorPairs=new Map(),locations=new Map(),categoryCounts=new Map();
   let events=0,mentions=0,sources=0,articles=0,goldWeighted=0,toneWeighted=0;
   for(const d of days){
     events+=Number(d.events)||0;mentions+=Number(d.mentions)||0;sources+=Number(d.sources)||0;articles+=Number(d.articles)||0;
@@ -521,7 +521,12 @@ async function buildHistoricalEventResponse(from,to,planet){
       const cat=HIST_ROOT_TO_CATEGORY[r.code]||'Other / Unclassified';
       categoryCounts.set(cat,(categoryCounts.get(cat)||0)+(Number(r.count)||0));
     }
+    for(const e of d.eventCodes||[]){
+      eventCodeCounts.set(e.code,(eventCodeCounts.get(e.code)||0)+(Number(e.count)||0));
+      eventCodeMentions.set(e.code,(eventCodeMentions.get(e.code)||0)+(Number(e.mentions)||0));
+    }
     for(const x of d.topActors||[])actors.set(x.name,(actors.get(x.name)||0)+(Number(x.count)||0));
+    for(const x of d.topActorPairs||[])actorPairs.set(x.name,(actorPairs.get(x.name)||0)+(Number(x.count)||0));
     for(const x of d.topLocations||[])locations.set(x.name,(locations.get(x.name)||0)+(Number(x.count)||0));
   }
   const rootNames={
@@ -535,22 +540,29 @@ async function buildHistoricalEventResponse(from,to,planet){
     code,name:rootNames[code]||code,count,mentions:rootMentions.get(code)||0
   })).sort((a,b)=>b.count-a.count);
   const categories=[...categoryCounts.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
-  const subcategories=historicalEventTypes.map(x=>({
-    category:HIST_ROOT_TO_CATEGORY[x.code]||'Other / Unclassified',name:x.name,count:x.count
+  const detailedEventCodes=[...eventCodeCounts.entries()].map(([code,count])=>({
+    code,count,mentions:eventCodeMentions.get(code)||0,root:code.slice(0,2)
+  })).sort((a,b)=>b.count-a.count);
+  const subcategories=(detailedEventCodes.length?detailedEventCodes:historicalEventTypes).map(x=>({
+    category:HIST_ROOT_TO_CATEGORY[x.root||x.code]||'Other / Unclassified',
+    name:detailedEventCodes.length?'CAMEO '+x.code: x.name,
+    count:x.count,
+    code:x.code
   }));
   const topActors=[...actors.entries()].sort((a,b)=>b[1]-a[1]).slice(0,15).map(([name,count])=>({name,count}));
+  const topActorPairs=[...actorPairs.entries()].sort((a,b)=>b[1]-a[1]).slice(0,15).map(([name,count])=>({name,count}));
   const topLocations=[...locations.entries()].sort((a,b)=>b[1]-a[1]).slice(0,15).map(([name,count])=>({name,count}));
   const complete=missingYears.length===0;
   return{
     from,to,planet,future:false,mode:'historical-events',
     count:events,rawCount:events,publisherCount:0,eventCount:events,eventClusters:[],articles:[],
     categories,subcategories,subjects:[],leaderEvidence:[],
-    historicalEventTypes,
+    historicalEventTypes,detailedEventCodes,
     historicalStats:{
       events,mentions,sources,articles,
       avgGoldstein:events?goldWeighted/events:0,
       avgTone:events?toneWeighted/events:0,
-      topActors,topLocations
+      topActors,topActorPairs,topLocations
     },
     archiveQuality:{
       level:complete&&events?'strong':'limited',
