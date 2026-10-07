@@ -164,7 +164,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Tracks selected planets through Lahiri sidereal signs and nakshatras from January 1, 2014 forward. Each continuous sign transit records degree path, motion, conjunctions, 90° squares and 150° inconjuncts to other planets. Select a past or current transit to compare categorized news headlines published during that same interval.</p></div></section>
 
 <section class="controls">
-<label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option></select></label>
+<label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
 <label>Start date<input id="startDate" type="date" value="2014-01-01" min="2014-01-01"></label>
 <label>Future horizon<select id="endYear"><option value="2027">End of 2027</option><option value="2028" selected>End of 2028</option><option value="2030">End of 2030</option></select></label>
 <label>Filter sign<select id="signFilter"><option value="">All signs</option></select></label>
@@ -253,7 +253,7 @@ async function build(){
 
 async function buildSignPeriodsAsync(start,end,planet){
   const periods=[];
-  const step=planet==='Sun'?12*3600000:6*3600000;
+  const step=['Sun','Jupiter','Saturn','Rahu','Ketu'].includes(planet)?12*3600000:6*3600000;
   let t=new Date(start),lon=trackedLon(t),sign=Math.floor(lon/30),periodStart=new Date(t);
   let iterations=0;
   for(let ms=t.getTime()+step;ms<=end.getTime()+step;ms+=step){
@@ -294,7 +294,7 @@ function refineNakBoundary(a,b,oldNak){
 }
 function makePeriod(start,end,sign){
   const sample=[];
-  const step=state.planet==='Sun'?12*3600000:6*3600000;
+  const step=['Sun','Jupiter','Saturn','Rahu','Ketu'].includes(state.planet)?12*3600000:6*3600000;
   for(let ms=start.getTime();ms<=end.getTime();ms+=step) sample.push(new Date(ms));
   if(!sample.length||sample[sample.length-1].getTime()!==end.getTime())sample.push(new Date(end));
 
@@ -339,7 +339,7 @@ function makePeriod(start,end,sign){
     startLon,endLon,naks,nakWindows,motion:[...motions],aspects
   };
 }
-function trackedLon(d){return bodyLon(state.planet,d)}
+function trackedLon(d){return planetLon(state.planet,d)}
 function planetLon(name,d){
   if(name==='Rahu'||name==='Ketu'){
     const n=meanNodes(d);return name==='Rahu'?n.rahu:n.ketu;
@@ -357,6 +357,7 @@ function meanNodes(d){
 }
 function trackedMotion(d){
   if(state.planet==='Sun')return'Direct';
+  if(state.planet==='Rahu'||state.planet==='Ketu')return'Retrograde';
   const h=12*3600000;
   const before=trackedLon(new Date(d.getTime()-h)),after=trackedLon(new Date(d.getTime()+h));
   const signed=((after-before+540)%360)-180;
