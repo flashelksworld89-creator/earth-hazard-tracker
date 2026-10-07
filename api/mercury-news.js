@@ -143,7 +143,7 @@ async function fetchFeed(feed){
     const description=summary(clean(readTag(b,'description')));
     const source=clean(readTag(b,'source'))||feed.name;
     const d=new Date(pub);
-    return {id:feed.name+'-'+i+'-'+hash(title+link),title,description,source,url:safe(link),publishedAt:Number.isFinite(d.getTime())?d.toISOString().slice(0,10):''};
+    return {id:feed.name+'-'+i+'-'+hash(title+link),title,description,source,url:safe(link),publishedAt:Number.isFinite(d.getTime())?d.toISOString().slice(0,10):'',publishedAtFull:Number.isFinite(d.getTime())?d.toISOString():''};
   }).filter(x=>x.title&&x.url&&x.publishedAt);
 }
 function classify(text){
