@@ -165,7 +165,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 
 <section class="controls">
 <label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
-<label>Start date<input id="startDate" type="date" value="2000-01-01" min="2000-01-01"></label>
+<label>Start date<input id="startDate" type="date" value="1980-01-01" min="1980-01-01"></label>
 <label>Future horizon<select id="endYear"><option value="2027">End of 2027</option><option value="2028" selected>End of 2028</option><option value="2030">End of 2030</option></select></label>
 <label>Filter sign<select id="signFilter"><option value="">All signs</option></select></label>
 <label>Period<select id="periodFilter"><option value="all">Past + current + future</option><option value="past">Past/current only</option><option value="future">Future only</option></select></label>
@@ -183,7 +183,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <section class="panel summary-panel">
 <div class="panel-head"><strong>12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button id="loadSummaryBtn" type="button" style="min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer">Load 12-sign news summary</button></div>
-<div class="detail-sub">Each zodiac receives the primary news category found across all completed/current <span id="summaryPlanetDesc">Mercury</span> passages through that sign since the selected start date. Counts are based on categorized headlines from archive windows with usable coverage. Weak or sparse historical windows are shown but excluded from comparative baselines.</div>
+<div class="detail-sub">Each zodiac receives the primary news category found across all completed/current <span id="summaryPlanetDesc">Mercury</span> passages through that sign since the selected start date. Modern periods use balanced headline archives; pre-2014 periods use GDELT 1.0 coded historical events when the compact index is available. Weak or missing archive windows are excluded from comparative baselines.</div>
 <div id="summaryGrid" class="summary-grid"><div class="empty">Building 12-sign summary…</div></div>
 </section>
 
@@ -444,6 +444,7 @@ function renderDetail(p){
 }
 function renderNews(p,data){
   const area=document.getElementById('newsArea');if(!area)return;
+  if(data.mode==='historical-events'){renderHistoricalEvents(p,data,area);return;}
   const cats=data.categories||[],max=Math.max(1,...cats.map(x=>x.count));
   const bars=cats.length?'<div class="category-bars">'+cats.map(c=>'<div class="cat"><span>'+esc(c.name)+'</span><div class="track"><div class="fill" style="width:'+((c.count/max)*100).toFixed(1)+'%"></div></div><b>'+c.count+'</b></div>').join('')+'</div>':'';
   const stories=(data.articles||[]).slice(0,24).map(a=>
@@ -549,6 +550,45 @@ function renderSignSummary(){
       '<div class="summary-meta">'+headlines+' headlines · '+classifiedTotal+' classified · '+unclassified+' unclassified</div>'+
     '</div>';
   }).join('');
+}
+
+function renderHistoricalEvents(p,data,area){
+  const stats=data.historicalStats||{};
+  const roots=(data.historicalEventTypes||[]).slice(0,12);
+  const actors=(stats.topActors||[]).slice(0,8);
+  const locations=(stats.topLocations||[]).slice(0,8);
+  const quality=data.archiveQuality||{};
+  const days=Math.max(1/24,daysBetween(p.start,p.end));
+  const eventRate=(Number(stats.events)||0)/days;
+  const rootHtml=roots.length
+    ? '<div class="headline-group"><h3>Top CAMEO event types</h3><div class="subcategory-list">'+roots.map(x=>
+        '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
+    : '';
+  const actorHtml=actors.length
+    ? '<div class="headline-group"><h3>Most frequent actors</h3><div class="subcategory-list">'+actors.map(x=>
+        '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
+    : '';
+  const locHtml=locations.length
+    ? '<div class="headline-group"><h3>Most frequent locations</h3><div class="subcategory-list">'+locations.map(x=>
+        '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
+    : '';
+  area.innerHTML=
+    '<div class="note"><b>Historical event mode.</b> This period uses GDELT 1.0 CAMEO-coded events rather than modern headline search. It is kept separate so missing old headlines are not treated as low news activity.</div>'+
+    '<div class="headline-groups"><div class="panel-head"><strong>HISTORICAL EVENT METRICS</strong><span class="status">'+esc(String(quality.level||'unknown').toUpperCase())+'</span></div>'+
+      '<div class="metric-grid">'+
+        '<div class="metric-card"><small>Unique coded events</small><b>'+Number(stats.events||0)+'</b></div>'+
+        '<div class="metric-card"><small>Events / 24h</small><b>'+eventRate.toFixed(1)+'</b></div>'+
+        '<div class="metric-card"><small>Media mentions</small><b>'+Number(stats.mentions||0)+'</b></div>'+
+        '<div class="metric-card"><small>Source references</small><b>'+Number(stats.sources||0)+'</b></div>'+
+        '<div class="metric-card"><small>Article references</small><b>'+Number(stats.articles||0)+'</b></div>'+
+        '<div class="metric-card"><small>Avg Goldstein</small><b>'+Number(stats.avgGoldstein||0).toFixed(2)+'</b></div>'+
+        '<div class="metric-card"><small>Avg tone</small><b>'+Number(stats.avgTone||0).toFixed(2)+'</b></div>'+
+      '</div>'+
+      (quality.reason?'<div class="note">'+esc(quality.reason)+'</div>':'')+
+      rootHtml+actorHtml+locHtml+
+    '</div>';
+  document.getElementById('newsStatus').textContent=(Number(stats.events)||0)+' historical coded events';
+  if(document.getElementById('summaryStatus')?.dataset.loading==='1')renderSignSummary();
 }
 
 function renderResearchMetrics(p,data){
