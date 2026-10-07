@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#06111f">
 <meta name="description" content="Mercury sidereal transit and news tracker from January 2024 forward.">
-<title>Mercury Transit News Tracker</title>
+<title>Planet Transit News Tracker</title>
 <style>
 :root{
   --bg:#02070d;--panel:#071420;--panel2:#0a1826;--border:rgba(124,185,255,.24);
@@ -84,6 +84,15 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .summary-rank .pct{color:#8fdcff;font-variant-numeric:tabular-nums}
 .summary-card .summary-runner{margin-top:6px;color:#b9cbd5;font-size:10px}
 .summary-card.loading{opacity:.72}
+.leader-evidence{margin-top:14px}
+.leader-table{display:grid;gap:8px}
+.leader-row{padding:10px;border:1px solid rgba(124,185,255,.12);border-radius:9px;background:#06111f}
+.leader-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.leader-head b{font-size:12px}
+.leader-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:7px}
+.leader-metric{padding:6px;border-radius:7px;background:rgba(255,255,255,.03)}
+.leader-metric small{display:block;color:#8fa9b9;font-size:8px;text-transform:uppercase}
+.leader-metric span{display:block;margin-top:2px;font-size:10px}
 .empty{padding:26px;text-align:center;color:#9fb7c6;font-size:12px}
 @media(max-width:1150px){
   .summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -104,6 +113,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
   .transit{grid-template-columns:1fr}
   .transit>div:last-child{grid-column:auto}
   .detail-grid{grid-template-columns:1fr}
+  .leader-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
   .cat{grid-template-columns:120px 1fr 30px}
 }
 @media(max-width:460px){
@@ -119,13 +129,14 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <body>
 <script>if(window.top===window.self&&location.pathname!=='/dashboard.html')location.replace('/dashboard.html?page='+encodeURIComponent('/patterns.html'));</script>
 <header>
-<a class="brand" href="/">☿ MERCURY TRANSIT NEWS<small>Lahiri sidereal transit + headline pattern tracker</small></a>
-<nav><a href="/">🌎 Earth Tracker</a><a href="/aviation.html">✈ Aviation Agent</a><a href="/worldfocus.html">◎ World Focus</a><a class="active" href="/patterns.html">☿ Mercury News</a></nav>
+<a class="brand" href="/">☿ PLANET TRANSIT NEWS<small>Lahiri sidereal transit + headline pattern tracker</small></a>
+<nav><a href="/">🌎 Earth Tracker</a><a href="/aviation.html">✈ Aviation Agent</a><a href="/worldfocus.html">◎ World Focus</a><a class="active" href="/patterns.html">☿ Planet News</a></nav>
 </header>
 <main>
-<section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Mercury Transit News Tracker</h1><p>Tracks Mercury through Lahiri sidereal signs and nakshatras from January 1, 2014 forward. Each continuous sign transit records Mercury's degree path, direct/retrograde motion, conjunctions, 90° squares and 150° inconjuncts to other planets. Select a past or current transit to compare categorized news headlines published during that same interval.</p></div></section>
+<section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Tracks selected planets through Lahiri sidereal signs and nakshatras from January 1, 2014 forward. Each continuous sign transit records degree path, motion, conjunctions, 90° squares and 150° inconjuncts to other planets. Select a past or current transit to compare categorized news headlines published during that same interval.</p></div></section>
 
 <section class="controls">
+<label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option></select></label>
 <label>Start date<input id="startDate" type="date" value="2014-01-01" min="2014-01-01"></label>
 <label>Future horizon<select id="endYear"><option value="2027">End of 2027</option><option value="2028" selected>End of 2028</option><option value="2030">End of 2030</option></select></label>
 <label>Filter sign<select id="signFilter"><option value="">All signs</option></select></label>
@@ -135,21 +146,21 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 
 <section class="stats">
 <div class="stat"><small>Transit periods</small><b id="statPeriods">—</b><span>continuous sign passages</span></div>
-<div class="stat"><small>Current Mercury</small><b id="statCurrent">—</b><span id="statCurrentNak">—</span></div>
+<div class="stat"><small id="currentPlanetLabel">Current Mercury</small><b id="statCurrent">—</b><span id="statCurrentNak">—</span></div>
 <div class="stat"><small>Conjunction events</small><b id="statConj">—</b><span>within 5°</span></div>
 <div class="stat"><small>Square events</small><b id="statSquare">—</b><span>within 4° of 90°</span></div>
 <div class="stat"><small>Inconjunct events</small><b id="statInconj">—</b><span>within 3° of 150°</span></div>
 </section>
 
 <section class="panel summary-panel">
-<div class="panel-head"><strong>12-ZODIAC MERCURY NEWS SUMMARY</strong><span id="summaryStatus" class="status">Collecting completed transits…</span></div>
-<div class="detail-sub">Each zodiac receives the primary news category found across all completed/current Mercury passages through that sign since the selected start date. Counts are based on categorized headlines actually retrieved for those transit windows.</div>
+<div class="panel-head"><strong>12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Collecting completed transits…</span></div>
+<div class="detail-sub">Each zodiac receives the primary news category found across all completed/current <span id="summaryPlanetDesc">Mercury</span> passages through that sign since the selected start date. Counts are based on categorized headlines actually retrieved for those transit windows.</div>
 <div id="summaryGrid" class="summary-grid"><div class="empty">Building 12-sign summary…</div></div>
 </section>
 
 <section class="layout">
 <div class="panel">
-<div class="panel-head"><strong>MERCURY SIGN TRANSIT TIMELINE</strong><span id="timelineStatus" class="status">Calculating…</span></div>
+<div class="panel-head"><strong><span id="timelinePlanetName">MERCURY</span> SIGN TRANSIT TIMELINE</strong><span id="timelineStatus" class="status">Calculating…</span></div>
 <div id="transitList" class="transit-list"><div class="empty">Building Mercury ephemeris…</div></div>
 </div>
 
@@ -167,20 +178,30 @@ const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio',
 const SG=['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓'];
 const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
 const NAK_SIZE=360/27;
-const OTHER=['Sun','Moon','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
+const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
-const state={periods:[],selected:null,news:new Map(),summaryRun:0};
+const state={periods:[],selected:null,news:new Map(),summaryRun:0,planet:'Mercury'};
 
 for(let i=0;i<12;i++){
   const o=document.createElement('option');o.value=String(i);o.textContent=SG[i]+' '+SIGNS[i];document.getElementById('signFilter').appendChild(o);
 }
 document.getElementById('rebuildBtn').onclick=build;
+document.getElementById('planetSelect').onchange=()=>{
+  state.planet=document.getElementById('planetSelect').value;
+  state.news.clear();
+  state.selected=null;
+  build();
+};
 document.getElementById('signFilter').onchange=renderTimeline;
 document.getElementById('periodFilter').onchange=renderTimeline;
 build();
 
 async function build(){
-  document.getElementById('timelineStatus').textContent='Calculating Mercury transits…';
+  document.getElementById('timelineStatus').textContent='Calculating '+state.planet+' transits…';
+  document.getElementById('currentPlanetLabel').textContent='Current '+state.planet;
+  document.getElementById('summaryPlanetName').textContent=state.planet.toUpperCase();
+  document.getElementById('summaryPlanetDesc').textContent=state.planet;
+  document.getElementById('timelinePlanetName').textContent=state.planet.toUpperCase();
   const start=new Date(document.getElementById('startDate').value+'T00:00:00Z');
   const end=new Date(Date.UTC(Number(document.getElementById('endYear').value),11,31,23,59,59));
   state.periods=buildSignPeriods(start,end);
@@ -196,10 +217,10 @@ async function build(){
 function buildSignPeriods(start,end){
   const periods=[];
   const step=6*3600000;
-  let t=new Date(start),lon=mercuryLon(t),sign=Math.floor(lon/30),periodStart=new Date(t);
+  let t=new Date(start),lon=trackedLon(t),sign=Math.floor(lon/30),periodStart=new Date(t);
   for(let ms=t.getTime()+step;ms<=end.getTime()+step;ms+=step){
     const d=new Date(Math.min(ms,end.getTime()));
-    const l=mercuryLon(d),s=Math.floor(l/30);
+    const l=trackedLon(d),s=Math.floor(l/30);
     if(s!==sign || d.getTime()===end.getTime()){
       const boundary=s!==sign?refineSignBoundary(new Date(ms-step),d,sign):d;
       periods.push(makePeriod(periodStart,boundary,sign));
@@ -214,7 +235,7 @@ function refineSignBoundary(a,b,oldSign){
   let lo=a.getTime(),hi=b.getTime();
   for(let i=0;i<28;i++){
     const mid=(lo+hi)/2;
-    if(Math.floor(mercuryLon(new Date(mid))/30)===oldSign)lo=mid;else hi=mid;
+    if(Math.floor(trackedLon(new Date(mid))/30)===oldSign)lo=mid;else hi=mid;
   }
   return new Date(hi);
 }
@@ -228,11 +249,12 @@ function makePeriod(start,end,sign){
   const motions=new Set();
   const best=new Map();
   for(const d of sample){
-    const m=mercuryLon(d);
+    const m=trackedLon(d);
     const ni=Math.min(26,Math.floor(m/NAK_SIZE));
     if(!naks.includes(ni))naks.push(ni);
-    motions.add(mercuryMotion(d));
-    for(const name of OTHER){
+    motions.add(trackedMotion(d));
+    for(const name of OTHER_ALL){
+      if(name===state.planet)continue;
       const p=planetLon(name,d);
       if(p===null)continue;
       const sep=angleDiff(m,p);
@@ -248,14 +270,14 @@ function makePeriod(start,end,sign){
     }
   }
   const aspects=[...best.values()].sort((a,b)=>a.date-b.date||a.delta-b.delta);
-  const startLon=mercuryLon(new Date(start.getTime()+60000));
-  const endLon=mercuryLon(new Date(Math.max(start.getTime(),end.getTime()-60000)));
+  const startLon=trackedLon(new Date(start.getTime()+60000));
+  const endLon=trackedLon(new Date(Math.max(start.getTime(),end.getTime()-60000)));
   return{
     id:start.toISOString()+'-'+sign,start:new Date(start),end:new Date(end),sign,
     startLon,endLon,naks,motion:[...motions],aspects
   };
 }
-function mercuryLon(d){return bodyLon('Mercury',d)}
+function trackedLon(d){return bodyLon(state.planet,d)}
 function planetLon(name,d){
   if(name==='Rahu'||name==='Ketu'){
     const n=meanNodes(d);return name==='Rahu'?n.rahu:n.ketu;
@@ -271,9 +293,10 @@ function meanNodes(d){
   const tropical=norm(125.04452-1934.136261*T+.0020708*T*T+(T*T*T)/450000);
   const rahu=norm(tropical-lahiri(d));return{rahu,ketu:norm(rahu+180)};
 }
-function mercuryMotion(d){
+function trackedMotion(d){
+  if(state.planet==='Sun')return'Direct';
   const h=12*3600000;
-  const before=mercuryLon(new Date(d.getTime()-h)),after=mercuryLon(new Date(d.getTime()+h));
+  const before=trackedLon(new Date(d.getTime()-h)),after=trackedLon(new Date(d.getTime()+h));
   const signed=((after-before+540)%360)-180;
   return signed<0?'Retrograde':'Direct';
 }
@@ -283,9 +306,9 @@ function summarize(){
   document.getElementById('statConj').textContent=all.filter(x=>x.kind==='conj').length;
   document.getElementById('statSquare').textContent=all.filter(x=>x.kind==='square').length;
   document.getElementById('statInconj').textContent=all.filter(x=>x.kind==='inconj').length;
-  const now=new Date(),lon=mercuryLon(now),si=Math.floor(lon/30),ni=Math.floor(lon/NAK_SIZE);
+  const now=new Date(),lon=trackedLon(now),si=Math.floor(lon/30),ni=Math.floor(lon/NAK_SIZE);
   document.getElementById('statCurrent').textContent=SG[si]+' '+SIGNS[si]+' '+fmtDegree(lon);
-  document.getElementById('statCurrentNak').textContent=NAK[ni]+' · '+mercuryMotion(now);
+  document.getElementById('statCurrentNak').textContent=NAK[ni]+' · '+trackedMotion(now);
 }
 function renderTimeline(){
   const signFilter=document.getElementById('signFilter').value;
@@ -325,7 +348,7 @@ async function selectPeriod(id){
     const from=isoDay(p.start);
     const endCap=new Date(Math.min(p.end.getTime(),Date.now()+86400000));
     const to=isoDay(new Date(endCap.getTime()+86400000));
-    const r=await fetch('/api/mercury-news?from='+from+'&to='+to,{cache:'no-store'});
+    const r=await fetch('/api/transit-news?planet='+encodeURIComponent(state.planet)+'&from='+from+'&to='+to,{cache:'no-store'});
     if(!r.ok)throw new Error('News HTTP '+r.status);
     const data=await r.json();state.news.set(key,data);renderNews(p,data);
   }catch(e){
@@ -337,7 +360,7 @@ function renderDetail(p){
   const future=p.start.getTime()>Date.now();
   const conj=p.aspects.filter(x=>x.kind==='conj'),sq=p.aspects.filter(x=>x.kind==='square'),inc=p.aspects.filter(x=>x.kind==='inconj');
   document.getElementById('detail').innerHTML=
-    '<div class="detail-title">'+SG[p.sign]+' Mercury in '+SIGNS[p.sign]+'</div>'+
+    '<div class="detail-title">'+SG[p.sign]+' '+state.planet+' in '+SIGNS[p.sign]+'</div>'+
     '<div class="detail-sub">'+fmtDateTime(p.start)+' → '+fmtDateTime(p.end)+' · '+p.motion.join(' / ')+'</div>'+
     '<div class="detail-grid">'+
       box('Degree path',fmtDegree(p.startLon)+' → '+fmtDegree(p.endLon))+
@@ -349,8 +372,8 @@ function renderDetail(p){
     '</div>'+
     '<div id="newsArea">'+(future?
       '<div class="note">This is a future transit. The astrology is calculated now, but news will not be invented. Headlines can be attached once this period occurs.</div>':
-      '<div class="empty">Loading categorized headlines for this Mercury transit…</div>')+'</div>'+
-    '<div class="note">Aspect events are descriptive astronomical metadata. News categories are compared with those transit conditions for pattern research; this does not establish that Mercury or any aspect causes the events.</div>';
+      '<div class="empty">Loading categorized headlines for this '+state.planet+' transit…</div>')+'</div>'+
+    '<div class="note">Aspect events are descriptive astronomical metadata. News categories are compared with those transit conditions for pattern research; this does not establish that the selected planet or any aspect causes the events.</div>';
   document.getElementById('newsStatus').textContent=future?'Future transit · astrology only':'Loading headlines…';
 }
 function renderNews(p,data){
@@ -359,12 +382,14 @@ function renderNews(p,data){
   const bars=cats.length?'<div class="category-bars">'+cats.map(c=>'<div class="cat"><span>'+esc(c.name)+'</span><div class="track"><div class="fill" style="width:'+((c.count/max)*100).toFixed(1)+'%"></div></div><b>'+c.count+'</b></div>').join('')+'</div>':'';
   const stories=(data.articles||[]).slice(0,24).map(a=>
     '<div class="story"><a href="'+escAttr(a.url)+'" target="_blank" rel="noopener">'+esc(a.title)+'</a>'+
-    '<div class="story-meta"><span>'+esc(a.newsCategory||'General')+'</span><span>'+esc(a.source||'')+'</span><span>'+esc(a.publishedAt||'')+'</span></div>'+
+    '<div class="story-meta"><span>'+esc(a.newsCategory||'Other / Unclassified')+'</span><span>'+esc(a.source||'')+'</span><span>'+esc(a.publishedAt||'')+'</span></div>'+
     (a.description?'<p>'+esc(a.description)+'</p>':'')+'</div>'
   ).join('');
+  const leaderBlock=state.planet==='Sun'?renderLeaderEvidence(data.leaderEvidence||[]):'';
   area.innerHTML=
-    '<div class="small">Headline categories during this Mercury-in-'+SIGNS[p.sign]+' interval</div>'+
+    '<div class="small">Headline categories during this '+state.planet+'-in-'+SIGNS[p.sign]+' interval</div>'+
     bars+
+    leaderBlock+
     '<div class="news-list">'+(stories||'<div class="empty">No headlines were returned for this historical window.</div>')+'</div>';
   document.getElementById('newsStatus').textContent=(data.count||0)+' categorized headlines';
   renderSignSummary();
@@ -387,7 +412,7 @@ async function buildSignSummary(){
           const from=isoDay(p.start);
           const endCap=new Date(Math.min(p.end.getTime(),Date.now()+86400000));
           const to=isoDay(new Date(endCap.getTime()+86400000));
-          const r=await fetch('/api/mercury-news?from='+from+'&to='+to);
+          const r=await fetch('/api/transit-news?planet='+encodeURIComponent(state.planet)+'&from='+from+'&to='+to);
           if(r.ok)state.news.set(p.id,await r.json());
         }catch(_){}
       }
@@ -398,7 +423,7 @@ async function buildSignSummary(){
   });
   await Promise.all(workers);
   if(run!==state.summaryRun)return;
-  if(status)status.textContent='Summary complete · '+eligible.length+' Mercury transit windows';
+  if(status)status.textContent='Summary complete · '+eligible.length+' transit windows';
   renderSignSummary();
 }
 
@@ -440,6 +465,24 @@ function renderSignSummary(){
       '<div class="summary-meta">'+headlines+' headlines · '+classifiedTotal+' classified · '+unclassified+' unclassified</div>'+
     '</div>';
   }).join('');
+}
+
+function renderLeaderEvidence(rows){
+  if(!rows.length)return '<div class="leader-evidence"><div class="note">No leader had enough title-based mentions in this transit window for the evidence panel.</div></div>';
+  return '<div class="leader-evidence"><div class="panel-head"><strong>LEADER COVERAGE EVIDENCE</strong><span class="status">Heuristic headline analysis</span></div>'+
+    '<div class="detail-sub">Leaders are displayed by news mention volume with their underlying coverage split and support, opposition and protest signals. These are descriptive headline measures, not political ratings.</div>'+
+    '<div class="leader-table">'+rows.map(x=>{
+      const total=Math.max(1,x.mentions);
+      const pos=(x.positive/total*100).toFixed(0),neg=(x.negative/total*100).toFixed(0),neu=(x.neutral/total*100).toFixed(0);
+      const issues=(x.topIssues||[]).map(i=>i.name+' ('+i.count+')').join(' · ')||'No dominant issue category';
+      return '<div class="leader-row"><div class="leader-head"><b>'+esc(x.name)+'</b><span class="small">'+x.mentions+' mentions</span></div>'+
+        '<div class="leader-metrics">'+
+          '<div class="leader-metric"><small>Positive coverage</small><span>'+pos+'%</span></div>'+
+          '<div class="leader-metric"><small>Negative coverage</small><span>'+neg+'%</span></div>'+
+          '<div class="leader-metric"><small>Neutral coverage</small><span>'+neu+'%</span></div>'+
+          '<div class="leader-metric"><small>Signals</small><span>Support '+x.supportSignals+' · Opposition '+x.oppositionSignals+' · Protest '+x.protestSignals+'</span></div>'+
+        '</div><div class="small" style="margin-top:7px">Top issues: '+esc(issues)+'</div></div>';
+    }).join('')+'</div></div>';
 }
 
 function eventText(a){return GLYPH[a.name]+' '+a.name+' '+fmtDate(a.date)+' (orb '+a.delta.toFixed(1)+'°)'}
