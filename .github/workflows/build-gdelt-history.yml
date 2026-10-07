@@ -1,4 +1,5 @@
 name: Build GDELT Historical Index
+# Seed 1980 index on workflow changes
 
 on:
   workflow_dispatch:
