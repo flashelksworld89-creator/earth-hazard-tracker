@@ -293,10 +293,19 @@ const SUBCATEGORIES={
     'Commercial Real Estate':['commercial real estate','office property','retail property']
   },
   'Agriculture / Food Supply':{
-    'Crops / Harvests':['crop','harvest','grain','wheat','corn','soybean'],
-    'Livestock':['livestock','cattle','poultry','swine'],
-    'Food Prices / Shortages':['food prices','food shortage','food supply'],
-    'Farm Policy':['farm bill','agriculture policy','farm subsidy']
+    'Crops / Harvests':['crop','harvest','grain','wheat','corn','soybean','rice','barley','crop yield'],
+    'Livestock / Animal Agriculture':['livestock','cattle','poultry','swine','pig','hog','dairy herd','beef herd'],
+    'Food Prices / Inflation':['food prices','food inflation','grocery prices','food costs','staple prices'],
+    'Food Shortages / Food Insecurity':['food shortage','food supply shortage','food insecurity','famine','hunger crisis','malnutrition crisis'],
+    'Food Safety / Contamination':['food safety','food contamination','contaminated food','food poisoning','salmonella','listeria','e coli contamination'],
+    'Food Recalls':['food recall','produce recall','meat recall','dairy recall','recall food'],
+    'Crop Disease / Plant Pathogens':['crop disease','plant disease','crop fungus','plant pathogen','wheat rust','blight','crop virus'],
+    'Agricultural Pests / Locusts':['pest outbreak','crop pest','locust','locust swarm','invasive pest','insect infestation'],
+    'Livestock Disease':['livestock disease','cattle disease','swine fever','avian flu','bird flu','foot and mouth disease','animal disease outbreak'],
+    'Agricultural Weather Impacts':['crop drought','farm drought','flooded farms','frost damage','heat damage crops','weather crop damage'],
+    'Major Commodity Shortages':['grain shortage','wheat shortage','rice shortage','corn shortage','sugar shortage','coffee shortage','cocoa shortage'],
+    'Fertilizer / Farm Inputs':['fertilizer','fertiliser','seed shortage','farm input costs','pesticide','irrigation'],
+    'Farm Policy / Subsidies':['farm bill','agriculture policy','farm subsidy','agricultural subsidy','crop insurance']
   },
   'Media / Journalism / Information':{
     'News Organizations':['newspaper','news outlet','media company'],
