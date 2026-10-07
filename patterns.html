@@ -245,7 +245,7 @@ const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarva
 const NAK_SIZE=360/27;
 const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
-const state={periods:[],selected:null,news:new Map(),summaryRun:0,trendRun:0,planet:'Mercury'};
+const state={periods:[],selected:null,news:new Map(),summaryRun:0,trendRun:0,baselineRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 
 for(let i=0;i<12;i++){
@@ -255,6 +255,7 @@ document.getElementById('rebuildBtn').onclick=build;
 document.getElementById('planetSelect').onchange=()=>{
   state.summaryRun++;
   state.trendRun++;
+  state.baselineRun++;
   state.planet=document.getElementById('planetSelect').value;
   document.getElementById('trendPlanet').value=state.planet;
   state.news.clear();
@@ -578,6 +579,30 @@ function renderTrendResults(query,planet,rows){
   el.querySelectorAll('[data-trend-id]').forEach(node=>node.onclick=()=>selectPeriod(node.dataset.trendId));
 }
 
+function periodDataMode(p){
+  return isoDay(new Date(p.end.getTime()+86400000))<='2014-01-01'?'historical-events':'modern-news';
+}
+async function loadFingerprintBaseline(selected,planet,run){
+  const mode=periodDataMode(selected);
+  const eligible=state.periods.filter(p=>
+    p.id!==selected.id &&
+    p.start.getTime()<=Date.now() &&
+    periodDataMode(p)===mode
+  );
+  eligible.sort((a,b)=>Math.abs(a.start-selected.start)-Math.abs(b.start-selected.start));
+  const targets=eligible.slice(0,8);
+  const status=document.getElementById('newsStatus');
+  let done=0;
+  for(const p of targets){
+    if(run!==state.baselineRun||planet!==state.planet)return;
+    if(!state.news.has(p.id)){
+      try{await fetchPeriodNews(p,planet,'force-cache')}catch(_){}
+    }
+    done++;
+    if(status&&run===state.baselineRun)status.textContent='Building transit fingerprint '+done+' / '+targets.length;
+    if(done%2===0)await yieldUI();
+  }
+}
 async function selectPeriod(id){
   const requestPlanet=state.planet;
   const p=state.periods.find(x=>x.id===id);if(!p)return;
@@ -589,6 +614,10 @@ async function selectPeriod(id){
   try{
     const data=await fetchPeriodNews(p,requestPlanet,'no-store');
     if(requestPlanet!==state.planet)return;
+    renderNews(p,data);
+    const baselineRun=++state.baselineRun;
+    await loadFingerprintBaseline(p,requestPlanet,baselineRun);
+    if(requestPlanet!==state.planet||baselineRun!==state.baselineRun||state.selected!==p.id)return;
     renderNews(p,data);
   }catch(e){
     document.getElementById('newsStatus').textContent='News unavailable';
@@ -816,8 +845,8 @@ function subcategoryAnomalies(p,data){
     const days=Math.max(1/24,daysBetween(other.start,other.end));
     for(const s of d.subcategories||[]){
       const key=(s.category||'')+'|||'+(s.name||'');
-      const x=baseline.get(key)||{rate:0,windows:0};
-      x.rate+=(Number(s.count)||0)/days;x.windows++;baseline.set(key,x);
+      const x=baseline.get(key)||{rate:0};
+      x.rate+=(Number(s.count)||0)/days;baseline.set(key,x);
     }
   }
   if(baselineWindows<3)return[];
@@ -825,7 +854,7 @@ function subcategoryAnomalies(p,data){
     const key=(s.category||'')+'|||'+(s.name||'');
     const b=baseline.get(key);
     const currentRate=(Number(s.count)||0)/currentDays;
-    const baseRate=b&&b.windows?b.rate/b.windows:0;
+    const baseRate=b&&baselineWindows?b.rate/baselineWindows:0;
     const ratio=baseRate>0?currentRate/baseRate:(currentRate>0?2:1);
     return{name:s.name,category:s.category,count:Number(s.count)||0,currentRate,baseRate,ratio};
   }).filter(x=>x.count>0).sort((a,b)=>b.ratio-a.ratio||b.currentRate-a.currentRate);
@@ -836,7 +865,7 @@ function renderTransitFingerprint(p,data,subLifts){
   const distinctive=top
     ? '<div class="trend-peak"><div class="small">MOST DISTINCTIVE PATTERN</div><div class="detail-title">'+esc(top.name)+'</div>'+
       '<div class="detail-sub">'+esc(top.category||'')+' · '+top.count+' matches · '+top.ratio.toFixed(2)+'× same-planet baseline</div></div>'
-    : '<div class="note">Load more comparable transit windows to calculate a detailed transit fingerprint.</div>';
+    : '<div class="note">Building a same-planet comparison baseline for this transit. The fingerprint will update automatically when enough comparable windows are available.</div>';
   const lifts=subLifts.length
     ? '<div class="headline-group"><h3>Detailed subcategory lift</h3><div class="subcategory-list">'+subLifts.map(x=>
       '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.ratio.toFixed(2)+'×</span></div>').join('')+'</div></div>'
@@ -859,15 +888,15 @@ function categoryAnomalies(p,data){
     baselineWindows++;
     const days=Math.max(1/24,daysBetween(other.start,other.end));
     for(const c of d.categories||[]){
-      const x=baseline.get(c.name)||{rate:0,windows:0};
-      x.rate+=(Number(c.count)||0)/days;x.windows++;baseline.set(c.name,x);
+      const x=baseline.get(c.name)||{rate:0};
+      x.rate+=(Number(c.count)||0)/days;baseline.set(c.name,x);
     }
   }
   if(baselineWindows<3)return[];
   return (data.categories||[]).filter(c=>c.name!=='Other / Unclassified').map(c=>{
     const b=baseline.get(c.name);
     const currentRate=(Number(c.count)||0)/currentDays;
-    const baseRate=b&&b.windows?b.rate/b.windows:0;
+    const baseRate=b&&baselineWindows?b.rate/baselineWindows:0;
     return{name:c.name,currentRate,baseRate,ratio:baseRate>0?currentRate/baseRate:(currentRate>0?2:1)};
   }).sort((a,b)=>Math.abs(b.ratio-1)-Math.abs(a.ratio-1));
 }
