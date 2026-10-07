@@ -48,6 +48,7 @@ def process_member(fp, days):
         if len(row)<35: continue
         day=row[1].strip()
         if len(day)!=8 or not day.isdigit(): continue
+        event_code=row[26].strip()
         root=row[28].strip().zfill(2)
         if root not in ROOT_LABELS: continue
         quad=integer(row[29])
@@ -71,9 +72,15 @@ def process_member(fp, days):
         d["tone_sum"]+=tone
         d["roots"][root]+=1
         d["root_mentions"][root]+=mentions
+        if event_code:
+            d["event_codes"][event_code]+=1
+            d["event_code_mentions"][event_code]+=mentions
         d["quads"][str(quad)]+=1
         if actor1:d["actors"][actor1]+=1
         if actor2:d["actors"][actor2]+=1
+        if actor1 and actor2:
+            pair=actor1+" -> "+event_code+" -> "+actor2 if event_code else actor1+" -> "+actor2
+            d["actor_pairs"][pair]+=1
         if loc:d["locations"][loc]+=1
         elif country:d["locations"][country]+=1
 
@@ -86,8 +93,11 @@ def finalize(days):
             "avgGoldstein":round(d["goldstein_sum"]/n,3),"avgTone":round(d["tone_sum"]/n,3),
             "roots":[{"code":k,"name":ROOT_LABELS[k],"count":v,"mentions":d["root_mentions"][k]}
                      for k,v in d["roots"].most_common()],
+            "eventCodes":[{"code":k,"count":v,"mentions":d["event_code_mentions"][k]}
+                          for k,v in d["event_codes"].most_common(40)],
             "quads":dict(d["quads"]),
             "topActors":[{"name":k,"count":v} for k,v in d["actors"].most_common(12)],
+            "topActorPairs":[{"name":k,"count":v} for k,v in d["actor_pairs"].most_common(20)],
             "topLocations":[{"name":k,"count":v} for k,v in d["locations"].most_common(12)]
         }
     return out
@@ -100,7 +110,8 @@ def main():
     os.makedirs(args.outdir,exist_ok=True)
     days=defaultdict(lambda:{
         "events":0,"mentions":0,"sources":0,"articles":0,"goldstein_sum":0.0,"tone_sum":0.0,
-        "roots":Counter(),"root_mentions":Counter(),"quads":Counter(),"actors":Counter(),"locations":Counter()
+        "roots":Counter(),"root_mentions":Counter(),"event_codes":Counter(),"event_code_mentions":Counter(),
+        "quads":Counter(),"actors":Counter(),"actor_pairs":Counter(),"locations":Counter()
     })
     ok=0
     for name in sources_for_year(args.year):
@@ -122,7 +133,7 @@ def main():
     payload={
       "year":args.year,
       "source":"GDELT 1.0 Event Database",
-      "eventTaxonomy":"CAMEO root event codes",
+      "eventTaxonomy":"CAMEO full event codes + root codes",
       "filesProcessed":ok,
       "days":finalize(days)
     }
