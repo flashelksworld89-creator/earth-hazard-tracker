@@ -54,16 +54,38 @@ const CATEGORIES={
   'Consumer Products / Recalls':['recall','product recall','consumer product','safety warning','defect','product safety']
 };
 
+const POSITIVE=['support','supported','approval','approved','praise','praised','success','successful','victory','win','wins','agreement','deal','peace','endorsement','endorsed'];
+const NEGATIVE=['opposition','oppose','opposed','condemn','condemned','criticism','criticized','protest','scandal','investigation','indicted','indictment','resign','resignation','crisis','failure','failed','attack','conflict','controversy'];
+const SUPPORT=['support','endorsed','endorsement','rally','backed','praise','praised','approval'];
+const OPPOSITION=['opposition','oppose','opposed','condemn','condemned','criticism','criticized','calls to resign','resign','protest'];
+const PROTEST=['protest','protests','demonstration','demonstrations','march','rally','civil unrest'];
+const LEADER_PATTERNS=[
+  /\bPresident\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){0,2})/g,
+  /\bPrime Minister\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){0,2})/g,
+  /\bPremier\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){0,2})/g,
+  /\bChancellor\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){0,2})/g,
+  /\bKing\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){0,2})/g,
+  /\bQueen\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){0,2})/g,
+  /\bGovernor\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){0,2})/g
+];
+
 export default async function handler(req,res){
   res.setHeader('Cache-Control','s-maxage=900, stale-while-revalidate=3600');
   res.setHeader('Access-Control-Allow-Origin','*');
   try{
     const from=cleanDate(req.query?.from),to=cleanDate(req.query?.to);
+    const planet=cleanPlanet(req.query?.planet);
     if(!from||!to) return res.status(400).json({error:'from and to dates are required'});
     const now=new Date();
-    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,future:true,count:0,articles:[],categories:[]});
+    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],leaderEvidence:[]});
 
-    const feeds=FEEDS.map(f=>({
+    const feeds=(planet==='Sun'
+      ? FEEDS.concat([
+          {name:'Leadership',q:'president OR "prime minister" OR monarch OR chancellor OR governor OR "head of state"'},
+          {name:'Executive Power',q:'"executive order" OR cabinet OR presidency OR leadership OR resignation OR summit'}
+        ])
+      : FEEDS
+    ).map(f=>({
       ...f,
       url:'https://news.google.com/rss/search?q='+encodeURIComponent(f.q+' after:'+from+' before:'+to)+'&hl=en-US&gl=US&ceid=US:en'
     }));
@@ -78,9 +100,10 @@ export default async function handler(req,res){
     const counts=new Map();
     for(const a of articles) counts.set(a.newsCategory,(counts.get(a.newsCategory)||0)+1);
     const categories=[...counts.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
-    return res.status(200).json({from,to,future:false,count:articles.length,categories,articles});
+    const leaderEvidence=planet==='Sun'?buildLeaderEvidence(articles):[];
+    return res.status(200).json({from,to,planet,future:false,count:articles.length,categories,articles,leaderEvidence});
   }catch(e){
-    return res.status(500).json({error:'Mercury news aggregation failed',detail:e?.message||String(e)});
+    return res.status(500).json({error:'Transit news aggregation failed',detail:e?.message||String(e)});
   }
 }
 
@@ -116,3 +139,56 @@ function safe(v){try{const u=new URL(v);return /^https?:$/.test(u.protocol)?u.hr
 function cleanDate(v){const s=String(v||'');return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:''}
 function dedupe(items){const seen=new Set();return items.filter(x=>{const k=(x.title||'').toLowerCase().replace(/\W+/g,' ').trim();if(seen.has(k))return false;seen.add(k);return true})}
 function hash(t){let h=2166136261;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
+
+function buildLeaderEvidence(articles){
+  const byLeader=new Map();
+  for(const article of articles){
+    const text=(article.title+' '+article.description).trim();
+    const names=extractLeaders(text);
+    if(!names.length) continue;
+    const sentiment=sentimentClass(text);
+    const low=' '+text.toLowerCase()+' ';
+    for(const name of names){
+      if(!byLeader.has(name)) byLeader.set(name,{name,mentions:0,positive:0,negative:0,neutral:0,supportSignals:0,oppositionSignals:0,protestSignals:0,categories:new Map()});
+      const x=byLeader.get(name);
+      x.mentions++;
+      x[sentiment]++;
+      if(hasAny(low,SUPPORT))x.supportSignals++;
+      if(hasAny(low,OPPOSITION))x.oppositionSignals++;
+      if(hasAny(low,PROTEST))x.protestSignals++;
+      x.categories.set(article.newsCategory,(x.categories.get(article.newsCategory)||0)+1);
+    }
+  }
+  return [...byLeader.values()]
+    .filter(x=>x.mentions>=2)
+    .sort((a,b)=>b.mentions-a.mentions||a.name.localeCompare(b.name))
+    .slice(0,30)
+    .map(x=>({
+      name:x.name,mentions:x.mentions,positive:x.positive,negative:x.negative,neutral:x.neutral,
+      supportSignals:x.supportSignals,oppositionSignals:x.oppositionSignals,protestSignals:x.protestSignals,
+      topIssues:[...x.categories.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([name,count])=>({name,count}))
+    }));
+}
+function extractLeaders(text){
+  const out=new Set();
+  for(const re of LEADER_PATTERNS){
+    re.lastIndex=0;
+    let m;
+    while((m=re.exec(text))){
+      const name=String(m[1]||'').replace(/\s+/g,' ').trim().replace(/[,:;.!?]+$/,'');
+      if(name.length>=3)out.add(name);
+    }
+  }
+  return [...out];
+}
+function sentimentClass(text){
+  const t=' '+String(text||'').toLowerCase()+' ';
+  let pos=0,neg=0;
+  for(const k of POSITIVE)if(t.includes(k))pos++;
+  for(const k of NEGATIVE)if(t.includes(k))neg++;
+  if(pos>neg)return'positive';
+  if(neg>pos)return'negative';
+  return'neutral';
+}
+function hasAny(text,terms){return terms.some(k=>text.includes(k))}
+function cleanPlanet(v){return String(v||'Mercury').toLowerCase()==='sun'?'Sun':'Mercury'}
