@@ -84,6 +84,9 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .summary-rank .pct{color:#8fdcff;font-variant-numeric:tabular-nums}
 .summary-card .summary-runner{margin-top:6px;color:#b9cbd5;font-size:10px}
 .summary-card.loading{opacity:.72}
+.subcategory-list{display:grid;gap:6px;margin-top:10px}
+.subcategory-row{display:grid;grid-template-columns:minmax(160px,1fr) 44px;gap:8px;align-items:center;padding:7px 8px;border-radius:7px;background:rgba(255,255,255,.025);font-size:10px}
+.subcategory-row b{font-size:10px;color:#eaf7ff}
 .headline-groups{display:grid;gap:10px;margin-top:14px}
 .headline-group{padding:10px;border:1px solid rgba(124,185,255,.12);border-radius:10px;background:#06111f}
 .headline-group h3{margin:0 0 7px;font-size:12px;color:#eefaff}
@@ -435,12 +438,13 @@ function renderNews(p,data){
   const bars=cats.length?'<div class="category-bars">'+cats.map(c=>'<div class="cat"><span>'+esc(c.name)+'</span><div class="track"><div class="fill" style="width:'+((c.count/max)*100).toFixed(1)+'%"></div></div><b>'+c.count+'</b></div>').join('')+'</div>':'';
   const stories=(data.articles||[]).slice(0,24).map(a=>
     '<div class="story"><a href="'+escAttr(a.url)+'" target="_blank" rel="noopener">'+esc(a.title)+'</a>'+
-    '<div class="story-meta"><span>'+esc(a.newsCategory||'Other / Unclassified')+'</span><span>'+esc(a.archiveSource||'News')+'</span><span>'+esc(a.source||'')+'</span><span>'+esc(a.publishedAt||'')+'</span></div>'+
+    '<div class="story-meta"><span>'+esc(a.newsCategory||'Other / Unclassified')+'</span>'+(a.newsSubcategory?'<span>'+esc(a.newsSubcategory)+'</span>':'')+'<span>'+esc(a.archiveSource||'News')+'</span><span>'+esc(a.source||'')+'</span><span>'+esc(a.publishedAt||'')+'</span></div>'+
     (a.description?'<p>'+esc(a.description)+'</p>':'')+'</div>'
   ).join('');
   const leaderBlock=state.planet==='Sun'?renderLeaderEvidence(data.leaderEvidence||[]):'';
   const subjectBlock=renderOrganicSubjects(data);
   const sourceBlock=renderSourceCoverage(data);
+  const subcategoryBlock=renderSubcategoryBreakdown(data);
   const topCategoryBlock=renderTopCategoryHeadlines(data);
   const nakHeadlineBlock=renderNakshatraHeadlines(p,data);
   area.innerHTML=
@@ -448,6 +452,7 @@ function renderNews(p,data){
     sourceBlock+
     subjectBlock+
     bars+
+    subcategoryBlock+
     topCategoryBlock+
     nakHeadlineBlock+
     leaderBlock+
@@ -549,6 +554,22 @@ function renderOrganicSubjects(data){
 }
 function titleCase(s){return String(s||'').replace(/\b\w/g,m=>m.toUpperCase())}
 
+function renderSubcategoryBreakdown(data){
+  const rows=(data.subcategories||[]).slice(0,24);
+  if(!rows.length)return'';
+  const byCategory=new Map();
+  for(const x of rows){
+    if(!byCategory.has(x.category))byCategory.set(x.category,[]);
+    byCategory.get(x.category).push(x);
+  }
+  return '<div class="headline-groups"><div class="panel-head"><strong>DETAILED SUBJECT BREAKDOWN</strong><span class="status">Second-level classification</span></div>'+
+    [...byCategory.entries()].map(([category,items])=>
+      '<div class="headline-group"><h3>'+esc(category)+'</h3><div class="subcategory-list">'+
+      items.slice(0,6).map(x=>'<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+
+      '</div></div>'
+    ).join('')+'</div>';
+}
+
 function renderTopCategoryHeadlines(data){
   const categories=(data.categories||[]).filter(c=>c.name!=='Other / Unclassified').slice(0,3);
   if(!categories.length)return'';
@@ -579,7 +600,7 @@ function renderNakshatraHeadlines(p,data){
 }
 function renderHeadlineLink(a){
   return '<div class="headline-link"><a href="'+escAttr(a.url)+'" target="_blank" rel="noopener">'+esc(a.title)+'</a>'+
-    '<span>'+esc(a.newsCategory||'Other / Unclassified')+' · '+esc(a.archiveSource||'News')+' · '+esc(a.source||'')+' · '+esc(a.publishedAt||'')+'</span></div>';
+    '<span>'+esc(a.newsCategory||'Other / Unclassified')+(a.newsSubcategory?' → '+esc(a.newsSubcategory):'')+' · '+esc(a.archiveSource||'News')+' · '+esc(a.source||'')+' · '+esc(a.publishedAt||'')+'</span></div>';
 }
 
 function renderMarsEvidence(rows){
