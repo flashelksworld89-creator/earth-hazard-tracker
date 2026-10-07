@@ -109,45 +109,40 @@ export default async function handler(req,res){
     const planet=cleanPlanet(req.query?.planet);
     if(!from||!to) return res.status(400).json({error:'from and to dates are required'});
     const now=new Date();
-    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],leaderEvidence:[],venusEvidence:[],marsEvidence:[]});
+    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
 
-    const feeds=(planet==='Sun'
-      ? FEEDS.concat([
-          {name:'Leadership',q:'president OR "prime minister" OR monarch OR chancellor OR governor OR "head of state"'},
-          {name:'Executive Power',q:'"executive order" OR cabinet OR presidency OR leadership OR resignation OR summit'}
-        ])
-      : planet==='Venus'
-        ? FEEDS.concat([
-            {name:'Relationships',q:'marriage OR divorce OR relationship OR wedding OR celebrity couple'},
-            {name:'Culture Luxury',q:'fashion OR beauty OR luxury OR music OR film OR art OR celebrity'},
-            {name:'Diplomacy Deals',q:'peace agreement OR reconciliation OR partnership OR merger OR luxury deal'}
-          ])
-        : planet==='Mars'
-          ? FEEDS.concat([
-              {name:'Conflict Action',q:'war OR military OR attack OR missile OR troops OR airstrike'},
-              {name:'Public Safety',q:'shooting OR police OR explosion OR fire OR crash OR accident'},
-              {name:'Competition',q:'sports OR championship OR boxing OR fight OR race'}
-            ])
-          : FEEDS
-    ).map(f=>({
+    const feeds=FEEDS.map(f=>({
       ...f,
       url:'https://news.google.com/rss/search?q='+encodeURIComponent(f.q+' after:'+from+' before:'+to)+'&hl=en-US&gl=US&ceid=US:en'
     }));
     const settled=await Promise.allSettled(feeds.map(fetchFeed));
     const items=[];
     for(const r of settled) if(r.status==='fulfilled') items.push(...r.value);
+
+    const gdeltCoverage=isWithinGdeltDocWindow(from,to);
+    if(gdeltCoverage.available){
+      const gdeltSettled=await Promise.allSettled(FEEDS.slice(0,6).map(f=>fetchGdeltFeed(f,from,to)));
+      for(const r of gdeltSettled) if(r.status==='fulfilled') items.push(...r.value);
+    }
     const articles=dedupe(items)
       .filter(a=>a.publishedAt>=from && a.publishedAt<to)
       .sort((a,b)=>new Date(b.publishedAt)-new Date(a.publishedAt))
-      .slice(0,80)
+      .slice(0,160)
       .map(a=>({...a,newsCategory:classify(a.title+' '+a.description)}));
     const counts=new Map();
     for(const a of articles) counts.set(a.newsCategory,(counts.get(a.newsCategory)||0)+1);
     const categories=[...counts.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
     const leaderEvidence=planet==='Sun'?buildLeaderEvidence(articles):[];
-    const venusEvidence=planet==='Venus'?buildVenusEvidence(articles):[];
-    const marsEvidence=planet==='Mars'?buildMarsEvidence(articles):[];
-    return res.status(200).json({from,to,planet,future:false,count:articles.length,categories,articles,leaderEvidence,venusEvidence,marsEvidence});
+    const subjects=buildOrganicSubjects(articles);
+    const sourceCounts=countSources(articles);
+    return res.status(200).json({
+      from,to,planet,future:false,count:articles.length,categories,subjects,articles,leaderEvidence,
+      sourceCounts,
+      sourceCoverage:{
+        googleNews:{available:true,label:'Google News RSS'},
+        gdelt:{available:gdeltCoverage.available,label:'GDELT DOC 2.0',reason:gdeltCoverage.reason||''}
+      }
+    });
   }catch(e){
     return res.status(500).json({error:'Transit news aggregation failed',detail:e?.message||String(e)});
   }
@@ -165,9 +160,82 @@ async function fetchFeed(feed){
     const description=summary(clean(readTag(b,'description')));
     const source=clean(readTag(b,'source'))||feed.name;
     const d=new Date(pub);
-    return {id:feed.name+'-'+i+'-'+hash(title+link),title,description,source,url:safe(link),publishedAt:Number.isFinite(d.getTime())?d.toISOString().slice(0,10):'',publishedAtFull:Number.isFinite(d.getTime())?d.toISOString():''};
+    return {id:feed.name+'-'+i+'-'+hash(title+link),title,description,source,url:safe(link),archiveSource:'Google News',publishedAt:Number.isFinite(d.getTime())?d.toISOString().slice(0,10):'',publishedAtFull:Number.isFinite(d.getTime())?d.toISOString():''};
   }).filter(x=>x.title&&x.url&&x.publishedAt);
 }
+async function fetchGdeltFeed(feed,from,to){
+  const start=from.replace(/-/g,'')+'000000';
+  const end=to.replace(/-/g,'')+'235959';
+  const url='https://api.gdeltproject.org/api/v2/doc/doc?query='+encodeURIComponent('('+feed.q+')')+
+    '&mode=ArtList&format=json&maxrecords=75&sort=DateDesc&startdatetime='+start+'&enddatetime='+end;
+  const r=await fetch(url,{headers:{'Accept':'application/json','User-Agent':'PlanetTransitNewsTracker/1.0'}});
+  if(!r.ok)throw new Error('GDELT '+feed.name+' HTTP '+r.status);
+  const json=await r.json();
+  const rows=Array.isArray(json?.articles)?json.articles:[];
+  return rows.map((x,i)=>{
+    const d=parseGdeltDate(x.seendate||x.date||'');
+    return{
+      id:'gdelt-'+feed.name+'-'+i+'-'+hash(String(x.title||'')+String(x.url||'')),
+      title:clean(x.title||''),
+      description:'',
+      source:clean(x.domain||x.sourcecountry||'GDELT'),
+      url:safe(x.url||''),
+      archiveSource:'GDELT',
+      publishedAt:Number.isFinite(d.getTime())?d.toISOString().slice(0,10):'',
+      publishedAtFull:Number.isFinite(d.getTime())?d.toISOString():''
+    };
+  }).filter(x=>x.title&&x.url&&x.publishedAt);
+}
+function parseGdeltDate(v){
+  const s=String(v||'');
+  const m=s.match(/^(\d{4})(\d{2})(\d{2})(?:T)?(\d{2})(\d{2})(\d{2})/);
+  if(m)return new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]));
+  return new Date(s);
+}
+function isWithinGdeltDocWindow(from,to){
+  const now=Date.now();
+  const start=new Date(from+'T00:00:00Z').getTime();
+  const end=new Date(to+'T23:59:59Z').getTime();
+  const cutoff=now-366*86400000;
+  if(end<cutoff)return{available:false,reason:'GDELT DOC 2.0 searchable window does not extend this far back'};
+  if(start>now)return{available:false,reason:'Future window'};
+  return{available:true,reason:''};
+}
+const SUBJECT_STOP=new Set(('the a an and or but if then than to of in on for from with without at by as is are was were be been being this that these those it its their his her they them he she you we our your about after before during over under into out up down new latest says said say report reports reported amid as us u.s. will would could should may might can just more most less least first last today yesterday tomorrow year years day days week weeks month months').split(/\s+/));
+function buildOrganicSubjects(articles){
+  const unigram=new Map(),bigram=new Map();
+  for(const a of articles){
+    const tokens=String(a.title||'').toLowerCase()
+      .replace(/https?:\/\/\S+/g,' ')
+      .replace(/[^a-z0-9' -]+/g,' ')
+      .split(/\s+/)
+      .map(x=>x.replace(/^'+|'+$/g,''))
+      .filter(x=>x.length>=3&&!SUBJECT_STOP.has(x)&&!/^[0-9]+$/.test(x));
+    const unique=new Set(tokens);
+    for(const t of unique)unigram.set(t,(unigram.get(t)||0)+1);
+    const seenBi=new Set();
+    for(let i=0;i<tokens.length-1;i++){
+      const phrase=tokens[i]+' '+tokens[i+1];
+      if(!seenBi.has(phrase)){bigram.set(phrase,(bigram.get(phrase)||0)+1);seenBi.add(phrase)}
+    }
+  }
+  const phrases=[...bigram.entries()].filter(([,c])=>c>=2).map(([name,count])=>({name,count,type:'phrase'}));
+  const words=[...unigram.entries()].filter(([,c])=>c>=2).map(([name,count])=>({name,count,type:'word'}));
+  const merged=[...phrases,...words].sort((a,b)=>b.count-a.count||b.name.length-a.name.length);
+  const selected=[];
+  for(const x of merged){
+    if(selected.some(y=>y.name.includes(x.name)||x.name.includes(y.name)))continue;
+    selected.push(x);
+    if(selected.length>=15)break;
+  }
+  return selected;
+}
+function countSources(articles){
+  const m={};
+  for(const a of articles){const k=a.archiveSource||'Unknown';m[k]=(m[k]||0)+1}
+  return m;
+}
+
 function classify(text){
   const t=' '+String(text||'').toLowerCase()+' ';
   let best='Other / Unclassified',score=0;
