@@ -212,6 +212,7 @@ for(let i=0;i<12;i++){
 }
 document.getElementById('rebuildBtn').onclick=build;
 document.getElementById('planetSelect').onchange=()=>{
+  state.summaryRun++;
   state.planet=document.getElementById('planetSelect').value;
   state.news.clear();
   state.selected=null;
@@ -394,6 +395,7 @@ function aspectTag(a){
   return '<span class="tag '+a.kind+'">'+label+' '+GLYPH[a.name]+' '+a.name+'</span>';
 }
 async function selectPeriod(id){
+  const requestPlanet=state.planet;
   const p=state.periods.find(x=>x.id===id);if(!p)return;
   state.selected=id;renderTimeline();renderDetail(p);
   if(p.start.getTime()>Date.now())return;
@@ -406,7 +408,9 @@ async function selectPeriod(id){
     const to=isoDay(new Date(endCap.getTime()+86400000));
     const r=await fetch('/api/mercury-news?planet='+encodeURIComponent(state.planet)+'&from='+from+'&to='+to,{cache:'no-store'});
     if(!r.ok)throw new Error('News HTTP '+r.status);
-    const data=await r.json();state.news.set(key,data);renderNews(p,data);
+    const data=await r.json();
+    if(requestPlanet!==state.planet)return;
+    state.news.set(key,data);renderNews(p,data);
   }catch(e){
     document.getElementById('newsStatus').textContent='News unavailable';
     const n=document.getElementById('newsArea');if(n)n.innerHTML='<div class="empty">Could not load headlines for this transit period.</div>';
@@ -464,6 +468,7 @@ function renderNews(p,data){
 async function buildSignSummary(userInitiated=false){
   if(!userInitiated)return;
   const run=++state.summaryRun;
+  const summaryPlanet=state.planet;
   const eligible=state.periods.filter(p=>p.start.getTime()<=Date.now());
   const status=document.getElementById('summaryStatus');
   if(status){status.dataset.loading='1';status.textContent='0 / '+eligible.length+' transit windows loaded';}
@@ -481,8 +486,8 @@ async function buildSignSummary(userInitiated=false){
           const from=isoDay(p.start);
           const endCap=new Date(Math.min(p.end.getTime(),Date.now()+86400000));
           const to=isoDay(new Date(endCap.getTime()+86400000));
-          const r=await fetch('/api/mercury-news?planet='+encodeURIComponent(state.planet)+'&from='+from+'&to='+to,{cache:'force-cache'});
-          if(r.ok)state.news.set(p.id,await r.json());
+          const r=await fetch('/api/mercury-news?planet='+encodeURIComponent(summaryPlanet)+'&from='+from+'&to='+to,{cache:'force-cache'});
+          if(r.ok&&run===state.summaryRun&&summaryPlanet===state.planet)state.news.set(p.id,await r.json());
         }catch(_){}
       }
       completed++;
@@ -601,22 +606,6 @@ function renderNakshatraHeadlines(p,data){
 function renderHeadlineLink(a){
   return '<div class="headline-link"><a href="'+escAttr(a.url)+'" target="_blank" rel="noopener">'+esc(a.title)+'</a>'+
     '<span>'+esc(a.newsCategory||'Other / Unclassified')+(a.newsSubcategory?' → '+esc(a.newsSubcategory):'')+' · '+esc(a.archiveSource||'News')+' · '+esc(a.source||'')+' · '+esc(a.publishedAt||'')+'</span></div>';
-}
-
-function renderMarsEvidence(rows){
-  if(!rows.length)return '<div class="mars-evidence"><div class="note">No Mars-specific themes were strong enough in this transit window.</div></div>';
-  const total=rows.reduce((s,x)=>s+x.count,0)||1;
-  return '<div class="mars-evidence"><div class="panel-head"><strong>MARS-SPECIFIC THEMES</strong><span class="status">Conflict, force & action layer</span></div>'+
-    '<div class="detail-sub">Legacy Mars theme view.</div>'+
-    '<div class="venus-grid">'+rows.slice(0,8).map(x=>'<div class="venus-card"><small>'+esc(x.name)+'</small><b>'+x.count+' stories · '+(x.count/total*100).toFixed(1)+'%</b></div>').join('')+'</div></div>';
-}
-
-function renderVenusEvidence(rows){
-  if(!rows.length)return '<div class="venus-evidence"><div class="note">No Venus-specific themes were strong enough in this transit window.</div></div>';
-  const total=rows.reduce((s,x)=>s+x.count,0)||1;
-  return '<div class="venus-evidence"><div class="panel-head"><strong>VENUS-SPECIFIC THEMES</strong><span class="status">Relationship, value & culture layer</span></div>'+
-    '<div class="detail-sub">Legacy Venus theme view.</div>'+
-    '<div class="venus-grid">'+rows.slice(0,8).map(x=>'<div class="venus-card"><small>'+esc(x.name)+'</small><b>'+x.count+' stories · '+(x.count/total*100).toFixed(1)+'%</b></div>').join('')+'</div></div>';
 }
 
 function renderLeaderEvidence(rows){
