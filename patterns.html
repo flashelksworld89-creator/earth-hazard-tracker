@@ -84,6 +84,19 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .summary-rank .pct{color:#8fdcff;font-variant-numeric:tabular-nums}
 .summary-card .summary-runner{margin-top:6px;color:#b9cbd5;font-size:10px}
 .summary-card.loading{opacity:.72}
+.headline-groups{display:grid;gap:10px;margin-top:14px}
+.headline-group{padding:10px;border:1px solid rgba(124,185,255,.12);border-radius:10px;background:#06111f}
+.headline-group h3{margin:0 0 7px;font-size:12px;color:#eefaff}
+.headline-group .group-meta{font-size:9px;color:#91a8bf;margin-bottom:7px}
+.headline-links{display:grid;gap:6px}
+.headline-link{padding:7px 8px;border-radius:7px;background:rgba(255,255,255,.025)}
+.headline-link a{color:#eefaff;text-decoration:none;font-size:11px;font-weight:700;line-height:1.4}
+.headline-link a:hover{color:#7dd3fc;text-decoration:underline}
+.headline-link span{display:block;margin-top:3px;color:#91a8bf;font-size:9px}
+.nak-window{padding:10px;border:1px solid rgba(124,185,255,.12);border-radius:10px;background:#06111f}
+.nak-window-head{display:flex;justify-content:space-between;gap:8px;align-items:start;margin-bottom:7px}
+.nak-window-head b{font-size:12px}
+.nak-window-head span{font-size:9px;color:#91a8bf}
 .venus-evidence{margin-top:14px}
 .venus-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .venus-card{padding:9px;border:1px solid rgba(124,185,255,.12);border-radius:9px;background:#06111f}
@@ -260,6 +273,15 @@ function refineSignBoundary(a,b,oldSign){
   }
   return new Date(hi);
 }
+function refineNakBoundary(a,b,oldNak){
+  let lo=a.getTime(),hi=b.getTime();
+  for(let i=0;i<24;i++){
+    const mid=(lo+hi)/2;
+    const ni=Math.floor(trackedLon(new Date(mid))/NAK_SIZE);
+    if(ni===oldNak)lo=mid;else hi=mid;
+  }
+  return new Date(hi);
+}
 function makePeriod(start,end,sign){
   const sample=[];
   const step=state.planet==='Sun'?12*3600000:6*3600000;
@@ -267,12 +289,20 @@ function makePeriod(start,end,sign){
   if(!sample.length||sample[sample.length-1].getTime()!==end.getTime())sample.push(new Date(end));
 
   const naks=[];
+  const nakWindows=[];
+  let currentNak=null,nakStart=new Date(start);
   const motions=new Set();
   const best=new Map();
   for(const d of sample){
     const m=trackedLon(d);
     const ni=Math.min(26,Math.floor(m/NAK_SIZE));
     if(!naks.includes(ni))naks.push(ni);
+    if(currentNak===null){currentNak=ni;nakStart=new Date(d);}
+    else if(ni!==currentNak){
+      const boundary=refineNakBoundary(new Date(Math.max(start.getTime(),d.getTime()-step)),d,currentNak);
+      nakWindows.push({nak:currentNak,start:new Date(nakStart),end:new Date(boundary)});
+      currentNak=ni;nakStart=new Date(boundary);
+    }
     motions.add(trackedMotion(d));
     for(const name of OTHER_ALL){
       if(name===state.planet)continue;
@@ -290,12 +320,13 @@ function makePeriod(start,end,sign){
       }
     }
   }
+  if(currentNak!==null)nakWindows.push({nak:currentNak,start:new Date(nakStart),end:new Date(end)});
   const aspects=[...best.values()].sort((a,b)=>a.date-b.date||a.delta-b.delta);
   const startLon=trackedLon(new Date(start.getTime()+60000));
   const endLon=trackedLon(new Date(Math.max(start.getTime(),end.getTime()-60000)));
   return{
     id:start.toISOString()+'-'+sign,start:new Date(start),end:new Date(end),sign,
-    startLon,endLon,naks,motion:[...motions],aspects
+    startLon,endLon,naks,nakWindows,motion:[...motions],aspects
   };
 }
 function trackedLon(d){return bodyLon(state.planet,d)}
@@ -408,11 +439,16 @@ function renderNews(p,data){
   ).join('');
   const leaderBlock=state.planet==='Sun'?renderLeaderEvidence(data.leaderEvidence||[]):'';
   const venusBlock=state.planet==='Venus'?renderVenusEvidence(data.venusEvidence||[]):'';
+  const topCategoryBlock=renderTopCategoryHeadlines(data);
+  const nakHeadlineBlock=renderNakshatraHeadlines(p,data);
   area.innerHTML=
     '<div class="small">Headline categories during this '+state.planet+'-in-'+SIGNS[p.sign]+' interval</div>'+
     bars+
+    topCategoryBlock+
+    nakHeadlineBlock+
     leaderBlock+
     venusBlock+
+    '<div class="panel-head" style="margin-top:14px"><strong>ALL RETRIEVED HEADLINES</strong></div>'+
     '<div class="news-list">'+(stories||'<div class="empty">No headlines were returned for this historical window.</div>')+'</div>';
   document.getElementById('newsStatus').textContent=(data.count||0)+' categorized headlines';
   if(document.getElementById('summaryStatus')?.dataset.loading==='1')renderSignSummary();
@@ -491,6 +527,39 @@ function renderSignSummary(){
       '<div class="summary-meta">'+headlines+' headlines · '+classifiedTotal+' classified · '+unclassified+' unclassified</div>'+
     '</div>';
   }).join('');
+}
+
+function renderTopCategoryHeadlines(data){
+  const categories=(data.categories||[]).filter(c=>c.name!=='Other / Unclassified').slice(0,3);
+  if(!categories.length)return'';
+  const articles=data.articles||[];
+  return '<div class="headline-groups"><div class="panel-head"><strong>TOP STORIES BY TOP 3 CATEGORY</strong><span class="status">Top returned headlines</span></div>'+
+    categories.map((c,i)=>{
+      const matches=articles.filter(a=>a.newsCategory===c.name).slice(0,4);
+      return '<div class="headline-group"><h3>#'+(i+1)+' '+esc(c.name)+' · '+c.count+' stories</h3>'+
+        '<div class="headline-links">'+(matches.length?matches.map(renderHeadlineLink).join(''):'<div class="small">No headline examples available.</div>')+'</div></div>';
+    }).join('')+'</div>';
+}
+
+function renderNakshatraHeadlines(p,data){
+  const windows=p.nakWindows||[];
+  if(!windows.length)return'';
+  const articles=data.articles||[];
+  return '<div class="headline-groups"><div class="panel-head"><strong>HEADLINES BY NAKSHATRA PASSAGE</strong><span class="status">'+windows.length+' segments</span></div>'+
+    windows.map((w,index)=>{
+      const start=w.start.getTime(),end=w.end.getTime();
+      const matches=articles.filter(a=>{
+        const d=new Date(a.publishedAtFull||((a.publishedAt||'')+'T12:00:00Z')).getTime();
+        return Number.isFinite(d)&&d>=start&&d<end;
+      }).slice(0,5);
+      return '<div class="nak-window"><div class="nak-window-head"><b>'+esc(NAK[w.nak])+(windows.filter(x=>x.nak===w.nak).length>1?' · passage '+(windows.slice(0,index+1).filter(x=>x.nak===w.nak).length):'')+'</b>'+
+        '<span>'+fmtDateTime(w.start)+' → '+fmtDateTime(w.end)+'</span></div>'+
+        '<div class="headline-links">'+(matches.length?matches.map(renderHeadlineLink).join(''):'<div class="small">No retrieved headline fell inside this nakshatra window.</div>')+'</div></div>';
+    }).join('')+'</div>';
+}
+function renderHeadlineLink(a){
+  return '<div class="headline-link"><a href="'+escAttr(a.url)+'" target="_blank" rel="noopener">'+esc(a.title)+'</a>'+
+    '<span>'+esc(a.newsCategory||'Other / Unclassified')+' · '+esc(a.source||'')+' · '+esc(a.publishedAt||'')+'</span></div>';
 }
 
 function renderVenusEvidence(rows){
