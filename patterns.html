@@ -435,22 +435,22 @@ function renderNews(p,data){
   const bars=cats.length?'<div class="category-bars">'+cats.map(c=>'<div class="cat"><span>'+esc(c.name)+'</span><div class="track"><div class="fill" style="width:'+((c.count/max)*100).toFixed(1)+'%"></div></div><b>'+c.count+'</b></div>').join('')+'</div>':'';
   const stories=(data.articles||[]).slice(0,24).map(a=>
     '<div class="story"><a href="'+escAttr(a.url)+'" target="_blank" rel="noopener">'+esc(a.title)+'</a>'+
-    '<div class="story-meta"><span>'+esc(a.newsCategory||'Other / Unclassified')+'</span><span>'+esc(a.source||'')+'</span><span>'+esc(a.publishedAt||'')+'</span></div>'+
+    '<div class="story-meta"><span>'+esc(a.newsCategory||'Other / Unclassified')+'</span><span>'+esc(a.archiveSource||'News')+'</span><span>'+esc(a.source||'')+'</span><span>'+esc(a.publishedAt||'')+'</span></div>'+
     (a.description?'<p>'+esc(a.description)+'</p>':'')+'</div>'
   ).join('');
   const leaderBlock=state.planet==='Sun'?renderLeaderEvidence(data.leaderEvidence||[]):'';
-  const venusBlock=state.planet==='Venus'?renderVenusEvidence(data.venusEvidence||[]):'';
-  const marsBlock=state.planet==='Mars'?renderMarsEvidence(data.marsEvidence||[]):'';
+  const subjectBlock=renderOrganicSubjects(data);
+  const sourceBlock=renderSourceCoverage(data);
   const topCategoryBlock=renderTopCategoryHeadlines(data);
   const nakHeadlineBlock=renderNakshatraHeadlines(p,data);
   area.innerHTML=
     '<div class="small">Headline categories during this '+state.planet+'-in-'+SIGNS[p.sign]+' interval</div>'+
+    sourceBlock+
+    subjectBlock+
     bars+
     topCategoryBlock+
     nakHeadlineBlock+
     leaderBlock+
-    venusBlock+
-    marsBlock+
     '<div class="panel-head" style="margin-top:14px"><strong>ALL RETRIEVED HEADLINES</strong></div>'+
     '<div class="news-list">'+(stories||'<div class="empty">No headlines were returned for this historical window.</div>')+'</div>';
   document.getElementById('newsStatus').textContent=(data.count||0)+' categorized headlines';
@@ -532,6 +532,23 @@ function renderSignSummary(){
   }).join('');
 }
 
+function renderSourceCoverage(data){
+  const counts=data.sourceCounts||{};
+  const cov=data.sourceCoverage||{};
+  const parts=Object.entries(counts).map(([name,count])=>esc(name)+': '+count);
+  const gdelt=cov.gdelt;
+  const note=gdelt&&!gdelt.available?' · GDELT unavailable for this window: '+esc(gdelt.reason||'outside archive window'):'';
+  return '<div class="note"><b>News sources:</b> '+(parts.join(' · ')||'No source counts')+note+'</div>';
+}
+function renderOrganicSubjects(data){
+  const rows=(data.subjects||[]).slice(0,10);
+  if(!rows.length)return'';
+  const max=Math.max(1,...rows.map(x=>x.count));
+  return '<div class="headline-groups"><div class="panel-head"><strong>MOST-DISCUSSED SUBJECTS</strong><span class="status">Derived from headline frequency</span></div>'+
+    '<div class="category-bars">'+rows.map(x=>'<div class="cat"><span>'+esc(titleCase(x.name))+'</span><div class="track"><div class="fill" style="width:'+((x.count/max)*100).toFixed(1)+'%"></div></div><b>'+x.count+'</b></div>').join('')+'</div></div>';
+}
+function titleCase(s){return String(s||'').replace(/\b\w/g,m=>m.toUpperCase())}
+
 function renderTopCategoryHeadlines(data){
   const categories=(data.categories||[]).filter(c=>c.name!=='Other / Unclassified').slice(0,3);
   if(!categories.length)return'';
@@ -562,14 +579,14 @@ function renderNakshatraHeadlines(p,data){
 }
 function renderHeadlineLink(a){
   return '<div class="headline-link"><a href="'+escAttr(a.url)+'" target="_blank" rel="noopener">'+esc(a.title)+'</a>'+
-    '<span>'+esc(a.newsCategory||'Other / Unclassified')+' · '+esc(a.source||'')+' · '+esc(a.publishedAt||'')+'</span></div>';
+    '<span>'+esc(a.newsCategory||'Other / Unclassified')+' · '+esc(a.archiveSource||'News')+' · '+esc(a.source||'')+' · '+esc(a.publishedAt||'')+'</span></div>';
 }
 
 function renderMarsEvidence(rows){
   if(!rows.length)return '<div class="mars-evidence"><div class="note">No Mars-specific themes were strong enough in this transit window.</div></div>';
   const total=rows.reduce((s,x)=>s+x.count,0)||1;
   return '<div class="mars-evidence"><div class="panel-head"><strong>MARS-SPECIFIC THEMES</strong><span class="status">Conflict, force & action layer</span></div>'+
-    '<div class="detail-sub">These tags sit on top of the universal news categories to isolate themes traditionally associated with Mars.</div>'+
+    '<div class="detail-sub">Legacy Mars theme view.</div>'+
     '<div class="venus-grid">'+rows.slice(0,8).map(x=>'<div class="venus-card"><small>'+esc(x.name)+'</small><b>'+x.count+' stories · '+(x.count/total*100).toFixed(1)+'%</b></div>').join('')+'</div></div>';
 }
 
@@ -577,7 +594,7 @@ function renderVenusEvidence(rows){
   if(!rows.length)return '<div class="venus-evidence"><div class="note">No Venus-specific themes were strong enough in this transit window.</div></div>';
   const total=rows.reduce((s,x)=>s+x.count,0)||1;
   return '<div class="venus-evidence"><div class="panel-head"><strong>VENUS-SPECIFIC THEMES</strong><span class="status">Relationship, value & culture layer</span></div>'+
-    '<div class="detail-sub">These tags sit on top of the universal news categories to isolate themes traditionally associated with Venus.</div>'+
+    '<div class="detail-sub">Legacy Venus theme view.</div>'+
     '<div class="venus-grid">'+rows.slice(0,8).map(x=>'<div class="venus-card"><small>'+esc(x.name)+'</small><b>'+x.count+' stories · '+(x.count/total*100).toFixed(1)+'%</b></div>').join('')+'</div></div>';
 }
 
