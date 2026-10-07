@@ -97,6 +97,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .nak-window-head{display:flex;justify-content:space-between;gap:8px;align-items:start;margin-bottom:7px}
 .nak-window-head b{font-size:12px}
 .nak-window-head span{font-size:9px;color:#91a8bf}
+.mars-evidence{margin-top:14px}
 .venus-evidence{margin-top:14px}
 .venus-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .venus-card{padding:9px;border:1px solid rgba(124,185,255,.12);border-radius:9px;background:#06111f}
@@ -155,7 +156,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Tracks selected planets through Lahiri sidereal signs and nakshatras from January 1, 2014 forward. Each continuous sign transit records degree path, motion, conjunctions, 90° squares and 150° inconjuncts to other planets. Select a past or current transit to compare categorized news headlines published during that same interval.</p></div></section>
 
 <section class="controls">
-<label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option></select></label>
+<label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option></select></label>
 <label>Start date<input id="startDate" type="date" value="2014-01-01" min="2014-01-01"></label>
 <label>Future horizon<select id="endYear"><option value="2027">End of 2027</option><option value="2028" selected>End of 2028</option><option value="2030">End of 2030</option></select></label>
 <label>Filter sign<select id="signFilter"><option value="">All signs</option></select></label>
@@ -439,6 +440,7 @@ function renderNews(p,data){
   ).join('');
   const leaderBlock=state.planet==='Sun'?renderLeaderEvidence(data.leaderEvidence||[]):'';
   const venusBlock=state.planet==='Venus'?renderVenusEvidence(data.venusEvidence||[]):'';
+  const marsBlock=state.planet==='Mars'?renderMarsEvidence(data.marsEvidence||[]):'';
   const topCategoryBlock=renderTopCategoryHeadlines(data);
   const nakHeadlineBlock=renderNakshatraHeadlines(p,data);
   area.innerHTML=
@@ -448,6 +450,7 @@ function renderNews(p,data){
     nakHeadlineBlock+
     leaderBlock+
     venusBlock+
+    marsBlock+
     '<div class="panel-head" style="margin-top:14px"><strong>ALL RETRIEVED HEADLINES</strong></div>'+
     '<div class="news-list">'+(stories||'<div class="empty">No headlines were returned for this historical window.</div>')+'</div>';
   document.getElementById('newsStatus').textContent=(data.count||0)+' categorized headlines';
@@ -560,6 +563,14 @@ function renderNakshatraHeadlines(p,data){
 function renderHeadlineLink(a){
   return '<div class="headline-link"><a href="'+escAttr(a.url)+'" target="_blank" rel="noopener">'+esc(a.title)+'</a>'+
     '<span>'+esc(a.newsCategory||'Other / Unclassified')+' · '+esc(a.source||'')+' · '+esc(a.publishedAt||'')+'</span></div>';
+}
+
+function renderMarsEvidence(rows){
+  if(!rows.length)return '<div class="mars-evidence"><div class="note">No Mars-specific themes were strong enough in this transit window.</div></div>';
+  const total=rows.reduce((s,x)=>s+x.count,0)||1;
+  return '<div class="mars-evidence"><div class="panel-head"><strong>MARS-SPECIFIC THEMES</strong><span class="status">Conflict, force & action layer</span></div>'+
+    '<div class="detail-sub">These tags sit on top of the universal news categories to isolate themes traditionally associated with Mars.</div>'+
+    '<div class="venus-grid">'+rows.slice(0,8).map(x=>'<div class="venus-card"><small>'+esc(x.name)+'</small><b>'+x.count+' stories · '+(x.count/total*100).toFixed(1)+'%</b></div>').join('')+'</div></div>';
 }
 
 function renderVenusEvidence(rows){
