@@ -559,7 +559,6 @@ function renderResearchMetrics(p,data){
   const quality=data.archiveQuality||{level:'unknown',analysisEligible:false,reason:''};
   const headlineRate=headlines/days;
   const eventRate=events/days;
-  const quality=data.archiveQuality||{};
   const anomalies=quality.analysisEligible===false?[]:categoryAnomalies(p,data).slice(0,3);
   const anomalyHtml=anomalies.length
     ? '<div class="headline-group"><h3>Largest category deviations vs loaded '+state.planet+' baseline</h3><div class="subcategory-list">'+anomalies.map(x=>{
