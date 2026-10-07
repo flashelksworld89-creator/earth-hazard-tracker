@@ -84,6 +84,11 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .summary-rank .pct{color:#8fdcff;font-variant-numeric:tabular-nums}
 .summary-card .summary-runner{margin-top:6px;color:#b9cbd5;font-size:10px}
 .summary-card.loading{opacity:.72}
+.venus-evidence{margin-top:14px}
+.venus-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.venus-card{padding:9px;border:1px solid rgba(124,185,255,.12);border-radius:9px;background:#06111f}
+.venus-card small{display:block;color:#8fa9b9;font-size:8px;text-transform:uppercase}
+.venus-card b{display:block;margin-top:4px;font-size:11px;line-height:1.4}
 .leader-evidence{margin-top:14px}
 .leader-table{display:grid;gap:8px}
 .leader-row{padding:10px;border:1px solid rgba(124,185,255,.12);border-radius:9px;background:#06111f}
@@ -114,6 +119,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
   .transit>div:last-child{grid-column:auto}
   .detail-grid{grid-template-columns:1fr}
   .leader-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .venus-grid{grid-template-columns:1fr}
   .cat{grid-template-columns:120px 1fr 30px}
 }
 @media(max-width:460px){
@@ -136,7 +142,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Tracks selected planets through Lahiri sidereal signs and nakshatras from January 1, 2014 forward. Each continuous sign transit records degree path, motion, conjunctions, 90° squares and 150° inconjuncts to other planets. Select a past or current transit to compare categorized news headlines published during that same interval.</p></div></section>
 
 <section class="controls">
-<label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option></select></label>
+<label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option></select></label>
 <label>Start date<input id="startDate" type="date" value="2014-01-01" min="2014-01-01"></label>
 <label>Future horizon<select id="endYear"><option value="2027">End of 2027</option><option value="2028" selected>End of 2028</option><option value="2030">End of 2030</option></select></label>
 <label>Filter sign<select id="signFilter"><option value="">All signs</option></select></label>
@@ -401,10 +407,12 @@ function renderNews(p,data){
     (a.description?'<p>'+esc(a.description)+'</p>':'')+'</div>'
   ).join('');
   const leaderBlock=state.planet==='Sun'?renderLeaderEvidence(data.leaderEvidence||[]):'';
+  const venusBlock=state.planet==='Venus'?renderVenusEvidence(data.venusEvidence||[]):'';
   area.innerHTML=
     '<div class="small">Headline categories during this '+state.planet+'-in-'+SIGNS[p.sign]+' interval</div>'+
     bars+
     leaderBlock+
+    venusBlock+
     '<div class="news-list">'+(stories||'<div class="empty">No headlines were returned for this historical window.</div>')+'</div>';
   document.getElementById('newsStatus').textContent=(data.count||0)+' categorized headlines';
   if(document.getElementById('summaryStatus')?.dataset.loading==='1')renderSignSummary();
@@ -483,6 +491,14 @@ function renderSignSummary(){
       '<div class="summary-meta">'+headlines+' headlines · '+classifiedTotal+' classified · '+unclassified+' unclassified</div>'+
     '</div>';
   }).join('');
+}
+
+function renderVenusEvidence(rows){
+  if(!rows.length)return '<div class="venus-evidence"><div class="note">No Venus-specific themes were strong enough in this transit window.</div></div>';
+  const total=rows.reduce((s,x)=>s+x.count,0)||1;
+  return '<div class="venus-evidence"><div class="panel-head"><strong>VENUS-SPECIFIC THEMES</strong><span class="status">Relationship, value & culture layer</span></div>'+
+    '<div class="detail-sub">These tags sit on top of the universal news categories to isolate themes traditionally associated with Venus.</div>'+
+    '<div class="venus-grid">'+rows.slice(0,8).map(x=>'<div class="venus-card"><small>'+esc(x.name)+'</small><b>'+x.count+' stories · '+(x.count/total*100).toFixed(1)+'%</b></div>').join('')+'</div></div>';
 }
 
 function renderLeaderEvidence(rows){
