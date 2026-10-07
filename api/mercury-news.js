@@ -54,6 +54,21 @@ const CATEGORIES={
   'Consumer Products / Recalls':['recall','product recall','consumer product','safety warning','defect','product safety']
 };
 
+const MARS_THEMES={
+  'War / Military Action':['war','military','troops','battle','combat','airstrike','air strike','missile','invasion','artillery','armed forces'],
+  'Weapons / Defense':['weapon','weapons','arms','defense system','defence system','drone strike','munition','ammunition','fighter jet'],
+  'Violence / Assault':['shooting','attack','assault','killed','murder','homicide','violence','stabbing','gunfire'],
+  'Police / Security Operations':['police','swat','security forces','raid','arrest operation','law enforcement','manhunt','crackdown'],
+  'Fires / Explosions':['fire','wildfire','explosion','blast','burning','detonation','factory fire'],
+  'Accidents / Crashes':['crash','collision','accident','derailment','wreck','vehicle accident','industrial accident'],
+  'Engineering / Mechanical Failure':['structural failure','bridge collapse','mechanical failure','engineering failure','equipment failure','infrastructure failure'],
+  'Surgery / Emergency Medicine':['surgery','surgeon','trauma','emergency room','emergency surgery','injury','wounded'],
+  'Protests / Confrontation':['protest','riot','clash','confrontation','demonstration','civil unrest','violent protest'],
+  'Competition / Sports':['competition','championship','tournament','match','fight','boxing','mma','race','sports'],
+  'Emergency Response':['emergency response','firefighters','rescue','evacuation','first responders','disaster response'],
+  'Territorial / Border Conflict':['border clash','territorial dispute','border conflict','incursion','frontier','occupation']
+};
+
 const VENUS_THEMES={
   'Relationships / Marriage':['marriage','married','wedding','divorce','relationship','couple','engagement','spouse','romance','dating'],
   'Diplomacy / Reconciliation':['reconciliation','peace talks','peace agreement','diplomatic agreement','settlement','truce','mediation','normalize relations'],
@@ -94,7 +109,7 @@ export default async function handler(req,res){
     const planet=cleanPlanet(req.query?.planet);
     if(!from||!to) return res.status(400).json({error:'from and to dates are required'});
     const now=new Date();
-    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],leaderEvidence:[],venusEvidence:[]});
+    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],leaderEvidence:[],venusEvidence:[],marsEvidence:[]});
 
     const feeds=(planet==='Sun'
       ? FEEDS.concat([
@@ -107,7 +122,13 @@ export default async function handler(req,res){
             {name:'Culture Luxury',q:'fashion OR beauty OR luxury OR music OR film OR art OR celebrity'},
             {name:'Diplomacy Deals',q:'peace agreement OR reconciliation OR partnership OR merger OR luxury deal'}
           ])
-        : FEEDS
+        : planet==='Mars'
+          ? FEEDS.concat([
+              {name:'Conflict Action',q:'war OR military OR attack OR missile OR troops OR airstrike'},
+              {name:'Public Safety',q:'shooting OR police OR explosion OR fire OR crash OR accident'},
+              {name:'Competition',q:'sports OR championship OR boxing OR fight OR race'}
+            ])
+          : FEEDS
     ).map(f=>({
       ...f,
       url:'https://news.google.com/rss/search?q='+encodeURIComponent(f.q+' after:'+from+' before:'+to)+'&hl=en-US&gl=US&ceid=US:en'
@@ -125,7 +146,8 @@ export default async function handler(req,res){
     const categories=[...counts.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
     const leaderEvidence=planet==='Sun'?buildLeaderEvidence(articles):[];
     const venusEvidence=planet==='Venus'?buildVenusEvidence(articles):[];
-    return res.status(200).json({from,to,planet,future:false,count:articles.length,categories,articles,leaderEvidence,venusEvidence});
+    const marsEvidence=planet==='Mars'?buildMarsEvidence(articles):[];
+    return res.status(200).json({from,to,planet,future:false,count:articles.length,categories,articles,leaderEvidence,venusEvidence,marsEvidence});
   }catch(e){
     return res.status(500).json({error:'Transit news aggregation failed',detail:e?.message||String(e)});
   }
@@ -163,6 +185,19 @@ function safe(v){try{const u=new URL(v);return /^https?:$/.test(u.protocol)?u.hr
 function cleanDate(v){const s=String(v||'');return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:''}
 function dedupe(items){const seen=new Set();return items.filter(x=>{const k=(x.title||'').toLowerCase().replace(/\W+/g,' ').trim();if(seen.has(k))return false;seen.add(k);return true})}
 function hash(t){let h=2166136261;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
+
+function buildMarsEvidence(articles){
+  const counts=new Map();
+  for(const article of articles){
+    const t=' '+(article.title+' '+article.description).toLowerCase()+' ';
+    for(const [name,terms] of Object.entries(MARS_THEMES)){
+      let score=0;
+      for(const term of terms)if(t.includes(term))score++;
+      if(score>0)counts.set(name,(counts.get(name)||0)+1);
+    }
+  }
+  return [...counts.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
+}
 
 function buildVenusEvidence(articles){
   const counts=new Map();
@@ -232,5 +267,6 @@ function cleanPlanet(v){
   const p=String(v||'Mercury').toLowerCase();
   if(p==='sun')return'Sun';
   if(p==='venus')return'Venus';
+  if(p==='mars')return'Mars';
   return'Mercury';
 }
