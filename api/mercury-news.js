@@ -400,7 +400,7 @@ export default async function handler(req,res){
     const planet=cleanPlanet(req.query?.planet);
     if(!from||!to) return res.status(400).json({error:'from and to dates are required'});
     const now=new Date();
-    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],subcategories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
+    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,eventCount:0,eventClusters:[],articles:[],categories:[],subcategories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
 
     const feeds=FEEDS.map(f=>({
       ...f,
@@ -423,9 +423,13 @@ export default async function handler(req,res){
         const newsSubcategory=classifySubcategory(newsCategory,text);
         return {...a,newsCategory,newsSubcategory};
       });
+    const eventClusters=clusterEvents(analysisArticles);
+    const articleCluster=new Map();
+    for(const cluster of eventClusters)for(const id of cluster.articleIds)articleCluster.set(id,cluster.id);
     const articles=[...analysisArticles]
       .sort((a,b)=>new Date(b.publishedAtFull||b.publishedAt)-new Date(a.publishedAtFull||a.publishedAt))
-      .slice(0,160);
+      .slice(0,160)
+      .map(a=>({...a,eventClusterId:articleCluster.get(a.id)||''}));
     const counts=new Map(),subCounts=new Map();
     for(const a of analysisArticles){
       counts.set(a.newsCategory,(counts.get(a.newsCategory)||0)+1);
@@ -442,7 +446,7 @@ export default async function handler(req,res){
     const subjects=buildOrganicSubjects(analysisArticles);
     const sourceCounts=countSources(analysisArticles);
     return res.status(200).json({
-      from,to,planet,future:false,count:analysisArticles.length,categories,subcategories,subjects,articles,leaderEvidence,
+      from,to,planet,future:false,count:analysisArticles.length,eventCount:eventClusters.length,eventClusters:eventClusters.slice(0,100),categories,subcategories,subjects,articles,leaderEvidence,
       sourceCounts,
       sourceCoverage:{
         googleNews:{available:true,label:'Google News RSS'},
@@ -519,6 +523,58 @@ function isWithinGdeltDocWindow(from,to){
   return{available:true,reason:''};
 }
 const SUBJECT_STOP=new Set(('the a an and or but if then than to of in on for from with without at by as is are was were be been being this that these those it its their his her they them he she you we our your about after before during over under into out up down new latest says said say report reports reported amid as us u.s. will would could should may might can just more most less least first last today yesterday tomorrow year years day days week weeks month months').split(/\s+/));
+function clusterEvents(articles){
+  const clusters=[];
+  for(const article of articles){
+    const tokens=eventTokens(article.title);
+    let best=null,bestScore=0;
+    for(const cluster of clusters){
+      if(Math.abs(new Date(article.publishedAtFull||article.publishedAt)-new Date(cluster.latest))>4*86400000)continue;
+      const score=jaccard(tokens,cluster.tokens);
+      if(score>bestScore){bestScore=score;best=cluster}
+    }
+    if(best&&bestScore>=0.42){
+      best.articleIds.push(article.id);
+      best.headlineCount++;
+      best.latest=laterIso(best.latest,article.publishedAtFull||article.publishedAt);
+      for(const t of tokens)best.tokens.add(t);
+      best.sources.add(article.source||'Unknown');
+      best.categories.set(article.newsCategory,(best.categories.get(article.newsCategory)||0)+1);
+      if((article.title||'').length<(best.title||'').length)best.title=article.title;
+    }else{
+      const categories=new Map();categories.set(article.newsCategory,1);
+      clusters.push({
+        id:'event-'+(clusters.length+1),
+        title:article.title,
+        earliest:article.publishedAtFull||article.publishedAt,
+        latest:article.publishedAtFull||article.publishedAt,
+        headlineCount:1,
+        articleIds:[article.id],
+        tokens:new Set(tokens),
+        sources:new Set([article.source||'Unknown']),
+        categories
+      });
+    }
+  }
+  return clusters.map(c=>({
+    id:c.id,title:c.title,earliest:c.earliest,latest:c.latest,
+    headlineCount:c.headlineCount,sourceCount:c.sources.size,articleIds:c.articleIds,
+    topCategory:[...c.categories.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||'Other / Unclassified'
+  })).sort((a,b)=>b.headlineCount-a.headlineCount||b.sourceCount-a.sourceCount);
+}
+function eventTokens(title){
+  return new Set(String(title||'').toLowerCase()
+    .replace(/[^a-z0-9 ]+/g,' ')
+    .split(/\s+/)
+    .filter(x=>x.length>=4&&!SUBJECT_STOP.has(x)&&!/^[0-9]+$/.test(x)));
+}
+function jaccard(a,b){
+  if(!a.size||!b.size)return 0;
+  let inter=0;for(const x of a)if(b.has(x))inter++;
+  return inter/(a.size+b.size-inter);
+}
+function laterIso(a,b){return new Date(a)>new Date(b)?a:b}
+
 function buildOrganicSubjects(articles){
   const unigram=new Map(),bigram=new Map();
   for(const a of articles){
