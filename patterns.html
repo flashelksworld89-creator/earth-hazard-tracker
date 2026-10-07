@@ -165,7 +165,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 
 <section class="controls">
 <label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
-<label>Start date<input id="startDate" type="date" value="2014-01-01" min="2014-01-01"></label>
+<label>Start date<input id="startDate" type="date" value="2000-01-01" min="2000-01-01"></label>
 <label>Future horizon<select id="endYear"><option value="2027">End of 2027</option><option value="2028" selected>End of 2028</option><option value="2030">End of 2030</option></select></label>
 <label>Filter sign<select id="signFilter"><option value="">All signs</option></select></label>
 <label>Period<select id="periodFilter"><option value="all">Past + current + future</option><option value="past">Past/current only</option><option value="future">Future only</option></select></label>
@@ -183,7 +183,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <section class="panel summary-panel">
 <div class="panel-head"><strong>12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button id="loadSummaryBtn" type="button" style="min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer">Load 12-sign news summary</button></div>
-<div class="detail-sub">Each zodiac receives the primary news category found across all completed/current <span id="summaryPlanetDesc">Mercury</span> passages through that sign since the selected start date. Counts are based on categorized headlines actually retrieved for those transit windows.</div>
+<div class="detail-sub">Each zodiac receives the primary news category found across all completed/current <span id="summaryPlanetDesc">Mercury</span> passages through that sign since the selected start date. Counts are based on categorized headlines from archive windows with usable coverage. Weak or sparse historical windows are shown but excluded from comparative baselines.</div>
 <div id="summaryGrid" class="summary-grid"><div class="empty">Building 12-sign summary…</div></div>
 </section>
 
@@ -521,6 +521,7 @@ function renderSignSummary(){
       const data=state.news.get(p.id);
       if(!data)continue;
       loaded++;
+      if(data.archiveQuality?.analysisEligible===false)continue;
       headlines+=Number(data.count)||0;
       for(const c of data.categories||[]){
         counts.set(c.name,(counts.get(c.name)||0)+(Number(c.count)||0));
@@ -554,9 +555,12 @@ function renderResearchMetrics(p,data){
   const days=Math.max(1/24,daysBetween(p.start,p.end));
   const headlines=Number(data.count)||0;
   const events=Number(data.eventCount)||0;
+  const publishers=Number(data.publisherCount)||0;
+  const quality=data.archiveQuality||{level:'unknown',analysisEligible:false,reason:''};
   const headlineRate=headlines/days;
   const eventRate=events/days;
-  const anomalies=categoryAnomalies(p,data).slice(0,3);
+  const quality=data.archiveQuality||{};
+  const anomalies=quality.analysisEligible===false?[]:categoryAnomalies(p,data).slice(0,3);
   const anomalyHtml=anomalies.length
     ? '<div class="headline-group"><h3>Largest category deviations vs loaded '+state.planet+' baseline</h3><div class="subcategory-list">'+anomalies.map(x=>{
         const cls=x.ratio>=1?'anomaly-up':'anomaly-down';
@@ -569,7 +573,12 @@ function renderResearchMetrics(p,data){
       '<div class="metric-card"><small>Headlines / 24h</small><b>'+headlineRate.toFixed(1)+'</b></div>'+
       '<div class="metric-card"><small>Unique events / 24h</small><b>'+eventRate.toFixed(1)+'</b></div>'+
       '<div class="metric-card"><small>Unique event clusters</small><b>'+events+'</b></div>'+
-    '</div>'+anomalyHtml+'</div>';
+      '<div class="metric-card"><small>Independent publishers</small><b>'+publishers+'</b></div>'+
+      '<div class="metric-card"><small>Archive confidence</small><b>'+esc(String(quality.level||'unknown').toUpperCase())+'</b></div>'+
+      '<div class="metric-card"><small>Raw → balanced sample</small><b>'+Number(data.rawCount||0)+' → '+headlines+'</b></div>'+
+    '</div>'+
+    (quality.reason?'<div class="note">'+esc(quality.reason)+'</div>':'')+
+    anomalyHtml+'</div>';
 }
 function categoryAnomalies(p,data){
   const currentDays=Math.max(1/24,daysBetween(p.start,p.end));
@@ -578,7 +587,7 @@ function categoryAnomalies(p,data){
   for(const other of state.periods){
     if(other.id===p.id)continue;
     const d=state.news.get(other.id);
-    if(!d)continue;
+    if(!d||d.archiveQuality?.analysisEligible===false)continue;
     baselineWindows++;
     const days=Math.max(1/24,daysBetween(other.start,other.end));
     for(const c of d.categories||[]){
@@ -601,7 +610,7 @@ function renderSourceCoverage(data){
   const parts=Object.entries(counts).map(([name,count])=>esc(name)+': '+count);
   const gdelt=cov.gdelt;
   const note=gdelt&&!gdelt.available?' · GDELT unavailable for this window: '+esc(gdelt.reason||'outside archive window'):'';
-  return '<div class="note"><b>News sources:</b> '+(parts.join(' · ')||'No source counts')+note+'</div>';
+  return '<div class="note"><b>News sources:</b> '+(parts.join(' · ')||'No source counts')+' · '+Number(data.publisherCount||0)+' independent publishers'+note+'</div>';
 }
 function renderOrganicSubjects(data){
   const rows=(data.subjects||[]).slice(0,10);
