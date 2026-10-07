@@ -54,6 +54,23 @@ const CATEGORIES={
   'Consumer Products / Recalls':['recall','product recall','consumer product','safety warning','defect','product safety']
 };
 
+const VENUS_THEMES={
+  'Relationships / Marriage':['marriage','married','wedding','divorce','relationship','couple','engagement','spouse','romance','dating'],
+  'Diplomacy / Reconciliation':['reconciliation','peace talks','peace agreement','diplomatic agreement','settlement','truce','mediation','normalize relations'],
+  'Women / Gender Issues':['women','woman','female','gender equality','women rights','maternal','girl'],
+  'Beauty / Fashion':['fashion','beauty','cosmetics','designer','runway','model','jewelry','perfume'],
+  'Film / Music / Arts':['film','movie','music','album','concert','art','artist','museum','theater','theatre'],
+  'Celebrity / Social Status':['celebrity','star','royal','socialite','famous','red carpet','award show'],
+  'Luxury / Consumer Goods':['luxury','luxury brand','designer brand','watch','jewelry','premium','high-end','consumer spending'],
+  'Hospitality / Tourism':['hotel','tourism','tourist','travel destination','resort','hospitality','vacation'],
+  'Real Estate / Property':['real estate','property','home sale','housing market','luxury home','estate'],
+  'Money / Wealth / Banking':['wealth','billionaire','banking','finance','assets','fortune','net worth','private equity'],
+  'Mergers / Partnerships / Contracts':['merger','partnership','joint venture','deal','contract','acquisition','agreement'],
+  'Sexuality / Reproductive Issues':['sexuality','reproductive','abortion','fertility','ivf','birth control','contraception'],
+  'Social Harmony / Cultural Trends':['culture','social trend','lifestyle','social harmony','community','popular culture'],
+  'Relationship / Money / Status Scandal':['affair','relationship scandal','divorce battle','financial scandal','luxury scandal','celebrity scandal']
+};
+
 const POSITIVE=['support','supported','approval','approved','praise','praised','success','successful','victory','win','wins','agreement','deal','peace','endorsement','endorsed'];
 const NEGATIVE=['opposition','oppose','opposed','condemn','condemned','criticism','criticized','protest','scandal','investigation','indicted','indictment','resign','resignation','crisis','failure','failed','attack','conflict','controversy'];
 const SUPPORT=['support','endorsed','endorsement','rally','backed','praise','praised','approval'];
@@ -77,14 +94,20 @@ export default async function handler(req,res){
     const planet=cleanPlanet(req.query?.planet);
     if(!from||!to) return res.status(400).json({error:'from and to dates are required'});
     const now=new Date();
-    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],leaderEvidence:[]});
+    if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,articles:[],categories:[],leaderEvidence:[],venusEvidence:[]});
 
     const feeds=(planet==='Sun'
       ? FEEDS.concat([
           {name:'Leadership',q:'president OR "prime minister" OR monarch OR chancellor OR governor OR "head of state"'},
           {name:'Executive Power',q:'"executive order" OR cabinet OR presidency OR leadership OR resignation OR summit'}
         ])
-      : FEEDS
+      : planet==='Venus'
+        ? FEEDS.concat([
+            {name:'Relationships',q:'marriage OR divorce OR relationship OR wedding OR celebrity couple'},
+            {name:'Culture Luxury',q:'fashion OR beauty OR luxury OR music OR film OR art OR celebrity'},
+            {name:'Diplomacy Deals',q:'peace agreement OR reconciliation OR partnership OR merger OR luxury deal'}
+          ])
+        : FEEDS
     ).map(f=>({
       ...f,
       url:'https://news.google.com/rss/search?q='+encodeURIComponent(f.q+' after:'+from+' before:'+to)+'&hl=en-US&gl=US&ceid=US:en'
@@ -101,7 +124,8 @@ export default async function handler(req,res){
     for(const a of articles) counts.set(a.newsCategory,(counts.get(a.newsCategory)||0)+1);
     const categories=[...counts.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
     const leaderEvidence=planet==='Sun'?buildLeaderEvidence(articles):[];
-    return res.status(200).json({from,to,planet,future:false,count:articles.length,categories,articles,leaderEvidence});
+    const venusEvidence=planet==='Venus'?buildVenusEvidence(articles):[];
+    return res.status(200).json({from,to,planet,future:false,count:articles.length,categories,articles,leaderEvidence,venusEvidence});
   }catch(e){
     return res.status(500).json({error:'Transit news aggregation failed',detail:e?.message||String(e)});
   }
@@ -139,6 +163,19 @@ function safe(v){try{const u=new URL(v);return /^https?:$/.test(u.protocol)?u.hr
 function cleanDate(v){const s=String(v||'');return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:''}
 function dedupe(items){const seen=new Set();return items.filter(x=>{const k=(x.title||'').toLowerCase().replace(/\W+/g,' ').trim();if(seen.has(k))return false;seen.add(k);return true})}
 function hash(t){let h=2166136261;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
+
+function buildVenusEvidence(articles){
+  const counts=new Map();
+  for(const article of articles){
+    const t=' '+(article.title+' '+article.description).toLowerCase()+' ';
+    for(const [name,terms] of Object.entries(VENUS_THEMES)){
+      let score=0;
+      for(const term of terms)if(t.includes(term))score++;
+      if(score>0)counts.set(name,(counts.get(name)||0)+1);
+    }
+  }
+  return [...counts.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);
+}
 
 function buildLeaderEvidence(articles){
   const byLeader=new Map();
@@ -191,4 +228,9 @@ function sentimentClass(text){
   return'neutral';
 }
 function hasAny(text,terms){return terms.some(k=>text.includes(k))}
-function cleanPlanet(v){return String(v||'Mercury').toLowerCase()==='sun'?'Sun':'Mercury'}
+function cleanPlanet(v){
+  const p=String(v||'Mercury').toLowerCase();
+  if(p==='sun')return'Sun';
+  if(p==='venus')return'Venus';
+  return'Mercury';
+}
