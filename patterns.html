@@ -72,14 +72,24 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .story-meta span{padding:2px 5px;border-radius:999px;background:rgba(255,255,255,.03)}
 .story p{margin:7px 0 0;color:#b2c7d3;font-size:11px;line-height:1.55}
 .note{margin-top:11px;padding:10px;border:1px solid rgba(250,204,21,.20);border-radius:9px;background:rgba(85,55,5,.16);color:#d8cc9e;font-size:11px;line-height:1.55}
+.summary-panel{margin-bottom:14px}
+.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.summary-card{padding:12px;border:1px solid rgba(124,185,255,.14);border-radius:10px;background:#06111f;min-width:0}
+.summary-card .summary-sign{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px;font-weight:850}
+.summary-card .primary{margin-top:8px;font-size:13px;font-weight:800;color:#eaf7ff;line-height:1.35}
+.summary-card .summary-meta{margin-top:5px;color:#9fb8c8;font-size:10px;line-height:1.5}
+.summary-card .summary-runner{margin-top:6px;color:#b9cbd5;font-size:10px}
+.summary-card.loading{opacity:.72}
 .empty{padding:26px;text-align:center;color:#9fb7c6;font-size:12px}
 @media(max-width:1150px){
+  .summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .layout{grid-template-columns:1fr}
   .layout>.panel:last-child{position:static}
   .transit-list,.news-list{max-height:none}
   .stats{grid-template-columns:repeat(3,1fr)}
 }
 @media(max-width:760px){
+  .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   header,.hero{align-items:stretch;flex-direction:column}
   nav a{font-size:12px}
   main{width:min(100% - 20px,1580px);padding-top:20px}
@@ -93,6 +103,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
   .cat{grid-template-columns:120px 1fr 30px}
 }
 @media(max-width:460px){
+  .summary-grid{grid-template-columns:1fr}
   .controls{grid-template-columns:1fr}
   .controls button{grid-column:auto}
   .stats{grid-template-columns:1fr}
@@ -126,6 +137,12 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <div class="stat"><small>Inconjunct events</small><b id="statInconj">—</b><span>within 3° of 150°</span></div>
 </section>
 
+<section class="panel summary-panel">
+<div class="panel-head"><strong>12-ZODIAC MERCURY NEWS SUMMARY</strong><span id="summaryStatus" class="status">Collecting completed transits…</span></div>
+<div class="detail-sub">Each zodiac receives the primary news category found across all completed/current Mercury passages through that sign since the selected start date. Counts are based on categorized headlines actually retrieved for those transit windows.</div>
+<div id="summaryGrid" class="summary-grid"><div class="empty">Building 12-sign summary…</div></div>
+</section>
+
 <section class="layout">
 <div class="panel">
 <div class="panel-head"><strong>MERCURY SIGN TRANSIT TIMELINE</strong><span id="timelineStatus" class="status">Calculating…</span></div>
@@ -148,7 +165,7 @@ const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarva
 const NAK_SIZE=360/27;
 const OTHER=['Sun','Moon','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
-const state={periods:[],selected:null,news:new Map()};
+const state={periods:[],selected:null,news:new Map(),summaryRun:0};
 
 for(let i=0;i<12;i++){
   const o=document.createElement('option');o.value=String(i);o.textContent=SG[i]+' '+SIGNS[i];document.getElementById('signFilter').appendChild(o);
@@ -165,6 +182,7 @@ async function build(){
   state.periods=buildSignPeriods(start,end);
   summarize();
   renderTimeline();
+  buildSignSummary();
   const now=Date.now();
   const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
   if(current) selectPeriod(current.id);
@@ -345,7 +363,72 @@ function renderNews(p,data){
     bars+
     '<div class="news-list">'+(stories||'<div class="empty">No headlines were returned for this historical window.</div>')+'</div>';
   document.getElementById('newsStatus').textContent=(data.count||0)+' categorized headlines';
+  renderSignSummary();
 }
+async function buildSignSummary(){
+  const run=++state.summaryRun;
+  const eligible=state.periods.filter(p=>p.start.getTime()<=Date.now());
+  const status=document.getElementById('summaryStatus');
+  if(status)status.textContent='0 / '+eligible.length+' transit windows loaded';
+  renderSignSummary();
+
+  let completed=0;
+  const queue=eligible.slice();
+  const workers=Array.from({length:2},async()=>{
+    while(queue.length && run===state.summaryRun){
+      const p=queue.shift();
+      if(!p)break;
+      if(!state.news.has(p.id)){
+        try{
+          const from=isoDay(p.start);
+          const endCap=new Date(Math.min(p.end.getTime(),Date.now()+86400000));
+          const to=isoDay(new Date(endCap.getTime()+86400000));
+          const r=await fetch('/api/mercury-news?from='+from+'&to='+to);
+          if(r.ok)state.news.set(p.id,await r.json());
+        }catch(_){}
+      }
+      completed++;
+      if(status)status.textContent=completed+' / '+eligible.length+' transit windows loaded';
+      renderSignSummary();
+    }
+  });
+  await Promise.all(workers);
+  if(run!==state.summaryRun)return;
+  if(status)status.textContent='Summary complete · '+eligible.length+' Mercury transit windows';
+  renderSignSummary();
+}
+
+function renderSignSummary(){
+  const grid=document.getElementById('summaryGrid');if(!grid)return;
+  const eligible=state.periods.filter(p=>p.start.getTime()<=Date.now());
+  grid.innerHTML=SIGNS.map((sign,si)=>{
+    const periods=eligible.filter(p=>p.sign===si);
+    const counts=new Map();
+    let headlines=0,loaded=0;
+    for(const p of periods){
+      const data=state.news.get(p.id);
+      if(!data)continue;
+      loaded++;
+      headlines+=Number(data.count)||0;
+      for(const c of data.categories||[]){
+        counts.set(c.name,(counts.get(c.name)||0)+(Number(c.count)||0));
+      }
+    }
+    const ranked=[...counts.entries()].sort((a,b)=>b[1]-a[1]);
+    const primary=ranked[0];
+    const runner=ranked[1];
+    const loading=loaded<periods.length;
+    const primaryText=primary?primary[0]:'Not enough news loaded yet';
+    const runnerText=runner?'Runner-up: '+runner[0]+' ('+runner[1]+')':'';
+    return '<div class="summary-card'+(loading?' loading':'')+'">'+
+      '<div class="summary-sign"><span>'+SG[si]+' '+sign+'</span><span class="small">'+loaded+'/'+periods.length+' periods</span></div>'+
+      '<div class="primary">'+esc(primaryText)+'</div>'+
+      '<div class="summary-meta">'+headlines+' categorized headlines'+(primary?' · primary count '+primary[1]:'')+'</div>'+
+      (runnerText?'<div class="summary-runner">'+esc(runnerText)+'</div>':'')+
+    '</div>';
+  }).join('');
+}
+
 function eventText(a){return GLYPH[a.name]+' '+a.name+' '+fmtDate(a.date)+' (orb '+a.delta.toFixed(1)+'°)'}
 function box(k,v){return '<div><small>'+k+'</small><b>'+esc(v)+'</b></div>'}
 function fmtDegree(lon){const x=norm(lon),d=x%30,deg=Math.floor(d),m=Math.floor((d-deg)*60);return deg+'°'+String(m).padStart(2,'0')+'′'}
