@@ -344,6 +344,10 @@ main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
   .status{white-space:normal}
   .unified-filter-grid{grid-template-columns:1fr}
 }
+
+.historical-report{margin:4px 0 14px;padding:16px;border:1px solid rgba(101,217,255,.18);border-radius:14px;background:linear-gradient(180deg,rgba(7,30,45,.82),rgba(5,19,30,.84))}
+.historical-report p{margin:10px 0;color:#c7d9e3;font-size:12px;line-height:1.72}
+.historical-report p b{color:#edf9ff}
 </style>
 </head>
 <body>
@@ -1011,6 +1015,55 @@ function renderSignSummary(){
   }).join('');
 }
 
+function historicalSentimentLabel(tone){
+  const n=Number(tone)||0;
+  if(n<=-5)return 'strongly negative';
+  if(n<=-1.5)return 'negative';
+  if(n<1.5)return 'mixed / neutral';
+  if(n<5)return 'positive';
+  return 'strongly positive';
+}
+function historicalGoldsteinLabel(score){
+  const n=Number(score)||0;
+  if(n<=-5)return 'high-conflict';
+  if(n<=-1)return 'conflict-leaning';
+  if(n<1)return 'mixed';
+  if(n<5)return 'cooperative';
+  return 'strongly cooperative';
+}
+function buildHistoricalNarrative(p,data){
+  const stats=data.historicalStats||{};
+  const cats=(data.categories||[]).slice(0,5);
+  const detailed=(data.detailedEventCodes||[]).slice(0,5);
+  const actors=(stats.topActors||[]).slice(0,5);
+  const pairs=(stats.topActorPairs||[]).slice(0,4);
+  const locations=(stats.topLocations||[]).slice(0,5);
+  const total=Math.max(1,Number(stats.events)||0);
+  const days=Math.max(1/24,daysBetween(p.start,p.end));
+  const eventRate=(Number(stats.events)||0)/days;
+  const pct=x=>((Number(x.count||0)/total)*100).toFixed(1)+'%';
+  const topCat=cats[0];
+  const secondCat=cats[1];
+  const actorText=actors.length?actors.map(x=>x.name).join(', '):'no dominant actors identified';
+  const locationText=locations.length?locations.map(x=>x.name).join(', '):'no dominant locations identified';
+  const pairText=pairs.length?pairs.map(x=>x.name).join(' · '):'no dominant actor-action pairs identified';
+  const codeText=detailed.length?detailed.map(x=>'CAMEO '+x.code+' ('+x.count+')').join(', '):'no detailed event codes available';
+  const categorySentence=topCat
+    ? ('The largest event category was <b>'+esc(topCat.name)+'</b> at '+pct(topCat)+
+       (secondCat?' of coded events, followed by <b>'+esc(secondCat.name)+'</b> at '+pct(secondCat)+'.':'.'))
+    : 'No dominant event category was available for this interval.';
+  return '<div class="historical-report">'+
+    '<div class="panel-head"><strong>HISTORICAL EVENT REPORT</strong><span class="status">GDELT reconstruction</span></div>'+
+    '<p><b>'+esc(state.planet)+' transit window:</b> '+fmtDate(p.start)+' → '+fmtDate(p.end)+'. '+
+      'The historical archive contains <b>'+Number(stats.events||0)+'</b> coded events across this interval, averaging <b>'+eventRate.toFixed(1)+'</b> events per day.</p>'+
+    '<p>'+categorySentence+' Overall event tone was <b>'+historicalSentimentLabel(stats.avgTone)+'</b> ('+Number(stats.avgTone||0).toFixed(2)+
+      '), while the average Goldstein score indicates a <b>'+historicalGoldsteinLabel(stats.avgGoldstein)+'</b> interaction environment ('+Number(stats.avgGoldstein||0).toFixed(2)+').</p>'+
+    '<p><b>Most active actors:</b> '+esc(actorText)+'. <b>Most active locations:</b> '+esc(locationText)+'.</p>'+
+    '<p><b>Dominant interaction patterns:</b> '+esc(pairText)+'.</p>'+
+    '<p><b>Most frequent detailed event codes:</b> '+esc(codeText)+'.</p>'+
+    '<div class="note"><b>What this report is:</b> a readable reconstruction from structured GDELT event records for the selected dates. It is not a reproduction of original historical newspaper headlines.</div>'+
+  '</div>';
+}
 function renderHistoricalEvents(p,data,area){
   const stats=data.historicalStats||{};
   const roots=(data.historicalEventTypes||[]).slice(0,12);
@@ -1022,19 +1075,19 @@ function renderHistoricalEvents(p,data,area){
   const days=Math.max(1/24,daysBetween(p.start,p.end));
   const eventRate=(Number(stats.events)||0)/days;
   const rootHtml=roots.length
-    ? '<div class="headline-group"><h3>Top CAMEO event types</h3><div class="subcategory-list">'+roots.map(x=>
+    ? '<div class="headline-group"><h3>Top historical event themes</h3><div class="subcategory-list">'+roots.map(x=>
         '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
     : '';
   const detailedHtml=detailed.length
-    ? '<div class="headline-group"><h3>Detailed CAMEO event codes</h3><div class="subcategory-list">'+detailed.map(x=>
-        '<div class="subcategory-row"><b>CAMEO '+esc(x.code)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
+    ? '<div class="headline-group"><h3>Detailed GDELT event codes</h3><div class="subcategory-list">'+detailed.map(x=>
+        '<div class="subcategory-row"><b>'+esc(x.name||('CAMEO '+x.code))+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
     : '';
   const actorHtml=actors.length
     ? '<div class="headline-group"><h3>Most frequent actors</h3><div class="subcategory-list">'+actors.map(x=>
         '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
     : '';
   const pairHtml=actorPairs.length
-    ? '<div class="headline-group"><h3>Top actor → action → actor pairs</h3><div class="subcategory-list">'+actorPairs.map(x=>
+    ? '<div class="headline-group"><h3>Top actor → action → actor patterns</h3><div class="subcategory-list">'+actorPairs.map(x=>
         '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
     : '';
   const locHtml=locations.length
@@ -1042,10 +1095,10 @@ function renderHistoricalEvents(p,data,area){
         '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
     : '';
   area.innerHTML=
-    '<div class="note"><b>Historical event mode.</b> This period uses GDELT 1.0 CAMEO-coded events rather than modern headline search. It is kept separate so missing old headlines are not treated as low news activity.</div>'+
+    buildHistoricalNarrative(p,data)+
     '<div class="headline-groups"><div class="panel-head"><strong>HISTORICAL EVENT METRICS</strong><span class="status">'+esc(String(quality.level||'unknown').toUpperCase())+'</span></div>'+
       '<div class="metric-grid">'+
-        '<div class="metric-card"><small>Unique coded events</small><b>'+Number(stats.events||0)+'</b></div>'+
+        '<div class="metric-card"><small>Coded events</small><b>'+Number(stats.events||0)+'</b></div>'+
         '<div class="metric-card"><small>Events / 24h</small><b>'+eventRate.toFixed(1)+'</b></div>'+
         '<div class="metric-card"><small>Media mentions</small><b>'+Number(stats.mentions||0)+'</b></div>'+
         '<div class="metric-card"><small>Source references</small><b>'+Number(stats.sources||0)+'</b></div>'+
@@ -1056,7 +1109,7 @@ function renderHistoricalEvents(p,data,area){
       (quality.reason?'<div class="note">'+esc(quality.reason)+'</div>':'')+
       detailedHtml+rootHtml+pairHtml+actorHtml+locHtml+
     '</div>';
-  document.getElementById('newsStatus').textContent=(Number(stats.events)||0)+' historical coded events';
+  document.getElementById('newsStatus').textContent=(Number(stats.events)||0)+' historical events · report generated';
   if(document.getElementById('summaryStatus')?.dataset.loading==='1')renderSignSummary();
 }
 
