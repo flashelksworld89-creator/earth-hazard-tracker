@@ -39,7 +39,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .active-filter-chip button{border:0;background:transparent;color:#9fb8c8;cursor:pointer;font-weight:900;padding:0 2px}
 @media(max-width:900px){.unified-filter-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.unified-filter-grid{grid-template-columns:1fr}}
-@media(max-width:1100px){@media(max-width:620px){@media(max-width:760px){.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
 .stat{padding:13px 14px}
 .stat small{display:block;color:#93adbd;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:700}
 .stat b{display:block;margin-top:5px;font-size:21px;line-height:1.2}
@@ -168,6 +168,182 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
   .cat{grid-template-columns:1fr 28px}
   .cat .track{grid-column:1/-1}
 }
+
+/* 2026 dashboard refresh */
+:root{
+  --surface:#07131f;
+  --surface2:#0a1927;
+  --surface3:#0d2031;
+  --line:rgba(133,190,232,.18);
+  --line-strong:rgba(56,189,248,.5);
+  --cyan:#65d9ff;
+  --cyan2:#22bdf1;
+  --shadow:0 18px 45px rgba(0,0,0,.24);
+}
+body{background:
+  radial-gradient(circle at 16% -10%,rgba(14,165,233,.13),transparent 32rem),
+  radial-gradient(circle at 85% 0,rgba(99,102,241,.08),transparent 28rem),
+  #02070d}
+main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
+.hero{padding:8px 2px 10px;margin-bottom:18px}
+.hero h1{letter-spacing:-.035em;font-weight:900}
+.hero p{max-width:980px;color:#a9bdcb}
+.controls,.panel{
+  background:linear-gradient(180deg,rgba(11,29,44,.96),rgba(6,18,29,.96));
+  border:1px solid var(--line);
+  border-radius:18px;
+  box-shadow:var(--shadow);
+}
+.primary-toolbar{
+  position:relative;
+  padding:16px 18px;
+  align-items:center;
+  border-color:rgba(56,189,248,.28);
+}
+.primary-toolbar:before{
+  content:"";
+  width:4px;
+  align-self:stretch;
+  border-radius:999px;
+  background:linear-gradient(180deg,#67e8f9,#0ea5e9);
+}
+.controls label,.unified-filter-grid label{
+  text-transform:uppercase;
+  letter-spacing:.055em;
+  font-size:10px;
+  color:#8ea8b8
+}
+.controls select,.unified-filter-grid select{
+  appearance:auto;
+  background:#071726;
+  border:1px solid rgba(137,190,226,.22);
+  border-radius:11px;
+  min-height:44px;
+  padding:10px 12px;
+  color:#eff9ff;
+  font-weight:700;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.02)
+}
+.controls select:focus,.unified-filter-grid select:focus{
+  outline:2px solid rgba(56,189,248,.22);
+  border-color:rgba(56,189,248,.65)
+}
+.panel{padding:18px}
+.panel-head{
+  min-height:38px;
+  padding-bottom:12px;
+  margin-bottom:14px;
+  border-bottom:1px solid rgba(133,190,232,.1)
+}
+.panel-head strong{font-size:13px;letter-spacing:.055em;color:#edf9ff}
+.head-range{font-size:10px;color:#7f9cad;font-weight:700;margin-left:6px}
+.status{
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:5px 9px;
+  border:1px solid rgba(56,189,248,.18);
+  border-radius:999px;
+  background:rgba(14,165,233,.07);
+  color:#9adcf5;
+  font-weight:700;
+  white-space:nowrap
+}
+.filter-panel{border-color:rgba(56,189,248,.25)}
+.unified-filter-grid{gap:12px}
+.unified-filter-grid button,#loadSummaryBtn{
+  min-height:44px!important;
+  border-radius:11px!important;
+  border:1px solid rgba(56,189,248,.28)!important;
+  background:linear-gradient(180deg,#0b283b,#071c2b)!important;
+  color:#eaf9ff!important;
+  font-weight:850!important;
+  padding:9px 15px!important;
+  transition:.18s ease
+}
+.unified-filter-grid button:hover,#loadSummaryBtn:hover{
+  transform:translateY(-1px);
+  border-color:rgba(101,217,255,.65)!important;
+  background:linear-gradient(180deg,#10364d,#0a2638)!important
+}
+#clearTransitFiltersBtn{
+  background:#09141e!important;
+  border-color:rgba(148,163,184,.18)!important;
+  color:#aabcc7!important
+}
+.active-filter-list{
+  min-height:38px;
+  padding:10px;
+  border:1px dashed rgba(133,190,232,.16);
+  border-radius:12px;
+  background:rgba(2,9,15,.22)
+}
+.active-filter-chip{
+  padding:7px 10px;
+  background:rgba(8,31,46,.95);
+  border-color:rgba(56,189,248,.28);
+  color:#dff7ff;
+  box-shadow:0 5px 14px rgba(0,0,0,.16)
+}
+.summary-panel{margin-top:16px}
+.layout{gap:16px}
+.timeline-panel{min-height:520px}
+.detail-panel{border-color:rgba(56,189,248,.23)}
+.transit-list{
+  gap:8px;
+  max-height:72vh;
+  scrollbar-width:thin;
+  scrollbar-color:#16415b transparent
+}
+.transit{
+  border-radius:14px;
+  border:1px solid rgba(133,190,232,.12);
+  background:linear-gradient(180deg,rgba(8,24,37,.96),rgba(5,17,27,.96));
+  padding:14px;
+  transition:.16s ease
+}
+.transit:hover{
+  transform:translateY(-1px);
+  border-color:rgba(56,189,248,.42);
+  background:linear-gradient(180deg,rgba(11,34,50,.98),rgba(7,23,35,.98))
+}
+.transit.active{
+  border-color:rgba(101,217,255,.68);
+  box-shadow:inset 3px 0 #38bdf8,0 8px 24px rgba(0,0,0,.2)
+}
+.sign{font-size:16px;color:#f2fbff}
+.dates{color:#bdd0dc;font-weight:700}
+.motion{margin-top:3px;color:#8ea8b8}
+.detail-title{font-size:27px;letter-spacing:-.025em}
+.detail-grid>div,.story,.summary-card,.metric-card,.nak-window,.leader-row{
+  border-radius:12px;
+  background:rgba(5,18,29,.9);
+  border-color:rgba(133,190,232,.12)
+}
+.empty-state{
+  display:flex;
+  min-height:130px;
+  flex-direction:column;
+  justify-content:center;
+  gap:6px;
+  border:1px dashed rgba(133,190,232,.15);
+  border-radius:13px;
+  background:rgba(2,9,15,.22)
+}
+.empty-state b{font-size:13px;color:#d9edf7}
+.empty-state span{font-size:11px;color:#819aa9}
+@media(max-width:1150px){
+  main{width:min(100% - 24px,1500px)}
+  .layout{grid-template-columns:1fr}
+  .detail-panel{position:static!important}
+}
+@media(max-width:760px){
+  main{width:min(100% - 16px,1500px)}
+  .panel{padding:14px}
+  .panel-head{align-items:flex-start;flex-direction:column}
+  .status{white-space:normal}
+  .unified-filter-grid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -177,15 +353,15 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <nav><a href="/">🌎 Earth Tracker</a><a href="/aviation.html">✈ Aviation Agent</a><a href="/worldfocus.html">◎ World Focus</a><a class="active" href="/patterns.html">☿ Planet News</a></nav>
 </header>
 <main>
-<section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Tracks selected planets through Lahiri sidereal signs and nakshatras from January 1, 2014 forward. Each continuous sign transit records degree path, motion, conjunctions, 90° squares and 150° inconjuncts to other planets. Select a past or current transit to compare categorized news headlines published during that same interval.</p></div></section>
+<section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Explore Lahiri sidereal planet transits from 1980 through 2028, then layer exact planet/sign passages to isolate overlapping historical windows. Select any transit to calculate detailed nakshatras, motion, aspects and the news patterns recorded during that interval.</p></div></section>
 
-<section class="controls">
+<section class="controls primary-toolbar">
 <label>Analyze planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
 <div class="detail-sub" style="align-self:center">Research range: Jan 1, 1980 → Dec 31, 2028</div>
 </section>
 
-<section class="panel" id="unifiedFilterPanel">
-<div class="panel-head"><strong>TRANSIT FILTERS · 1980–2028</strong><span id="planetFilterStatus" class="status">No filters active</span></div>
+<section class="panel filter-panel" id="unifiedFilterPanel">
+<div class="panel-head"><strong>⌘ TRANSIT FILTERS <span class="head-range">1980–2028</span></strong><span id="planetFilterStatus" class="status">No filters active</span></div>
 <div class="unified-filter-grid">
 <label>Filter planet
 <select id="filterPlanetSelect">
@@ -200,22 +376,22 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <div class="detail-sub">Mercury, Sun, Venus, Mars, Jupiter, Saturn, Rahu, and Ketu all use this same filter. Add one or more passages to restrict results to their exact overlapping dates.</div>
 </section>
 
-<section class="panel summary-panel">
-<div class="panel-head"><strong>12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
+<section class="panel summary-panel dashboard-panel">
+<div class="panel-head"><strong>▦ 12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button id="loadSummaryBtn" type="button" style="min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer">Load 12-sign news summary</button></div>
 <div class="detail-sub">Each zodiac summarizes the analyzed planet within the currently active transit filters. Any of the eight planets/nodes can be used as a filter across 1980–2028. Weak or missing archive windows are excluded from comparative baselines.</div>
-<div id="summaryGrid" class="summary-grid"><div class="empty">Building 12-sign summary…</div></div>
+<div id="summaryGrid" class="summary-grid"><div class="empty empty-state"><b>Summary ready when you are.</b><span>Load the 12-sign news summary after choosing any filters you want to apply.</span></div></div>
 </section>
 
 <section class="layout">
-<div class="panel">
-<div class="panel-head"><strong><span id="timelinePlanetName">MERCURY</span> SIGN TRANSIT TIMELINE</strong><span id="timelineStatus" class="status">Calculating…</span></div>
-<div id="transitList" class="transit-list"><div class="empty">Building selected-planet ephemeris…</div></div>
+<div class="panel timeline-panel dashboard-panel">
+<div class="panel-head"><strong>◫ <span id="timelinePlanetName">MERCURY</span> TRANSIT TIMELINE</strong><span id="timelineStatus" class="status">Calculating…</span></div>
+<div id="transitList" class="transit-list"><div class="empty empty-state"><b>Preparing transit timeline…</b><span>Calculating sign passages across the research range.</span></div></div>
 </div>
 
-<div class="panel">
-<div class="panel-head"><strong>TRANSIT + NEWS DETAIL</strong><span id="newsStatus" class="status">Select a transit</span></div>
-<div id="detail"><div class="empty">Choose a transit period to inspect its nakshatras, planetary aspects and news categories.</div></div>
+<div class="panel detail-panel dashboard-panel">
+<div class="panel-head"><strong>◉ TRANSIT + NEWS DETAIL</strong><span id="newsStatus" class="status">Select a transit</span></div>
+<div id="detail"><div class="empty empty-state"><b>Select a transit.</b><span>Detailed nakshatras, aspects and news load only for the passage you choose.</span></div></div>
 </div>
 </section>
 </main>
