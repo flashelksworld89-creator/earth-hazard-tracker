@@ -94,16 +94,12 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .metric-card b{display:block;margin-top:4px;font-size:13px}
 .anomaly-up{color:#fbbf24}.anomaly-down{color:#93c5fd}
 .subcategory-list{display:grid;gap:6px;margin-top:10px}
-.trend-search{margin-top:14px}
 .trend-controls{display:grid;grid-template-columns:minmax(220px,1fr) 180px auto;gap:8px;align-items:end}
 .trend-controls label{display:grid;gap:5px;font-size:10px;color:#91a8bf;text-transform:uppercase;font-weight:800}
 .trend-controls input,.trend-controls select{min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 10px}
 .trend-controls button{min-height:40px;border:1px solid var(--border);background:#0b1a2c;color:var(--text);border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer}
 .trend-peak{margin-top:12px;padding:12px;border:1px solid rgba(124,185,255,.18);border-radius:10px;background:#06111f}
-.trend-results{display:grid;gap:8px;margin-top:10px}
-.trend-row{display:grid;grid-template-columns:minmax(150px,1fr) minmax(160px,1.2fr) 90px 90px;gap:8px;align-items:center;padding:9px;border:1px solid rgba(124,185,255,.1);border-radius:8px}
-.trend-row small{color:#91a8bf}
-@media(max-width:760px){.trend-controls{grid-template-columns:1fr}.trend-row{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.trend-controls{grid-template-columns:1fr}}
 .subcategory-row{display:grid;grid-template-columns:minmax(160px,1fr) 44px;gap:8px;align-items:center;padding:7px 8px;border-radius:7px;background:rgba(255,255,255,.025);font-size:10px}
 .subcategory-row b{font-size:10px;color:#eaf7ff}
 .headline-groups{display:grid;gap:10px;margin-top:14px}
@@ -223,17 +219,6 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <div class="note">This panel shows the astronomical state actually used by the selected planet before any news data is attached.</div>
 </section>
 
-<section class="panel trend-search">
-<div class="panel-head"><strong>TREND SEARCH</strong><span id="trendStatus" class="status">Search categories, subcategories or subjects</span></div>
-<div class="trend-controls">
-<label>Category or subject<input id="trendQuery" type="search" placeholder="e.g. food safety, inflation, protests, dengue"></label>
-<label>Planet<select id="trendPlanet"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
-<button id="trendSearchBtn" type="button">Find peak transits</button>
-</div>
-<div class="detail-sub">Ranks matching topics only inside the Rahu/Ketu passage selected above. Each historical occurrence of a nodal sign axis is kept separate rather than combining all years together.</div>
-<div id="trendResults"><div class="empty">Enter a topic to search the transit history.</div></div>
-</section>
-
 <section class="panel summary-panel">
 <div class="panel-head"><strong>12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button id="loadSummaryBtn" type="button" style="min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer">Load 12-sign news summary</button></div>
@@ -263,7 +248,7 @@ const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarva
 const NAK_SIZE=360/27;
 const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
-const state={basePeriods:[],periods:[],nodalCycles:[],selectedNodalCycle:'',selected:null,news:new Map(),regimeNews:new Map(),summaryRun:0,trendRun:0,baselineRun:0,planet:'Mercury'};
+const state={basePeriods:[],periods:[],nodalCycles:[],selectedNodalCycle:'',selected:null,news:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 
 for(let i=0;i<12;i++){
@@ -272,10 +257,10 @@ for(let i=0;i<12;i++){
 document.getElementById('rebuildBtn').onclick=build;
 document.getElementById('planetSelect').onchange=()=>{
   state.summaryRun++;
-  state.trendRun++;
+  
   state.baselineRun++;
   state.planet=document.getElementById('planetSelect').value;
-  document.getElementById('trendPlanet').value=state.planet;
+  
   state.news.clear();
   state.selected=null;
   build();
@@ -288,8 +273,8 @@ document.getElementById('nodalAxisSelect').onchange=()=>{
 document.getElementById('applyNodalCycleBtn').onclick=applySelectedNodalCycle;
 document.getElementById('nodalCycleSelect').onchange=applySelectedNodalCycle;
 document.getElementById('loadSummaryBtn').onclick=()=>buildSignSummary(true);
-document.getElementById('trendSearchBtn').onclick=runTrendSearch;
-document.getElementById('trendQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runTrendSearch();}});
+
+
 build();
 
 async function buildNodalCyclesAsync(start,end){
@@ -352,7 +337,7 @@ function updateNodalCycleInfo(id){
 function applySelectedNodalCycle(){
   const id=document.getElementById('nodalCycleSelect').value;
   if(!id)return;
-  state.summaryRun++;state.trendRun++;state.baselineRun++;
+  state.summaryRun++;state.baselineRun++;
   state.selectedNodalCycle=id;
   state.news.clear();state.selected=null;
   updateNodalCycleInfo(id);
@@ -596,109 +581,6 @@ async function fetchPeriodNews(p,planet,cacheMode='force-cache'){
   state.news.set(p.id,data);
   return data;
 }
-function trendMatchScore(data,query){
-  const q=String(query||'').toLowerCase().trim();
-  if(!q)return{count:0,matches:[]};
-  let count=0;const matches=[];
-  for(const c of data.categories||[]){
-    const n=String(c.name||'').toLowerCase();
-    if(n.includes(q)||q.includes(n)){count+=Number(c.count)||0;matches.push(c.name);}
-  }
-  for(const s of data.subcategories||[]){
-    const n=String(s.name||'').toLowerCase();
-    if(n.includes(q)||q.includes(n)){count+=Number(s.count)||0;matches.push(s.name);}
-  }
-  for(const s of data.subjects||[]){
-    const n=String(s.name||'').toLowerCase();
-    if(n.includes(q)||q.includes(n)){count+=Number(s.count)||0;matches.push(s.name);}
-  }
-  if(data.mode==='historical-events'){
-    for(const x of data.historicalEventTypes||[]){
-      const n=String(x.name||'').toLowerCase();
-      if(n.includes(q)||q.includes(n)){count+=Number(x.count)||0;matches.push(x.name);}
-    }
-  }
-  if(!count){
-    const seen=new Set();
-    for(const a of data.articles||[]){
-      const t=((a.title||'')+' '+(a.description||'')).toLowerCase();
-      if(t.includes(q)&&!seen.has(a.id)){seen.add(a.id);count++;}
-    }
-    if(count)matches.push('Headline text');
-  }
-  return{count,matches:[...new Set(matches)].slice(0,4)};
-}
-async function runTrendSearch(){
-  const query=document.getElementById('trendQuery').value.trim();
-  if(!query){document.getElementById('trendResults').innerHTML='<div class="empty">Enter a category, subcategory or subject first.</div>';return;}
-  const planet=document.getElementById('trendPlanet').value;
-  const run=++state.trendRun;
-  const status=document.getElementById('trendStatus');
-  const resultsEl=document.getElementById('trendResults');
-  if(planet!==state.planet){
-    state.summaryRun++;
-    state.planet=planet;
-    state.news.clear();state.selected=null;
-    document.getElementById('planetSelect').value=planet;
-    await build();
-    if(run!==state.trendRun)return;
-  }
-  const periods=state.periods.filter(p=>p.start.getTime()<=Date.now());
-  status.textContent='Scanning 0 / '+periods.length+' transit windows…';
-  resultsEl.innerHTML='<div class="empty">Collecting available archive data for “'+esc(query)+'”…</div>';
-  const rows=[];
-  let done=0;
-  for(const p of periods){
-    if(run!==state.trendRun)return;
-    try{
-      const data=await fetchPeriodNews(p,planet,'force-cache');
-      if(data&&data.archiveQuality?.analysisEligible!==false){
-        const match=trendMatchScore(data,query);
-        if(match.count>0){
-          const days=Math.max(1/24,daysBetween(p.start,p.end));
-          rows.push({p,data,count:match.count,rate:match.count/days,matches:match.matches});
-        }
-      }
-    }catch(_){}
-    done++;
-    if(done%3===0||done===periods.length){
-      status.textContent='Scanning '+done+' / '+periods.length+' transit windows…';
-      await yieldUI();
-    }
-  }
-  if(run!==state.trendRun)return;
-  rows.sort((a,b)=>b.rate-a.rate||b.count-a.count);
-  renderTrendResults(query,planet,rows);
-}
-function renderTrendResults(query,planet,rows){
-  const status=document.getElementById('trendStatus');
-  const el=document.getElementById('trendResults');
-  if(!rows.length){
-    status.textContent='No comparable matches';
-    el.innerHTML='<div class="empty">No usable archive window matched “'+esc(query)+'”. Older historical indexes may not contain this modern subject classification.</div>';
-    return;
-  }
-  const peak=rows[0],p=peak.p;
-  const peakNak=p.naks.map(i=>NAK[i]).join(' → ');
-  status.textContent=rows.length+' matching transit windows';
-  const peakHtml='<div class="trend-peak"><div class="small">PEAK NORMALIZED WINDOW</div>'+
-    '<div class="detail-title">'+GLYPH[planet]+' '+planet+' in '+SIGNS[p.sign]+'</div>'+
-    '<div class="detail-sub">'+fmtDateTime(p.start)+' → '+fmtDateTime(p.end)+' · '+p.motion.join(' / ')+'</div>'+
-    '<div class="metric-grid">'+
-      '<div class="metric-card"><small>Matched activity</small><b>'+peak.count+'</b></div>'+
-      '<div class="metric-card"><small>Matches / 24h</small><b>'+peak.rate.toFixed(2)+'</b></div>'+
-      '<div class="metric-card"><small>Nakshatras</small><b>'+esc(peakNak)+'</b></div>'+
-    '</div><div class="small">Matched: '+esc(peak.matches.join(' · '))+'</div></div>';
-  const list='<div class="trend-results">'+rows.slice(0,20).map((x,i)=>
-    '<div class="trend-row" data-trend-id="'+esc(x.p.id)+'"><div><b>#'+(i+1)+' '+SG[x.p.sign]+' '+SIGNS[x.p.sign]+'</b><br><small>'+esc(x.p.motion.join(' / '))+'</small></div>'+
-    '<div><b>'+fmtDate(x.p.start)+' → '+fmtDate(x.p.end)+'</b><br><small>'+esc(x.p.naks.map(n=>NAK[n]).join(' → '))+'</small></div>'+
-    '<div><small>Count</small><br><b>'+x.count+'</b></div>'+
-    '<div><small>Per 24h</small><br><b>'+x.rate.toFixed(2)+'</b></div></div>'
-  ).join('')+'</div>';
-  el.innerHTML=peakHtml+list;
-  el.querySelectorAll('[data-trend-id]').forEach(node=>node.onclick=()=>selectPeriod(node.dataset.trendId));
-}
-
 function nodalRegimeAt(date){
   const mid=new Date(date);
   const nodes=meanNodes(mid);
