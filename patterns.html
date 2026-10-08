@@ -181,12 +181,8 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Tracks selected planets through Lahiri sidereal signs and nakshatras from January 1, 2014 forward. Each continuous sign transit records degree path, motion, conjunctions, 90° squares and 150° inconjuncts to other planets. Select a past or current transit to compare categorized news headlines published during that same interval.</p></div></section>
 
 <section class="controls">
-<label>Planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
-<label>Start date<input id="startDate" type="date" value="1980-01-01" min="1980-01-01"></label>
-<label>Future horizon<select id="endYear"><option value="2027">End of 2027</option><option value="2028" selected>End of 2028</option><option value="2030">End of 2030</option></select></label>
-<label>Filter sign<select id="signFilter"><option value="">All signs</option></select></label>
-<label>Period<select id="periodFilter"><option value="all">Past + current + future</option><option value="past">Past/current only</option><option value="future">Future only</option></select></label>
-<button id="rebuildBtn" type="button">Rebuild timeline</button>
+<label>Analyze planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
+<div class="detail-sub" style="align-self:center">Research range: Jan 1, 1980 → Dec 31, 2028</div>
 </section>
 
 <section class="panel" id="nodalCyclePanel">
@@ -248,10 +244,7 @@ const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'
 const state={periods:[],cyclePeriods:[],nodalCycles:[],selectedNodalCycle:'',secondaryPeriods:{},secondaryFilters:{Sun:'',Venus:'',Mars:'',Jupiter:'',Saturn:''},selected:null,news:new Map(),fetchCache:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,buildRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 
-for(let i=0;i<12;i++){
-  const o=document.createElement('option');o.value=String(i);o.textContent=SG[i]+' '+SIGNS[i];document.getElementById('signFilter').appendChild(o);
-}
-document.getElementById('rebuildBtn').onclick=build;
+
 document.getElementById('planetSelect').onchange=()=>{
   state.summaryRun++;
   
@@ -262,8 +255,6 @@ document.getElementById('planetSelect').onchange=()=>{
   state.selected=null;
   build();
 };
-document.getElementById('signFilter').onchange=renderTimeline;
-document.getElementById('periodFilter').onchange=renderTimeline;
 document.getElementById('nodalAxisSelect').onchange=()=>{
   populateNodalCycleYears(document.getElementById('nodalAxisSelect').value);
 };
@@ -386,8 +377,8 @@ async function build(){
   document.getElementById('timelinePlanetName').textContent=buildPlanet.toUpperCase();
   document.getElementById('transitList').innerHTML='<div class="empty">Building Rahu/Ketu cycle list…</div>';
   document.getElementById('detail').innerHTML='<div class="empty">Choose a '+esc(buildPlanet)+' transit period to inspect its nakshatras, planetary aspects and news categories.</div>';
-  const start=new Date(document.getElementById('startDate').value+'T00:00:00Z');
-  const end=new Date(Date.UTC(Number(document.getElementById('endYear').value),11,31,23,59,59));
+  const start=new Date('1980-01-01T00:00:00Z');
+  const end=new Date('2028-12-31T23:59:59Z');
   document.getElementById('summaryStatus').textContent='Ready to load historical news';
   document.getElementById('summaryGrid').innerHTML='<div class="empty">Select a Rahu/Ketu cycle, then load the summary when needed.</div>';
   state.nodalCycles=await buildNodalCyclesAsync(start,end);
@@ -572,16 +563,8 @@ function trackedMotion(d){
   return signed<0?'Retrograde':'Direct';
 }
 function renderTimeline(){
-  const signFilter=document.getElementById('signFilter').value;
-  const periodFilter=document.getElementById('periodFilter').value;
   const now=Date.now();
-  const rows=state.periods.filter(p=>{
-    if(signFilter!==''&&p.sign!==Number(signFilter))return false;
-    const future=p.start.getTime()>now;
-    if(periodFilter==='past'&&future)return false;
-    if(periodFilter==='future'&&!future)return false;
-    return true;
-  });
+  const rows=state.periods.slice();
   document.getElementById('transitList').innerHTML=rows.map(p=>{
     const future=p.start.getTime()>now,active=p.start.getTime()<=now&&p.end.getTime()>now;
     const cls='transit'+(future?' future':'')+(state.selected===p.id?' active':'');
@@ -591,7 +574,7 @@ function renderTimeline(){
       '<div><div class="dates">'+fmtDate(p.start)+' → '+fmtDate(p.end)+'</div><div class="motion">'+p.motion.join(' / ')+'<br>'+fmtDegree(p.startLon)+' → '+fmtDegree(p.endLon)+'</div><div class="small">'+daysBetween(p.start,p.end).toFixed(1)+' days · '+p.aspects.length+' aspect links</div></div>'+
       '<div><div class="nak">'+p.naks.map(i=>NAK[i]).join(' → ')+'</div><div class="aspects">'+(aspects||'<span class="tag">No configured aspect within orb</span>')+'</div></div>'+
     '</div>';
-  }).join('')||'<div class="empty">No transit periods match this filter.</div>';
+  }).join('')||'<div class="empty">No transit periods match the selected cycle filters.</div>';
   document.querySelectorAll('.transit[data-id]').forEach(el=>el.onclick=()=>selectPeriod(el.dataset.id));
 }
 function aspectTag(a){
