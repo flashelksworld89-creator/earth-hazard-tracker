@@ -357,15 +357,15 @@ main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
 <nav><a href="/">🌎 Earth Tracker</a><a href="/aviation.html">✈ Aviation Agent</a><a href="/worldfocus.html">◎ World Focus</a><a class="active" href="/patterns.html">☿ Planet News</a></nav>
 </header>
 <main>
-<section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Explore Lahiri sidereal planet transits from 1980 through 2028, then layer exact planet/sign passages to isolate overlapping historical windows. Select any transit to calculate detailed nakshatras, motion, aspects and the news patterns recorded during that interval.</p></div></section>
+<section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Explore Lahiri sidereal planet transits from 2014 through 2028, then layer exact planet/sign passages to isolate overlapping historical windows. Select any transit to calculate detailed nakshatras, motion, aspects and the news patterns recorded during that interval.</p></div></section>
 
 <section class="controls primary-toolbar">
 <label>Analyze planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
-<div class="detail-sub" style="align-self:center">Research range: Jan 1, 1980 → Dec 31, 2028</div>
+<div class="detail-sub" style="align-self:center">Research range: Jan 1, 2014 → Dec 31, 2028</div>
 </section>
 
 <section class="panel filter-panel" id="unifiedFilterPanel">
-<div class="panel-head"><strong>⌘ TRANSIT FILTERS <span class="head-range">1980–2028</span></strong><span id="planetFilterStatus" class="status">No filters active</span></div>
+<div class="panel-head"><strong>⌘ TRANSIT FILTERS <span class="head-range">2014–2028</span></strong><span id="planetFilterStatus" class="status">No filters active</span></div>
 <div class="unified-filter-grid">
 <label>Filter planet
 <select id="filterPlanetSelect">
@@ -383,7 +383,7 @@ main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
 <section class="panel summary-panel dashboard-panel">
 <div class="panel-head"><strong>▦ 12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button id="loadSummaryBtn" type="button" style="min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer">Load 12-sign news summary</button></div>
-<div class="detail-sub">Each zodiac summarizes the analyzed planet within the currently active transit filters. Any of the eight planets/nodes can be used as a filter across 1980–2028. Weak or missing archive windows are excluded from comparative baselines.</div>
+<div class="detail-sub">Each zodiac summarizes the analyzed planet within the currently active transit filters. Any of the eight planets/nodes can be used as a filter across 2014–2028. Weak or missing archive windows are excluded from comparative baselines.</div>
 <div id="summaryGrid" class="summary-grid"><div class="empty empty-state"><b>Summary ready when you are.</b><span>Load the 12-sign news summary after choosing any filters you want to apply.</span></div></div>
 </section>
 
@@ -412,7 +412,7 @@ const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'
 const state={periods:[],basePeriods:[],filterCatalogs:{},activeFilters:[],selected:null,news:new Map(),fetchCache:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,buildRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 const FILTER_PLANETS=['Mercury','Sun','Venus','Mars','Jupiter','Saturn','Rahu','Ketu'];
-const RESEARCH_START=new Date('1980-01-01T00:00:00Z');
+const RESEARCH_START=new Date('2014-01-01T00:00:00Z');
 const RESEARCH_END=new Date('2028-12-31T23:59:59Z');
 
 
@@ -815,7 +815,7 @@ async function fetchNodalRegimeBaseline(p,planet,run){
   return{regime,data:merged};
 }
 function periodDataMode(p){
-  return isoDay(new Date(p.end.getTime()+86400000))<='2014-01-01'?'historical-events':'modern-news';
+  return isoDay(new Date(p.end.getTime()+86400000))<'2014-01-01'?'historical-events':'modern-news';
 }
 async function loadFingerprintBaseline(selected,planet,run){
   const mode=periodDataMode(selected);
