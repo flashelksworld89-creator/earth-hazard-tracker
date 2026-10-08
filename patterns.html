@@ -29,6 +29,10 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .controls label{display:grid;gap:6px;color:#bfd1dc;font-size:12px;font-weight:650}
 .controls select,.controls input,.controls button{min-height:42px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:9px;padding:9px 10px;font-size:14px}
 .controls button{cursor:pointer;font-weight:800;padding-inline:16px}
+#nodalCyclePanel{margin-bottom:14px;border-color:rgba(56,189,248,.38)}
+#nodalCyclePanel .trend-controls{grid-template-columns:minmax(230px,1fr) minmax(280px,1.3fr) auto}
+#nodalCyclePanel select{width:100%}
+@media(max-width:760px){#nodalCyclePanel .trend-controls{grid-template-columns:1fr}}
 .stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
 .stat{padding:13px 14px}
 .stat small{display:block;color:#93adbd;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:700}
@@ -179,8 +183,21 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <label>Future horizon<select id="endYear"><option value="2027">End of 2027</option><option value="2028" selected>End of 2028</option><option value="2030">End of 2030</option></select></label>
 <label>Filter sign<select id="signFilter"><option value="">All signs</option></select></label>
 <label>Period<select id="periodFilter"><option value="all">Past + current + future</option><option value="past">Past/current only</option><option value="future">Future only</option></select></label>
-<label>Rahu/Ketu cycle<select id="nodalCycleSelect"><option value="">Building cycles…</option></select></label>
 <button id="rebuildBtn" type="button">Rebuild timeline</button>
+</section>
+
+<section class="panel" id="nodalCyclePanel">
+<div class="panel-head"><strong>RAHU / KETU CYCLE FILTER</strong><span id="nodalCycleStatus" class="status">Building cycle years…</span></div>
+<div class="trend-controls">
+<label>Rahu / Ketu zodiac axis
+<select id="nodalAxisSelect"><option value="">Building zodiac axes…</option></select>
+</label>
+<label>Cycle year / passage
+<select id="nodalCycleSelect"><option value="">Building cycle years…</option></select>
+</label>
+<button id="applyNodalCycleBtn" type="button">Apply cycle</button>
+</div>
+<div id="nodalCycleInfo" class="detail-sub">Choose a nodal zodiac axis, then choose one specific historical passage. Planet results will use only that Rahu/Ketu cycle.</div>
 </section>
 
 <section class="stats">
@@ -265,18 +282,11 @@ document.getElementById('planetSelect').onchange=()=>{
 };
 document.getElementById('signFilter').onchange=renderTimeline;
 document.getElementById('periodFilter').onchange=renderTimeline;
-document.getElementById('nodalCycleSelect').onchange=()=>{
-  state.summaryRun++;state.trendRun++;state.baselineRun++;
-  state.selectedNodalCycle=document.getElementById('nodalCycleSelect').value;
-  state.news.clear();state.selected=null;
-  applyNodalCycleScope();
-  summarize();renderTimeline();
-  document.getElementById('summaryStatus').textContent='Ready to load selected-cycle news';
-  document.getElementById('summaryGrid').innerHTML='<div class="empty">This summary is restricted to the selected Rahu/Ketu passage. Press “Load 12-sign news summary” to analyze only this cycle.</div>';
-  const now=Date.now();
-  const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
-  if(current)selectPeriod(current.id);
+document.getElementById('nodalAxisSelect').onchange=()=>{
+  populateNodalCycleYears(document.getElementById('nodalAxisSelect').value);
 };
+document.getElementById('applyNodalCycleBtn').onclick=applySelectedNodalCycle;
+document.getElementById('nodalCycleSelect').onchange=applySelectedNodalCycle;
 document.getElementById('loadSummaryBtn').onclick=()=>buildSignSummary(true);
 document.getElementById('trendSearchBtn').onclick=runTrendSearch;
 document.getElementById('trendQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runTrendSearch();}});
@@ -296,20 +306,65 @@ async function buildNodalCyclesAsync(start,end){
   }
   return cycles.sort((a,b)=>a.start-b.start);
 }
+function cycleAxisKey(c){return c.rahuSign+'-'+c.ketuSign}
+function cycleYearLabel(c){
+  const sy=c.start.getUTCFullYear(),ey=c.end.getUTCFullYear();
+  return sy===ey?String(sy):(sy+'–'+ey);
+}
 function populateNodalCycleSelect(){
-  const sel=document.getElementById('nodalCycleSelect');
-  const previous=state.selectedNodalCycle;
-  sel.innerHTML=state.nodalCycles.map(c=>{
-    const label='Rahu '+SIGNS[c.rahuSign]+' / Ketu '+SIGNS[c.ketuSign]+' · '+fmtDate(c.start)+' → '+fmtDate(c.end);
-    return '<option value="'+escAttr(c.id)+'">'+esc(label)+'</option>';
-  }).join('');
-  let chosen=previous&&state.nodalCycles.some(c=>c.id===previous)?previous:'';
-  if(!chosen){
+  const axisSel=document.getElementById('nodalAxisSelect');
+  const axes=[...new Map(state.nodalCycles.map(c=>[cycleAxisKey(c),c])).entries()]
+    .sort((a,b)=>Number(a[0].split('-')[0])-Number(b[0].split('-')[0]));
+  axisSel.innerHTML=axes.map(([key,c])=>
+    '<option value="'+escAttr(key)+'">Rahu '+SIGNS[c.rahuSign]+' / Ketu '+SIGNS[c.ketuSign]+'</option>'
+  ).join('');
+  let chosenCycle=state.nodalCycles.find(c=>c.id===state.selectedNodalCycle);
+  if(!chosenCycle){
     const now=Date.now();
-    const current=state.nodalCycles.find(c=>c.start.getTime()<=now&&c.end.getTime()>now);
-    chosen=(current||state.nodalCycles[0]||{}).id||'';
+    chosenCycle=state.nodalCycles.find(c=>c.start.getTime()<=now&&c.end.getTime()>now)||state.nodalCycles[0]||null;
   }
-  state.selectedNodalCycle=chosen;sel.value=chosen;
+  const axisKey=chosenCycle?cycleAxisKey(chosenCycle):(axes[0]?.[0]||'');
+  axisSel.value=axisKey;
+  populateNodalCycleYears(axisKey,chosenCycle?.id||'');
+}
+function populateNodalCycleYears(axisKey,preferredId=''){
+  const sel=document.getElementById('nodalCycleSelect');
+  const rows=state.nodalCycles.filter(c=>cycleAxisKey(c)===axisKey);
+  sel.innerHTML=rows.map(c=>
+    '<option value="'+escAttr(c.id)+'">'+esc(cycleYearLabel(c)+' · '+fmtDate(c.start)+' → '+fmtDate(c.end))+'</option>'
+  ).join('');
+  let chosen=preferredId&&rows.some(c=>c.id===preferredId)?preferredId:'';
+  if(!chosen&&rows.length){
+    const now=Date.now();
+    const current=rows.find(c=>c.start.getTime()<=now&&c.end.getTime()>now);
+    chosen=(current||rows[rows.length-1]).id;
+  }
+  sel.value=chosen;
+  document.getElementById('nodalCycleStatus').textContent=rows.length+' cycle year'+(rows.length===1?'':'s')+' available for this axis';
+  updateNodalCycleInfo(chosen);
+}
+function updateNodalCycleInfo(id){
+  const c=state.nodalCycles.find(x=>x.id===id);
+  const info=document.getElementById('nodalCycleInfo');
+  if(!c){info.textContent='No cycle passage available for this axis in the selected timeline range.';return;}
+  info.innerHTML='<b>Selected passage:</b> Rahu '+SIGNS[c.rahuSign]+' / Ketu '+SIGNS[c.ketuSign]+' · '+cycleYearLabel(c)+' · '+fmtDate(c.start)+' → '+fmtDate(c.end);
+}
+function applySelectedNodalCycle(){
+  const id=document.getElementById('nodalCycleSelect').value;
+  if(!id)return;
+  state.summaryRun++;state.trendRun++;state.baselineRun++;
+  state.selectedNodalCycle=id;
+  state.news.clear();state.selected=null;
+  updateNodalCycleInfo(id);
+  applyNodalCycleScope();
+  summarize();renderTimeline();
+  const cycle=selectedNodalCycle();
+  document.getElementById('nodalCycleStatus').textContent=cycle?'ACTIVE · '+cycleYearLabel(cycle):'No cycle selected';
+  document.getElementById('summaryStatus').textContent='Ready to load selected-cycle news';
+  document.getElementById('summaryGrid').innerHTML='<div class="empty">This summary is restricted to the selected Rahu/Ketu passage. Press “Load 12-sign news summary” to analyze only this cycle.</div>';
+  const now=Date.now();
+  const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
+  if(current)selectPeriod(current.id);
 }
 function selectedNodalCycle(){
   return state.nodalCycles.find(c=>c.id===state.selectedNodalCycle)||null;
@@ -348,6 +403,8 @@ async function build(){
   state.nodalCycles=await buildNodalCyclesAsync(start,end);
   if(buildPlanet!==state.planet)return;
   populateNodalCycleSelect();
+  state.selectedNodalCycle=document.getElementById('nodalCycleSelect').value;
+  updateNodalCycleInfo(state.selectedNodalCycle);
   applyNodalCycleScope();
   updateVerification(start,end);
   summarize();
