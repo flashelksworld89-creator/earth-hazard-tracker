@@ -346,7 +346,6 @@ function applyUnifiedFilters(){
 async function build(){
   const run=++state.buildRun,buildPlanet=state.planet;
   document.getElementById('summaryPlanetName').textContent=buildPlanet.toUpperCase();
-  document.getElementById('summaryPlanetDesc').textContent=buildPlanet;
   document.getElementById('timelinePlanetName').textContent=buildPlanet.toUpperCase();
   document.getElementById('transitList').innerHTML='<div class="empty">Building '+esc(buildPlanet)+' transit catalog…</div>';
   document.getElementById('detail').innerHTML='<div class="empty">Choose a '+esc(buildPlanet)+' transit period to inspect its nakshatras, planetary aspects and news categories.</div>';
