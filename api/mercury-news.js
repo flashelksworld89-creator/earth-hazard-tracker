@@ -413,7 +413,7 @@ export default async function handler(req,res){
     if(!from||!to) return res.status(400).json({error:'from and to dates are required'});
     const now=new Date();
     if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,rawCount:0,publisherCount:0,archiveQuality:{level:'future',analysisEligible:false,reason:'Future window'},eventCount:0,eventClusters:[],articles:[],categories:[],subcategories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
-    if(to<='2014-01-01'){
+    if(to<'2014-01-01'){
       const historical=await buildHistoricalEventResponse(from,to,planet);
       return res.status(200).json(historical);
     }
