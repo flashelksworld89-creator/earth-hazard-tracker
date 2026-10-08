@@ -33,6 +33,11 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 #nodalCyclePanel .trend-controls{grid-template-columns:minmax(230px,1fr) minmax(280px,1.3fr) auto}
 #nodalCyclePanel select{width:100%}
 #planetTransitFilters{margin-bottom:14px}
+.overlap-summary{display:flex;justify-content:space-between;gap:12px;align-items:center;cursor:pointer;list-style:none}
+.overlap-summary::-webkit-details-marker{display:none}
+.overlap-summary::after{content:'▾';font-size:12px;color:#9fb8c8}
+#planetTransitFilters[open] .overlap-summary::after{content:'▴'}
+#planetTransitFilters label[hidden]{display:none!important}
 .planet-filter-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:10px;align-items:end}
 .planet-filter-grid label{display:grid;gap:6px;color:#bfd1dc;font-size:11px;font-weight:700}
 .planet-filter-grid select,.planet-filter-grid button{min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px}
@@ -199,18 +204,18 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <div id="nodalCycleInfo" class="detail-sub">Choose a nodal zodiac axis, then choose one specific historical passage. Planet results will use only that Rahu/Ketu cycle.</div>
 </section>
 
-<section class="panel" id="planetTransitFilters">
-<div class="panel-head"><strong>PLANET TRANSIT FILTERS</strong><span id="planetFilterStatus" class="status">Optional · narrow this Rahu/Ketu cycle</span></div>
-<div class="planet-filter-grid">
-<label>Sun passage<select id="filterSun"><option value="">Any Sun transit</option></select></label>
-<label>Venus passage<select id="filterVenus"><option value="">Any Venus transit</option></select></label>
-<label>Mars passage<select id="filterMars"><option value="">Any Mars transit</option></select></label>
-<label>Jupiter passage<select id="filterJupiter"><option value="">Any Jupiter transit</option></select></label>
-<label>Saturn passage<select id="filterSaturn"><option value="">Any Saturn transit</option></select></label>
-<button id="clearPlanetFilters" type="button">Clear filters</button>
+<details class="panel" id="planetTransitFilters">
+<summary class="overlap-summary"><strong>OPTIONAL OVERLAP FILTERS</strong><span id="planetFilterStatus" class="status">None active</span></summary>
+<div class="planet-filter-grid" style="margin-top:12px">
+<label data-filter-planet="Sun">Sun passage<select id="filterSun"><option value="">Any Sun transit</option></select></label>
+<label data-filter-planet="Venus">Venus passage<select id="filterVenus"><option value="">Any Venus transit</option></select></label>
+<label data-filter-planet="Mars">Mars passage<select id="filterMars"><option value="">Any Mars transit</option></select></label>
+<label data-filter-planet="Jupiter">Jupiter passage<select id="filterJupiter"><option value="">Any Jupiter transit</option></select></label>
+<label data-filter-planet="Saturn">Saturn passage<select id="filterSaturn"><option value="">Any Saturn transit</option></select></label>
+<button id="clearPlanetFilters" type="button">Clear overlap filters</button>
 </div>
-<div class="detail-sub">Each list contains only passages that occur inside the selected Rahu/Ketu cycle. Select one or more passages to restrict the main planet's results to the time when those transits overlap.</div>
-</section>
+<div class="detail-sub" style="margin-top:10px">Optional. Use these only when you want the analyzed planet's results restricted to dates that overlap another planet's selected passage.</div>
+</details>
 
 <section class="panel summary-panel">
 <div class="panel-head"><strong>12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
@@ -247,12 +252,11 @@ const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 
 document.getElementById('planetSelect').onchange=()=>{
   state.summaryRun++;
-  
   state.baselineRun++;
   state.planet=document.getElementById('planetSelect').value;
-  
   state.news.clear();
   state.selected=null;
+  updateOverlapFilterVisibility();
   build();
 };
 document.getElementById('nodalAxisSelect').onchange=()=>{
@@ -362,6 +366,7 @@ async function rebuildCyclePeriods(){
   state.cyclePeriods=periods;
   await buildSecondaryPlanetFilters(cycle,run);
   if(run!==state.buildRun||planet!==state.planet)return;
+  updateOverlapFilterVisibility();
   applySecondaryPlanetFilters(false);
   renderTimeline();
   const now=Date.now();
@@ -429,6 +434,19 @@ async function buildSecondaryPlanetFilters(cycle,run){
     await yieldUI();
   }
 }
+function updateOverlapFilterVisibility(){
+  for(const name of ['Sun','Venus','Mars','Jupiter','Saturn']){
+    const label=document.querySelector('[data-filter-planet="'+name+'"]');
+    if(!label)continue;
+    const redundant=name===state.planet;
+    label.hidden=redundant;
+    if(redundant){
+      state.secondaryFilters[name]='';
+      const sel=document.getElementById('filter'+name);
+      if(sel)sel.value='';
+    }
+  }
+}
 function applySecondaryPlanetFilters(render=true){
   let rows=state.cyclePeriods.slice();
   const active=[];
@@ -441,7 +459,7 @@ function applySecondaryPlanetFilters(render=true){
     rows=rows.filter(p=>p.end.getTime()>target.start.getTime()&&p.start.getTime()<target.end.getTime());
   }
   state.periods=rows;
-  document.getElementById('planetFilterStatus').textContent=active.length?('Active: '+active.join(' · ')):'Optional · showing the full selected Rahu/Ketu cycle';
+  document.getElementById('planetFilterStatus').textContent=active.length?('Active: '+active.join(' · ')):'None active';
   document.getElementById('timelineStatus').textContent=rows.length+' '+state.planet+' periods in selected cycle';
   if(render){
     state.news.clear();state.selected=null;
