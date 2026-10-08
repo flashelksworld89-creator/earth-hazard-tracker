@@ -32,6 +32,13 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 #nodalCyclePanel{margin-bottom:14px;border-color:rgba(56,189,248,.38)}
 #nodalCyclePanel .trend-controls{grid-template-columns:minmax(230px,1fr) minmax(280px,1.3fr) auto}
 #nodalCyclePanel select{width:100%}
+#planetTransitFilters{margin-bottom:14px}
+.planet-filter-grid{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:10px;align-items:end}
+.planet-filter-grid label{display:grid;gap:6px;color:#bfd1dc;font-size:11px;font-weight:700}
+.planet-filter-grid select,.planet-filter-grid button{min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px}
+.planet-filter-grid button{cursor:pointer;font-weight:800}
+@media(max-width:1100px){.planet-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.planet-filter-grid{grid-template-columns:1fr}}
 @media(max-width:760px){#nodalCyclePanel .trend-controls{grid-template-columns:1fr}}
 .stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
 .stat{padding:13px 14px}
@@ -196,27 +203,17 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <div id="nodalCycleInfo" class="detail-sub">Choose a nodal zodiac axis, then choose one specific historical passage. Planet results will use only that Rahu/Ketu cycle.</div>
 </section>
 
-<section class="stats">
-<div class="stat"><small>Transit periods</small><b id="statPeriods">—</b><span>continuous sign passages</span></div>
-<div class="stat"><small id="currentPlanetLabel">Current Mercury</small><b id="statCurrent">—</b><span id="statCurrentNak">—</span></div>
-<div class="stat"><small>Conjunction events</small><b id="statConj">—</b><span>within 5°</span></div>
-<div class="stat"><small>Square events</small><b id="statSquare">—</b><span>within 4° of 90°</span></div>
-<div class="stat"><small>Inconjunct events</small><b id="statInconj">—</b><span>within 3° of 150°</span></div>
-</section>
-
-<section class="panel">
-<div class="panel-head"><strong>CALCULATION VERIFICATION</strong><span id="verifyStatus" class="status">Waiting for ephemeris</span></div>
-<div class="detail-grid">
-<div><small>Planet</small><b id="verifyPlanet">—</b></div>
-<div><small>Calculation path</small><b id="verifyMethod">—</b></div>
-<div><small>Sidereal reference</small><b>Lahiri ayanamsa</b></div>
-<div><small>Current longitude</small><b id="verifyLon">—</b></div>
-<div><small>Current sign / nakshatra</small><b id="verifySignNak">—</b></div>
-<div><small>Motion</small><b id="verifyMotion">—</b></div>
-<div><small>Timeline range</small><b id="verifyRange">—</b></div>
-<div><small>Ingress refinement</small><b>Binary-refined boundaries</b></div>
+<section class="panel" id="planetTransitFilters">
+<div class="panel-head"><strong>PLANET TRANSIT FILTERS</strong><span id="planetFilterStatus" class="status">Optional · narrow this Rahu/Ketu cycle</span></div>
+<div class="planet-filter-grid">
+<label>Sun passage<select id="filterSun"><option value="">Any Sun transit</option></select></label>
+<label>Venus passage<select id="filterVenus"><option value="">Any Venus transit</option></select></label>
+<label>Mars passage<select id="filterMars"><option value="">Any Mars transit</option></select></label>
+<label>Jupiter passage<select id="filterJupiter"><option value="">Any Jupiter transit</option></select></label>
+<label>Saturn passage<select id="filterSaturn"><option value="">Any Saturn transit</option></select></label>
+<button id="clearPlanetFilters" type="button">Clear filters</button>
 </div>
-<div class="note">This panel shows the astronomical state actually used by the selected planet before any news data is attached.</div>
+<div class="detail-sub">Each list contains only passages that occur inside the selected Rahu/Ketu cycle. Select one or more passages to restrict the main planet's results to the time when those transits overlap.</div>
 </section>
 
 <section class="panel summary-panel">
@@ -248,7 +245,7 @@ const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarva
 const NAK_SIZE=360/27;
 const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
-const state={basePeriods:[],periods:[],nodalCycles:[],selectedNodalCycle:'',selected:null,news:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,planet:'Mercury'};
+const state={periods:[],cyclePeriods:[],nodalCycles:[],selectedNodalCycle:'',secondaryPeriods:{},secondaryFilters:{Sun:'',Venus:'',Mars:'',Jupiter:'',Saturn:''},selected:null,news:new Map(),fetchCache:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,buildRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 
 for(let i=0;i<12;i++){
@@ -273,6 +270,19 @@ document.getElementById('nodalAxisSelect').onchange=()=>{
 document.getElementById('applyNodalCycleBtn').onclick=applySelectedNodalCycle;
 document.getElementById('nodalCycleSelect').onchange=applySelectedNodalCycle;
 document.getElementById('loadSummaryBtn').onclick=()=>buildSignSummary(true);
+for(const name of ['Sun','Venus','Mars','Jupiter','Saturn']){
+  document.getElementById('filter'+name).onchange=()=>{
+    state.secondaryFilters[name]=document.getElementById('filter'+name).value;
+    applySecondaryPlanetFilters();
+  };
+}
+document.getElementById('clearPlanetFilters').onclick=()=>{
+  for(const name of ['Sun','Venus','Mars','Jupiter','Saturn']){
+    state.secondaryFilters[name]='';
+    document.getElementById('filter'+name).value='';
+  }
+  applySecondaryPlanetFilters();
+};
 
 
 build();
@@ -334,71 +344,119 @@ function updateNodalCycleInfo(id){
   if(!c){info.textContent='No cycle passage available for this axis in the selected timeline range.';return;}
   info.innerHTML='<b>Selected passage:</b> Rahu '+SIGNS[c.rahuSign]+' / Ketu '+SIGNS[c.ketuSign]+' · '+cycleYearLabel(c)+' · '+fmtDate(c.start)+' → '+fmtDate(c.end);
 }
-function applySelectedNodalCycle(){
+async function applySelectedNodalCycle(){
   const id=document.getElementById('nodalCycleSelect').value;
   if(!id)return;
-  state.summaryRun++;state.baselineRun++;
+  state.summaryRun++;state.baselineRun++;state.buildRun++;
   state.selectedNodalCycle=id;
   state.news.clear();state.selected=null;
   updateNodalCycleInfo(id);
-  applyNodalCycleScope();
-  summarize();renderTimeline();
   const cycle=selectedNodalCycle();
   document.getElementById('nodalCycleStatus').textContent=cycle?'ACTIVE · '+cycleYearLabel(cycle):'No cycle selected';
   document.getElementById('summaryStatus').textContent='Ready to load selected-cycle news';
   document.getElementById('summaryGrid').innerHTML='<div class="empty">This summary is restricted to the selected Rahu/Ketu passage. Press “Load 12-sign news summary” to analyze only this cycle.</div>';
-  const now=Date.now();
-  const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
-  if(current)selectPeriod(current.id);
+  await rebuildCyclePeriods();
 }
 function selectedNodalCycle(){
   return state.nodalCycles.find(c=>c.id===state.selectedNodalCycle)||null;
 }
-function applyNodalCycleScope(){
-  const cycle=selectedNodalCycle();
-  if(!cycle){state.periods=state.basePeriods.slice();return;}
-  const scoped=[];
-  for(const p of state.basePeriods){
-    const start=Math.max(p.start.getTime(),cycle.start.getTime());
-    const end=Math.min(p.end.getTime(),cycle.end.getTime());
-    if(end<=start)continue;
-    scoped.push(makePeriod(new Date(start),new Date(end),p.sign));
-  }
-  state.periods=scoped;
-  document.getElementById('timelineStatus').textContent=state.periods.length+' scoped sign-transit periods';
-}
-async function build(){
-  const buildPlanet=state.planet;
-  document.getElementById('timelineStatus').textContent='Calculating '+buildPlanet+' transits…';
-  document.getElementById('currentPlanetLabel').textContent='Current '+state.planet;
-  document.getElementById('summaryPlanetName').textContent=state.planet.toUpperCase();
-  document.getElementById('summaryPlanetDesc').textContent=state.planet;
-  document.getElementById('timelinePlanetName').textContent=state.planet.toUpperCase();
-  document.getElementById('transitList').innerHTML='<div class="empty">Building '+esc(buildPlanet)+' ephemeris…</div>';
-  document.getElementById('detail').innerHTML='<div class="empty">Choose a '+esc(buildPlanet)+' transit period to inspect its nakshatras, planetary aspects and news categories.</div>';
-  const start=new Date(document.getElementById('startDate').value+'T00:00:00Z');
-  const end=new Date(Date.UTC(Number(document.getElementById('endYear').value),11,31,23,59,59));
-  updateVerification(start,end);
-  document.getElementById('summaryStatus').textContent='Ready to load historical news';
-  document.getElementById('summaryGrid').innerHTML='<div class="empty">Press “Load 12-sign news summary” when you want to collect historical headlines. The transit timeline remains available immediately.</div>';
-  await yieldUI();
-  const periods=await buildSignPeriodsAsync(start,end,buildPlanet);
-  if(buildPlanet!==state.planet)return;
-  state.basePeriods=periods;
-  state.nodalCycles=await buildNodalCyclesAsync(start,end);
-  if(buildPlanet!==state.planet)return;
-  populateNodalCycleSelect();
-  state.selectedNodalCycle=document.getElementById('nodalCycleSelect').value;
-  updateNodalCycleInfo(state.selectedNodalCycle);
-  applyNodalCycleScope();
-  updateVerification(start,end);
-  summarize();
+async function rebuildCyclePeriods(){
+  const cycle=selectedNodalCycle();if(!cycle)return;
+  const run=++state.buildRun;
+  const planet=state.planet;
+  document.getElementById('timelineStatus').textContent='Calculating '+planet+' only inside '+cycleYearLabel(cycle)+'…';
+  document.getElementById('transitList').innerHTML='<div class="empty">Building '+esc(planet)+' transits for the selected Rahu/Ketu cycle…</div>';
+  const periods=await buildSignPeriodsAsync(cycle.start,cycle.end,planet);
+  if(run!==state.buildRun||planet!==state.planet)return;
+  state.cyclePeriods=periods;
+  await buildSecondaryPlanetFilters(cycle,run);
+  if(run!==state.buildRun||planet!==state.planet)return;
+  applySecondaryPlanetFilters(false);
   renderTimeline();
   const now=Date.now();
   const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
-  if(current) selectPeriod(current.id);
-  const activeCycle=selectedNodalCycle();
-  document.getElementById('timelineStatus').textContent=state.periods.length+' periods · '+(activeCycle?('Rahu '+SIGNS[activeCycle.rahuSign]+' / Ketu '+SIGNS[activeCycle.ketuSign]):'all cycles');
+  if(current)selectPeriod(current.id);
+  else if(state.periods.length)selectPeriod(state.periods[Math.max(0,state.periods.length-1)].id);
+}
+async function build(){
+  const run=++state.buildRun;
+  const buildPlanet=state.planet;
+  document.getElementById('summaryPlanetName').textContent=buildPlanet.toUpperCase();
+  document.getElementById('summaryPlanetDesc').textContent=buildPlanet;
+  document.getElementById('timelinePlanetName').textContent=buildPlanet.toUpperCase();
+  document.getElementById('transitList').innerHTML='<div class="empty">Building Rahu/Ketu cycle list…</div>';
+  document.getElementById('detail').innerHTML='<div class="empty">Choose a '+esc(buildPlanet)+' transit period to inspect its nakshatras, planetary aspects and news categories.</div>';
+  const start=new Date(document.getElementById('startDate').value+'T00:00:00Z');
+  const end=new Date(Date.UTC(Number(document.getElementById('endYear').value),11,31,23,59,59));
+  document.getElementById('summaryStatus').textContent='Ready to load historical news';
+  document.getElementById('summaryGrid').innerHTML='<div class="empty">Select a Rahu/Ketu cycle, then load the summary when needed.</div>';
+  state.nodalCycles=await buildNodalCyclesAsync(start,end);
+  if(run!==state.buildRun||buildPlanet!==state.planet)return;
+  populateNodalCycleSelect();
+  state.selectedNodalCycle=document.getElementById('nodalCycleSelect').value;
+  updateNodalCycleInfo(state.selectedNodalCycle);
+  await rebuildCyclePeriods();
+}
+function simplePlanetSignPeriods(planet,start,end){
+  const periods=[];
+  const step=['Sun','Jupiter','Saturn'].includes(planet)?12*3600000:6*3600000;
+  const signAt=d=>Math.floor(planetLon(planet,d)/30);
+  const refine=(a,b,oldSign)=>{
+    let lo=a.getTime(),hi=b.getTime();
+    for(let i=0;i<24;i++){
+      const mid=(lo+hi)/2;
+      if(signAt(new Date(mid))===oldSign)lo=mid;else hi=mid;
+    }
+    return new Date(hi);
+  };
+  let t=new Date(start),sign=signAt(t),periodStart=new Date(t);
+  for(let ms=t.getTime()+step;ms<=end.getTime()+step;ms+=step){
+    const d=new Date(Math.min(ms,end.getTime())),s=signAt(d);
+    if(s!==sign||d.getTime()===end.getTime()){
+      const boundary=s!==sign?refine(new Date(Math.max(start.getTime(),ms-step)),d,sign):d;
+      periods.push({id:planet+'|'+periodStart.toISOString()+'|'+sign,planet,start:new Date(periodStart),end:new Date(boundary),sign});
+      periodStart=new Date(boundary);sign=s;
+    }
+    if(d.getTime()===end.getTime())break;
+  }
+  return periods;
+}
+async function buildSecondaryPlanetFilters(cycle,run){
+  const names=['Sun','Venus','Mars','Jupiter','Saturn'];
+  for(const name of names){
+    if(run!==state.buildRun)return;
+    const rows=simplePlanetSignPeriods(name,cycle.start,cycle.end);
+    state.secondaryPeriods[name]=rows;
+    const sel=document.getElementById('filter'+name);
+    const previous=state.secondaryFilters[name];
+    sel.innerHTML='<option value="">Any '+name+' transit</option>'+rows.map(r=>
+      '<option value="'+escAttr(r.id)+'">'+SG[r.sign]+' '+SIGNS[r.sign]+' · '+fmtDate(r.start)+' → '+fmtDate(r.end)+'</option>'
+    ).join('');
+    if(previous&&rows.some(r=>r.id===previous))sel.value=previous;
+    else{state.secondaryFilters[name]='';sel.value='';}
+    await yieldUI();
+  }
+}
+function applySecondaryPlanetFilters(render=true){
+  let rows=state.cyclePeriods.slice();
+  const active=[];
+  for(const name of ['Sun','Venus','Mars','Jupiter','Saturn']){
+    const id=state.secondaryFilters[name];
+    if(!id)continue;
+    const target=(state.secondaryPeriods[name]||[]).find(r=>r.id===id);
+    if(!target)continue;
+    active.push(name+' '+SIGNS[target.sign]);
+    rows=rows.filter(p=>p.end.getTime()>target.start.getTime()&&p.start.getTime()<target.end.getTime());
+  }
+  state.periods=rows;
+  document.getElementById('planetFilterStatus').textContent=active.length?('Active: '+active.join(' · ')):'Optional · showing the full selected Rahu/Ketu cycle';
+  document.getElementById('timelineStatus').textContent=rows.length+' '+state.planet+' periods in selected cycle';
+  if(render){
+    state.news.clear();state.selected=null;
+    document.getElementById('summaryStatus').textContent='Ready to load filtered-cycle news';
+    document.getElementById('summaryGrid').innerHTML='<div class="empty">Filters changed. Load the summary to analyze only the overlapping windows.</div>';
+    renderTimeline();
+  }
 }
 
 async function buildSignPeriodsAsync(start,end,planet){
@@ -513,35 +571,6 @@ function trackedMotion(d){
   const signed=((after-before+540)%360)-180;
   return signed<0?'Retrograde':'Direct';
 }
-function updateVerification(start,end){
-  const now=new Date();
-  const lon=trackedLon(now);
-  const si=Math.floor(lon/30);
-  const ni=Math.min(26,Math.floor(lon/NAK_SIZE));
-  const isNode=state.planet==='Rahu'||state.planet==='Ketu';
-  document.getElementById('verifyPlanet').textContent=(GLYPH[state.planet]||'')+' '+state.planet;
-  document.getElementById('verifyMethod').textContent=isNode?'Mean lunar node + Lahiri':'Astronomy Engine geocentric + Lahiri';
-  document.getElementById('verifyLon').textContent=lon.toFixed(6)+'° ('+fmtDegree(lon)+')';
-  document.getElementById('verifySignNak').textContent=SG[si]+' '+SIGNS[si]+' · '+NAK[ni];
-  document.getElementById('verifyMotion').textContent=trackedMotion(now);
-  document.getElementById('verifyRange').textContent=isoDay(start)+' → '+isoDay(end);
-  if(isNode){
-    const n=meanNodes(now);
-    document.getElementById('verifyStatus').textContent='Calculated for '+state.planet+' · node separation '+angleDiff(n.rahu,n.ketu).toFixed(3)+'°';
-  }else{
-    document.getElementById('verifyStatus').textContent='Calculated for '+state.planet;
-  }
-}
-function summarize(){
-  document.getElementById('statPeriods').textContent=state.periods.length;
-  const all=state.periods.flatMap(p=>p.aspects);
-  document.getElementById('statConj').textContent=all.filter(x=>x.kind==='conj').length;
-  document.getElementById('statSquare').textContent=all.filter(x=>x.kind==='square').length;
-  document.getElementById('statInconj').textContent=all.filter(x=>x.kind==='inconj').length;
-  const now=new Date(),lon=trackedLon(now),si=Math.floor(lon/30),ni=Math.floor(lon/NAK_SIZE);
-  document.getElementById('statCurrent').textContent=SG[si]+' '+SIGNS[si]+' '+fmtDegree(lon);
-  document.getElementById('statCurrentNak').textContent=NAK[ni]+' · '+trackedMotion(now);
-}
 function renderTimeline(){
   const signFilter=document.getElementById('signFilter').value;
   const periodFilter=document.getElementById('periodFilter').value;
@@ -575,11 +604,21 @@ async function fetchPeriodNews(p,planet,cacheMode='force-cache'){
   const from=isoDay(p.start);
   const endCap=new Date(Math.min(p.end.getTime(),Date.now()+86400000));
   const to=isoDay(new Date(endCap.getTime()+86400000));
-  const r=await fetch('/api/mercury-news?planet='+encodeURIComponent(planet)+'&from='+from+'&to='+to,{cache:cacheMode});
-  if(!r.ok)throw new Error('News HTTP '+r.status);
-  const data=await r.json();
-  state.news.set(p.id,data);
-  return data;
+  const requestKey=planet+'|'+from+'|'+to;
+  let promise=state.fetchCache.get(requestKey);
+  if(!promise){
+    promise=fetch('/api/mercury-news?planet='+encodeURIComponent(planet)+'&from='+from+'&to='+to,{cache:cacheMode})
+      .then(r=>{if(!r.ok)throw new Error('News HTTP '+r.status);return r.json()});
+    state.fetchCache.set(requestKey,promise);
+  }
+  try{
+    const data=await promise;
+    state.news.set(p.id,data);
+    return data;
+  }catch(e){
+    state.fetchCache.delete(requestKey);
+    throw e;
+  }
 }
 function nodalRegimeAt(date){
   const mid=new Date(date);
@@ -641,28 +680,31 @@ function mergeNewsData(chunks){
   };
 }
 async function fetchNodalRegimeBaseline(p,planet,run){
+  const cycle=selectedNodalCycle();
   const mid=new Date((p.start.getTime()+p.end.getTime())/2);
-  const regime=nodalRegimeBounds(mid);
+  const regime=cycle||nodalRegimeBounds(mid);
   const mode=periodDataMode(p);
   const cacheKey=mode+'|'+regime.key+'|'+isoDay(regime.start)+'|'+isoDay(regime.end);
   if(state.regimeNews.has(cacheKey))return{regime,data:state.regimeNews.get(cacheKey)};
-  const chunks=[];
   const maxEnd=Math.min(regime.end.getTime(),Date.now()+86400000);
-  const chunkMs=90*86400000;
+  const chunkMs=180*86400000;
+  const windows=[];
   for(let ms=regime.start.getTime();ms<maxEnd;ms+=chunkMs){
-    if(run!==state.baselineRun||planet!==state.planet)return null;
-    const fromDate=new Date(ms);
-    const toDate=new Date(Math.min(ms+chunkMs,maxEnd));
-    const from=isoDay(fromDate),to=isoDay(toDate);
-    try{
-      const r=await fetch('/api/mercury-news?planet='+encodeURIComponent(planet)+'&from='+from+'&to='+to,{cache:'force-cache'});
-      if(r.ok){
-        const d=await r.json();
-        if(d.archiveQuality?.analysisEligible!==false)chunks.push(d);
-      }
-    }catch(_){}
-    await yieldUI();
+    windows.push([new Date(ms),new Date(Math.min(ms+chunkMs,maxEnd))]);
   }
+  const settled=await Promise.allSettled(windows.map(async([fromDate,toDate])=>{
+    if(run!==state.baselineRun||planet!==state.planet)return null;
+    const from=isoDay(fromDate),to=isoDay(toDate);
+    const key='regime|'+planet+'|'+from+'|'+to;
+    let promise=state.fetchCache.get(key);
+    if(!promise){
+      promise=fetch('/api/mercury-news?planet='+encodeURIComponent(planet)+'&from='+from+'&to='+to,{cache:'force-cache'}).then(r=>r.ok?r.json():null);
+      state.fetchCache.set(key,promise);
+    }
+    return promise;
+  }));
+  if(run!==state.baselineRun||planet!==state.planet)return null;
+  const chunks=settled.filter(x=>x.status==='fulfilled'&&x.value&&x.value.archiveQuality?.analysisEligible!==false).map(x=>x.value);
   const merged=mergeNewsData(chunks);
   state.regimeNews.set(cacheKey,merged);
   return{regime,data:merged};
@@ -785,18 +827,12 @@ async function buildSignSummary(userInitiated=false){
 
   let completed=0;
   const queue=eligible.slice();
-  const workers=Array.from({length:1},async()=>{
+  const workers=Array.from({length:4},async()=>{
     while(queue.length && run===state.summaryRun){
       const p=queue.shift();
       if(!p)break;
       if(!state.news.has(p.id)){
-        try{
-          const from=isoDay(p.start);
-          const endCap=new Date(Math.min(p.end.getTime(),Date.now()+86400000));
-          const to=isoDay(new Date(endCap.getTime()+86400000));
-          const r=await fetch('/api/mercury-news?planet='+encodeURIComponent(summaryPlanet)+'&from='+from+'&to='+to,{cache:'force-cache'});
-          if(r.ok&&run===state.summaryRun&&summaryPlanet===state.planet)state.news.set(p.id,await r.json());
-        }catch(_){}
+        try{await fetchPeriodNews(p,summaryPlanet,'force-cache')}catch(_){}
       }
       completed++;
       if(status)status.textContent=completed+' / '+eligible.length+' transit windows loaded';
