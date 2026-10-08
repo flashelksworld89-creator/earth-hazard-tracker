@@ -179,6 +179,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <label>Future horizon<select id="endYear"><option value="2027">End of 2027</option><option value="2028" selected>End of 2028</option><option value="2030">End of 2030</option></select></label>
 <label>Filter sign<select id="signFilter"><option value="">All signs</option></select></label>
 <label>Period<select id="periodFilter"><option value="all">Past + current + future</option><option value="past">Past/current only</option><option value="future">Future only</option></select></label>
+<label>Rahu/Ketu cycle<select id="nodalCycleSelect"><option value="">Building cycles…</option></select></label>
 <button id="rebuildBtn" type="button">Rebuild timeline</button>
 </section>
 
@@ -212,14 +213,14 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 <label>Planet<select id="trendPlanet"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
 <button id="trendSearchBtn" type="button">Find peak transits</button>
 </div>
-<div class="detail-sub">Ranks matching topics by normalized activity inside each completed transit. Results show where the selected planet was transiting when the topic was strongest. Historical windows are used only when their archive-quality flag allows comparison.</div>
+<div class="detail-sub">Ranks matching topics only inside the Rahu/Ketu passage selected above. Each historical occurrence of a nodal sign axis is kept separate rather than combining all years together.</div>
 <div id="trendResults"><div class="empty">Enter a topic to search the transit history.</div></div>
 </section>
 
 <section class="panel summary-panel">
 <div class="panel-head"><strong>12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button id="loadSummaryBtn" type="button" style="min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer">Load 12-sign news summary</button></div>
-<div class="detail-sub">Each zodiac receives the primary news category found across all completed/current <span id="summaryPlanetDesc">Mercury</span> passages through that sign since the selected start date. Modern periods use balanced headline archives; pre-2014 periods use GDELT 1.0 coded historical events when the compact index is available. Weak or missing archive windows are excluded from comparative baselines.</div>
+<div class="detail-sub">Each zodiac receives results only from the currently selected Rahu/Ketu passage. <span id="summaryPlanetDesc">Mercury</span> transits from different nodal-cycle years are not combined. Modern periods use balanced headline archives; pre-2014 periods use GDELT 1.0 coded historical events when the compact index is available. Weak or missing archive windows are excluded from comparative baselines.</div>
 <div id="summaryGrid" class="summary-grid"><div class="empty">Building 12-sign summary…</div></div>
 </section>
 
@@ -245,7 +246,7 @@ const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarva
 const NAK_SIZE=360/27;
 const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
-const state={periods:[],selected:null,news:new Map(),regimeNews:new Map(),summaryRun:0,trendRun:0,baselineRun:0,planet:'Mercury'};
+const state={basePeriods:[],periods:[],nodalCycles:[],selectedNodalCycle:'',selected:null,news:new Map(),regimeNews:new Map(),summaryRun:0,trendRun:0,baselineRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 
 for(let i=0;i<12;i++){
@@ -264,11 +265,68 @@ document.getElementById('planetSelect').onchange=()=>{
 };
 document.getElementById('signFilter').onchange=renderTimeline;
 document.getElementById('periodFilter').onchange=renderTimeline;
+document.getElementById('nodalCycleSelect').onchange=()=>{
+  state.summaryRun++;state.trendRun++;state.baselineRun++;
+  state.selectedNodalCycle=document.getElementById('nodalCycleSelect').value;
+  state.news.clear();state.selected=null;
+  applyNodalCycleScope();
+  summarize();renderTimeline();
+  document.getElementById('summaryStatus').textContent='Ready to load selected-cycle news';
+  document.getElementById('summaryGrid').innerHTML='<div class="empty">This summary is restricted to the selected Rahu/Ketu passage. Press “Load 12-sign news summary” to analyze only this cycle.</div>';
+  const now=Date.now();
+  const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
+  if(current)selectPeriod(current.id);
+};
 document.getElementById('loadSummaryBtn').onclick=()=>buildSignSummary(true);
 document.getElementById('trendSearchBtn').onclick=runTrendSearch;
 document.getElementById('trendQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runTrendSearch();}});
 build();
 
+async function buildNodalCyclesAsync(start,end){
+  const cycles=[];const seen=new Set();let cursor=new Date(start);let guard=0;
+  while(cursor.getTime()<end.getTime()&&guard++<80){
+    const r=nodalRegimeBounds(cursor);
+    const key=isoDay(r.start)+'|'+r.rahuSign;
+    if(!seen.has(key)&&r.end.getTime()>start.getTime()&&r.start.getTime()<end.getTime()){
+      seen.add(key);
+      cycles.push({...r,id:key});
+    }
+    cursor=new Date(r.end.getTime()+86400000);
+    if(guard%4===0)await yieldUI();
+  }
+  return cycles.sort((a,b)=>a.start-b.start);
+}
+function populateNodalCycleSelect(){
+  const sel=document.getElementById('nodalCycleSelect');
+  const previous=state.selectedNodalCycle;
+  sel.innerHTML=state.nodalCycles.map(c=>{
+    const label='Rahu '+SIGNS[c.rahuSign]+' / Ketu '+SIGNS[c.ketuSign]+' · '+fmtDate(c.start)+' → '+fmtDate(c.end);
+    return '<option value="'+escAttr(c.id)+'">'+esc(label)+'</option>';
+  }).join('');
+  let chosen=previous&&state.nodalCycles.some(c=>c.id===previous)?previous:'';
+  if(!chosen){
+    const now=Date.now();
+    const current=state.nodalCycles.find(c=>c.start.getTime()<=now&&c.end.getTime()>now);
+    chosen=(current||state.nodalCycles[0]||{}).id||'';
+  }
+  state.selectedNodalCycle=chosen;sel.value=chosen;
+}
+function selectedNodalCycle(){
+  return state.nodalCycles.find(c=>c.id===state.selectedNodalCycle)||null;
+}
+function applyNodalCycleScope(){
+  const cycle=selectedNodalCycle();
+  if(!cycle){state.periods=state.basePeriods.slice();return;}
+  const scoped=[];
+  for(const p of state.basePeriods){
+    const start=Math.max(p.start.getTime(),cycle.start.getTime());
+    const end=Math.min(p.end.getTime(),cycle.end.getTime());
+    if(end<=start)continue;
+    scoped.push(makePeriod(new Date(start),new Date(end),p.sign));
+  }
+  state.periods=scoped;
+  document.getElementById('timelineStatus').textContent=state.periods.length+' scoped sign-transit periods';
+}
 async function build(){
   const buildPlanet=state.planet;
   document.getElementById('timelineStatus').textContent='Calculating '+buildPlanet+' transits…';
@@ -286,14 +344,19 @@ async function build(){
   await yieldUI();
   const periods=await buildSignPeriodsAsync(start,end,buildPlanet);
   if(buildPlanet!==state.planet)return;
-  state.periods=periods;
+  state.basePeriods=periods;
+  state.nodalCycles=await buildNodalCyclesAsync(start,end);
+  if(buildPlanet!==state.planet)return;
+  populateNodalCycleSelect();
+  applyNodalCycleScope();
   updateVerification(start,end);
   summarize();
   renderTimeline();
   const now=Date.now();
   const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
   if(current) selectPeriod(current.id);
-  document.getElementById('timelineStatus').textContent=state.periods.length+' sign-transit periods';
+  const activeCycle=selectedNodalCycle();
+  document.getElementById('timelineStatus').textContent=state.periods.length+' periods · '+(activeCycle?('Rahu '+SIGNS[activeCycle.rahuSign]+' / Ketu '+SIGNS[activeCycle.ketuSign]):'all cycles');
 }
 
 async function buildSignPeriodsAsync(start,end,planet){
