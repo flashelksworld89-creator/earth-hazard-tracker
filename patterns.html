@@ -205,16 +205,19 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 </section>
 
 <details class="panel" id="planetTransitFilters">
-<summary class="overlap-summary"><strong>OPTIONAL OVERLAP FILTERS</strong><span id="planetFilterStatus" class="status">None active</span></summary>
+<summary class="overlap-summary"><strong>OPTIONAL PLANET FILTERS · 1980–2028</strong><span id="planetFilterStatus" class="status">None active</span></summary>
 <div class="planet-filter-grid" style="margin-top:12px">
+<label data-filter-planet="Mercury">Mercury passage<select id="filterMercury"><option value="">Any Mercury transit</option></select></label>
 <label data-filter-planet="Sun">Sun passage<select id="filterSun"><option value="">Any Sun transit</option></select></label>
 <label data-filter-planet="Venus">Venus passage<select id="filterVenus"><option value="">Any Venus transit</option></select></label>
 <label data-filter-planet="Mars">Mars passage<select id="filterMars"><option value="">Any Mars transit</option></select></label>
 <label data-filter-planet="Jupiter">Jupiter passage<select id="filterJupiter"><option value="">Any Jupiter transit</option></select></label>
 <label data-filter-planet="Saturn">Saturn passage<select id="filterSaturn"><option value="">Any Saturn transit</option></select></label>
-<button id="clearPlanetFilters" type="button">Clear overlap filters</button>
+<label data-filter-planet="Rahu">Rahu passage<select id="filterRahu"><option value="">Any Rahu transit</option></select></label>
+<label data-filter-planet="Ketu">Ketu passage<select id="filterKetu"><option value="">Any Ketu transit</option></select></label>
+<button id="clearPlanetFilters" type="button">Clear planet filters</button>
 </div>
-<div class="detail-sub" style="margin-top:10px">Optional. Use these only when you want the analyzed planet's results restricted to dates that overlap another planet's selected passage.</div>
+<div class="detail-sub" style="margin-top:10px">Each filter contains that planet's complete Lahiri sidereal sign passages from 1980 through 2028. Choose any passage to restrict the analyzed planet's results to overlapping dates.</div>
 </details>
 
 <section class="panel summary-panel">
@@ -246,8 +249,11 @@ const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarva
 const NAK_SIZE=360/27;
 const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
-const state={periods:[],cyclePeriods:[],nodalCycles:[],selectedNodalCycle:'',secondaryPeriods:{},secondaryFilters:{Sun:'',Venus:'',Mars:'',Jupiter:'',Saturn:''},selected:null,news:new Map(),fetchCache:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,buildRun:0,planet:'Mercury'};
+const state={periods:[],cyclePeriods:[],nodalCycles:[],selectedNodalCycle:'',secondaryPeriods:{},secondaryFilters:{Mercury:'',Sun:'',Venus:'',Mars:'',Jupiter:'',Saturn:'',Rahu:'',Ketu:''},selected:null,news:new Map(),fetchCache:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,buildRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
+const FILTER_PLANETS=['Mercury','Sun','Venus','Mars','Jupiter','Saturn','Rahu','Ketu'];
+const RESEARCH_START=new Date('1980-01-01T00:00:00Z');
+const RESEARCH_END=new Date('2028-12-31T23:59:59Z');
 
 
 document.getElementById('planetSelect').onchange=()=>{
@@ -265,14 +271,14 @@ document.getElementById('nodalAxisSelect').onchange=()=>{
 document.getElementById('applyNodalCycleBtn').onclick=applySelectedNodalCycle;
 document.getElementById('nodalCycleSelect').onchange=applySelectedNodalCycle;
 document.getElementById('loadSummaryBtn').onclick=()=>buildSignSummary(true);
-for(const name of ['Sun','Venus','Mars','Jupiter','Saturn']){
+for(const name of FILTER_PLANETS){
   document.getElementById('filter'+name).onchange=()=>{
     state.secondaryFilters[name]=document.getElementById('filter'+name).value;
     applySecondaryPlanetFilters();
   };
 }
 document.getElementById('clearPlanetFilters').onclick=()=>{
-  for(const name of ['Sun','Venus','Mars','Jupiter','Saturn']){
+  for(const name of FILTER_PLANETS){
     state.secondaryFilters[name]='';
     document.getElementById('filter'+name).value='';
   }
@@ -383,8 +389,8 @@ async function build(){
   document.getElementById('timelinePlanetName').textContent=buildPlanet.toUpperCase();
   document.getElementById('transitList').innerHTML='<div class="empty">Building Rahu/Ketu cycle list…</div>';
   document.getElementById('detail').innerHTML='<div class="empty">Choose a '+esc(buildPlanet)+' transit period to inspect its nakshatras, planetary aspects and news categories.</div>';
-  const start=new Date('1980-01-01T00:00:00Z');
-  const end=new Date('2028-12-31T23:59:59Z');
+  const start=RESEARCH_START;
+  const end=RESEARCH_END;
   document.getElementById('summaryStatus').textContent='Ready to load historical news';
   document.getElementById('summaryGrid').innerHTML='<div class="empty">Select a Rahu/Ketu cycle, then load the summary when needed.</div>';
   state.nodalCycles=await buildNodalCyclesAsync(start,end);
@@ -419,23 +425,27 @@ function simplePlanetSignPeriods(planet,start,end){
   return periods;
 }
 async function buildSecondaryPlanetFilters(cycle,run){
-  const names=['Sun','Venus','Mars','Jupiter','Saturn'];
-  for(const name of names){
+  for(const name of FILTER_PLANETS){
     if(run!==state.buildRun)return;
-    const rows=simplePlanetSignPeriods(name,cycle.start,cycle.end);
-    state.secondaryPeriods[name]=rows;
+    let rows=state.secondaryPeriods[name];
+    if(!rows||!rows.length){
+      rows=simplePlanetSignPeriods(name,RESEARCH_START,RESEARCH_END);
+      state.secondaryPeriods[name]=rows;
+    }
     const sel=document.getElementById('filter'+name);
     const previous=state.secondaryFilters[name];
-    sel.innerHTML='<option value="">Any '+name+' transit</option>'+rows.map(r=>
-      '<option value="'+escAttr(r.id)+'">'+SG[r.sign]+' '+SIGNS[r.sign]+' · '+fmtDate(r.start)+' → '+fmtDate(r.end)+'</option>'
-    ).join('');
+    sel.innerHTML='<option value="">Any '+name+' transit</option>'+rows.map(r=>{
+      const sy=r.start.getUTCFullYear(),ey=r.end.getUTCFullYear();
+      const years=sy===ey?String(sy):(sy+'–'+ey);
+      return '<option value="'+escAttr(r.id)+'">'+SG[r.sign]+' '+SIGNS[r.sign]+' · '+years+' · '+fmtDate(r.start)+' → '+fmtDate(r.end)+'</option>';
+    }).join('');
     if(previous&&rows.some(r=>r.id===previous))sel.value=previous;
     else{state.secondaryFilters[name]='';sel.value='';}
     await yieldUI();
   }
 }
 function updateOverlapFilterVisibility(){
-  for(const name of ['Sun','Venus','Mars','Jupiter','Saturn']){
+  for(const name of FILTER_PLANETS){
     const label=document.querySelector('[data-filter-planet="'+name+'"]');
     if(!label)continue;
     const redundant=name===state.planet;
@@ -448,24 +458,36 @@ function updateOverlapFilterVisibility(){
   }
 }
 function applySecondaryPlanetFilters(render=true){
-  let rows=state.cyclePeriods.slice();
+  let windows=state.cyclePeriods.map(p=>({p,start:p.start.getTime(),end:p.end.getTime()}));
   const active=[];
-  for(const name of ['Sun','Venus','Mars','Jupiter','Saturn']){
+  for(const name of FILTER_PLANETS){
     const id=state.secondaryFilters[name];
     if(!id)continue;
     const target=(state.secondaryPeriods[name]||[]).find(r=>r.id===id);
     if(!target)continue;
-    active.push(name+' '+SIGNS[target.sign]);
-    rows=rows.filter(p=>p.end.getTime()>target.start.getTime()&&p.start.getTime()<target.end.getTime());
+    active.push(name+' '+SIGNS[target.sign]+' '+target.start.getUTCFullYear());
+    windows=windows.map(w=>({
+      p:w.p,
+      start:Math.max(w.start,target.start.getTime()),
+      end:Math.min(w.end,target.end.getTime())
+    })).filter(w=>w.end>w.start);
   }
-  state.periods=rows;
+  state.periods=windows.map(w=>{
+    if(w.start===w.p.start.getTime()&&w.end===w.p.end.getTime())return w.p;
+    return makePeriod(new Date(w.start),new Date(w.end),w.p.sign);
+  });
   document.getElementById('planetFilterStatus').textContent=active.length?('Active: '+active.join(' · ')):'None active';
-  document.getElementById('timelineStatus').textContent=rows.length+' '+state.planet+' periods in selected cycle';
+  document.getElementById('timelineStatus').textContent=state.periods.length+' '+state.planet+' periods after overlap filters';
   if(render){
     state.news.clear();state.selected=null;
-    document.getElementById('summaryStatus').textContent='Ready to load filtered-cycle news';
-    document.getElementById('summaryGrid').innerHTML='<div class="empty">Filters changed. Load the summary to analyze only the overlapping windows.</div>';
+    document.getElementById('summaryStatus').textContent='Ready to load filtered news';
+    document.getElementById('summaryGrid').innerHTML='<div class="empty">Filters changed. Load the summary to analyze only the exact overlapping windows.</div>';
     renderTimeline();
+    const now=Date.now();
+    const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
+    const latestPast=state.periods.filter(p=>p.start.getTime()<=now).sort((a,b)=>b.start-a.start)[0];
+    const auto=current||latestPast||state.periods[0];
+    if(auto)selectPeriod(auto.id);
   }
 }
 
@@ -593,7 +615,7 @@ function renderTimeline(){
       '<div><div class="dates">'+fmtDate(p.start)+' → '+fmtDate(p.end)+'</div><div class="motion">'+p.motion.join(' / ')+'<br>'+fmtDegree(p.startLon)+' → '+fmtDegree(p.endLon)+'</div><div class="small">'+daysBetween(p.start,p.end).toFixed(1)+' days · '+p.aspects.length+' aspect links</div></div>'+
       '<div><div class="nak">'+p.naks.map(i=>NAK[i]).join(' → ')+'</div><div class="aspects">'+(aspects||'<span class="tag">No configured aspect within orb</span>')+'</div></div>'+
     '</div>';
-  }).join('')||'<div class="empty">No transit periods match the selected cycle filters.</div>';
+  }).join('')||'<div class="empty">No dates overlap all active filters and the selected Rahu/Ketu cycle. Choose a different cycle or clear one of the planet filters.</div>';
   document.querySelectorAll('.transit[data-id]').forEach(el=>el.onclick=()=>selectPeriod(el.dataset.id));
 }
 function aspectTag(a){
