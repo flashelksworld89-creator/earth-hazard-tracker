@@ -248,7 +248,10 @@ for(let i=0;i<12;i++){
   o.value=String(i);o.textContent=SG[i]+' '+SIGNS[i];
   document.getElementById('filterSignSelect').appendChild(o);
 }
-document.getElementById('filterPlanetSelect').onchange=populateUnifiedPassages;
+document.getElementById('filterPlanetSelect').onchange=()=>{
+  document.getElementById('filterSignSelect').value='';
+  document.getElementById('filterPassageSelect').innerHTML='<option value="">Choose a sign first</option>';
+};
 document.getElementById('filterSignSelect').onchange=populateUnifiedPassages;
 document.getElementById('addTransitFilterBtn').onclick=addUnifiedFilter;
 document.getElementById('clearTransitFiltersBtn').onclick=()=>{state.activeFilters=[];applyUnifiedFilters();};
@@ -256,16 +259,19 @@ document.getElementById('loadSummaryBtn').onclick=()=>buildSignSummary(true);
 
 build();
 
-function simplePlanetSignPeriods(planet,start,end){
+async function simplePlanetSignPeriodsAsync(planet,start,end){
   const periods=[];
   const step=['Sun','Jupiter','Saturn','Rahu','Ketu'].includes(planet)?3*86400000:86400000;
   const signAt=d=>Math.floor(planetLon(planet,d)/30);
   const refine=(a,b,oldSign)=>{
     let lo=a.getTime(),hi=b.getTime();
-    for(let i=0;i<24;i++){const mid=(lo+hi)/2;if(signAt(new Date(mid))===oldSign)lo=mid;else hi=mid;}
+    for(let i=0;i<24;i++){
+      const mid=(lo+hi)/2;
+      if(signAt(new Date(mid))===oldSign)lo=mid;else hi=mid;
+    }
     return new Date(hi);
   };
-  let t=new Date(start),sign=signAt(t),periodStart=new Date(t);
+  let t=new Date(start),sign=signAt(t),periodStart=new Date(t),iterations=0;
   for(let ms=t.getTime()+step;ms<=end.getTime()+step;ms+=step){
     const d=new Date(Math.min(ms,end.getTime())),s=signAt(d);
     if(s!==sign||d.getTime()===end.getTime()){
@@ -273,22 +279,35 @@ function simplePlanetSignPeriods(planet,start,end){
       periods.push({id:planet+'|'+periodStart.toISOString()+'|'+sign,planet,start:new Date(periodStart),end:new Date(boundary),sign});
       periodStart=new Date(boundary);sign=s;
     }
+    if(++iterations%120===0)await yieldUI();
     if(d.getTime()===end.getTime())break;
   }
   return periods;
 }
 async function ensureFilterCatalog(planet){
   if(state.filterCatalogs[planet])return state.filterCatalogs[planet];
-  const rows=simplePlanetSignPeriods(planet,RESEARCH_START,RESEARCH_END);
+  if(planet===state.planet&&state.basePeriods.length){
+    const rows=state.basePeriods.map(p=>({
+      id:planet+'|'+p.start.toISOString()+'|'+p.sign,
+      planet,start:new Date(p.start),end:new Date(p.end),sign:p.sign
+    }));
+    state.filterCatalogs[planet]=rows;
+    return rows;
+  }
+  const rows=await simplePlanetSignPeriodsAsync(planet,RESEARCH_START,RESEARCH_END);
   state.filterCatalogs[planet]=rows;
-  await yieldUI();
   return rows;
 }
 async function populateUnifiedPassages(){
   const planet=document.getElementById('filterPlanetSelect').value;
   const signValue=document.getElementById('filterSignSelect').value;
   const passage=document.getElementById('filterPassageSelect');
-  passage.innerHTML='<option value="">Loading…</option>';
+  if(signValue===''){
+    passage.innerHTML='<option value="">Choose a sign first</option>';
+    return;
+  }
+  passage.innerHTML='<option value="">Loading '+planet+' passages…</option>';
+  await yieldUI();
   const rows=await ensureFilterCatalog(planet);
   const filtered=signValue===''?rows:rows.filter(r=>r.sign===Number(signValue));
   passage.innerHTML='<option value="">Choose a passage</option>'+filtered.map(r=>{
@@ -326,7 +345,7 @@ function renderActiveFilters(){
   el.querySelectorAll('[data-remove-filter]').forEach(btn=>btn.onclick=()=>removeUnifiedFilter(btn.dataset.removeFilter));
   document.getElementById('planetFilterStatus').textContent=state.activeFilters.length+' active filter'+(state.activeFilters.length===1?'':'s');
 }
-function applyUnifiedFilters(){
+function applyUnifiedFilters(autoSelect=true){
   let windows=state.basePeriods.map(p=>({p,start:p.start.getTime(),end:p.end.getTime()}));
   for(const target of state.activeFilters){
     windows=windows.map(w=>({p:w.p,start:Math.max(w.start,target.start.getTime()),end:Math.min(w.end,target.end.getTime())})).filter(w=>w.end>w.start);
@@ -337,11 +356,16 @@ function applyUnifiedFilters(){
   document.getElementById('timelineStatus').textContent=state.periods.length+' '+state.planet+' periods after filters';
   document.getElementById('summaryStatus').textContent='Ready to load filtered news';
   document.getElementById('summaryGrid').innerHTML='<div class="empty">Load the summary to analyze the current filtered windows.</div>';
-  const now=Date.now();
-  const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
-  const latestPast=state.periods.filter(p=>p.start.getTime()<=now).sort((a,b)=>b.start-a.start)[0];
-  const auto=current||latestPast||state.periods[0];
-  if(auto)selectPeriod(auto.id);
+  if(autoSelect){
+    const now=Date.now();
+    const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
+    const latestPast=state.periods.filter(p=>p.start.getTime()<=now).sort((a,b)=>b.start-a.start)[0];
+    const auto=current||latestPast||state.periods[0];
+    if(auto)selectPeriod(auto.id);
+  }else{
+    document.getElementById('detail').innerHTML='<div class="empty">Timeline ready. Select a transit to calculate detailed aspects and load news.</div>';
+    document.getElementById('newsStatus').textContent='Select a transit';
+  }
 }
 async function build(){
   const run=++state.buildRun,buildPlanet=state.planet;
@@ -352,8 +376,8 @@ async function build(){
   const periods=await buildSignPeriodsAsync(RESEARCH_START,RESEARCH_END,buildPlanet);
   if(run!==state.buildRun||buildPlanet!==state.planet)return;
   state.basePeriods=periods;
-  applyUnifiedFilters();
-  await populateUnifiedPassages();
+  applyUnifiedFilters(false);
+  document.getElementById('filterPassageSelect').innerHTML='<option value="">Choose a planet/sign to load passages</option>';
 }
 async function buildSignPeriodsAsync(start,end,planet){
   const periods=[];
