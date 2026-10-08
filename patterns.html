@@ -366,8 +366,9 @@ async function rebuildCyclePeriods(){
   renderTimeline();
   const now=Date.now();
   const current=state.periods.find(p=>p.start.getTime()<=now&&p.end.getTime()>now);
-  if(current)selectPeriod(current.id);
-  else if(state.periods.length)selectPeriod(state.periods[Math.max(0,state.periods.length-1)].id);
+  const latestPast=state.periods.filter(p=>p.start.getTime()<=now).sort((a,b)=>b.start-a.start)[0];
+  const auto=current||latestPast||state.periods[0];
+  if(auto)selectPeriod(auto.id);
 }
 async function build(){
   const run=++state.buildRun;
@@ -722,28 +723,42 @@ async function selectPeriod(id){
   state.selected=id;renderTimeline();renderDetail(p);
   if(p.start.getTime()>Date.now())return;
   const key=p.id;
-  if(state.news.has(key)){renderNews(p,state.news.get(key));return}
-  document.getElementById('newsStatus').textContent='Loading headlines…';
+  let data=state.news.get(key)||null;
+  document.getElementById('newsStatus').textContent=data?'News loaded':'Loading news…';
   try{
-    const data=await fetchPeriodNews(p,requestPlanet,'no-store');
-    if(requestPlanet!==state.planet)return;
+    if(!data)data=await fetchPeriodNews(p,requestPlanet,'force-cache');
+    if(requestPlanet!==state.planet||state.selected!==p.id)return;
+    if(!data)throw new Error('No news response returned');
     renderNews(p,data);
-    const baselineRun=++state.baselineRun;
-    document.getElementById('newsStatus').textContent='Building Rahu/Ketu regime baseline…';
-    const nodal=await fetchNodalRegimeBaseline(p,requestPlanet,baselineRun);
-    if(requestPlanet!==state.planet||baselineRun!==state.baselineRun||state.selected!==p.id)return;
-    if(nodal){
-      p.nodalRegime=nodal.regime;
-      p.nodalBaseline=nodal.data;
-    }else{
-      await loadFingerprintBaseline(p,requestPlanet,baselineRun);
-    }
-    if(requestPlanet!==state.planet||baselineRun!==state.baselineRun||state.selected!==p.id)return;
-    renderNews(p,data);
+    document.getElementById('newsStatus').textContent=(data.count||data.eventCount||0)+' records loaded';
   }catch(e){
-    document.getElementById('newsStatus').textContent='News unavailable';
-    const n=document.getElementById('newsArea');if(n)n.innerHTML='<div class="empty">Could not load headlines for this transit period.</div>';
+    if(requestPlanet!==state.planet||state.selected!==p.id)return;
+    document.getElementById('newsStatus').textContent='News request failed';
+    const n=document.getElementById('newsArea');
+    if(n)n.innerHTML='<div class="empty"><b>News could not load.</b><br>'+esc(e?.message||String(e))+'</div>';
+    return;
   }
+
+  const baselineRun=++state.baselineRun;
+  Promise.resolve().then(async()=>{
+    try{
+      const nodal=await fetchNodalRegimeBaseline(p,requestPlanet,baselineRun);
+      if(requestPlanet!==state.planet||baselineRun!==state.baselineRun||state.selected!==p.id)return;
+      if(nodal){
+        p.nodalRegime=nodal.regime;
+        p.nodalBaseline=nodal.data;
+      }else{
+        await loadFingerprintBaseline(p,requestPlanet,baselineRun);
+      }
+      if(requestPlanet!==state.planet||baselineRun!==state.baselineRun||state.selected!==p.id)return;
+      renderNews(p,data);
+      document.getElementById('newsStatus').textContent=(data.count||data.eventCount||0)+' records loaded · fingerprint ready';
+    }catch(_){
+      if(requestPlanet===state.planet&&state.selected===p.id){
+        document.getElementById('newsStatus').textContent=(data.count||data.eventCount||0)+' records loaded · baseline unavailable';
+      }
+    }
+  });
 }
 function renderDetail(p){
   const future=p.start.getTime()>Date.now();
