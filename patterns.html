@@ -245,7 +245,7 @@ const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarva
 const NAK_SIZE=360/27;
 const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
-const state={periods:[],selected:null,news:new Map(),summaryRun:0,trendRun:0,baselineRun:0,planet:'Mercury'};
+const state={periods:[],selected:null,news:new Map(),regimeNews:new Map(),summaryRun:0,trendRun:0,baselineRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 
 for(let i=0;i<12;i++){
@@ -579,6 +579,92 @@ function renderTrendResults(query,planet,rows){
   el.querySelectorAll('[data-trend-id]').forEach(node=>node.onclick=()=>selectPeriod(node.dataset.trendId));
 }
 
+function nodalRegimeAt(date){
+  const mid=new Date(date);
+  const nodes=meanNodes(mid);
+  const rahuSign=Math.floor(nodes.rahu/30);
+  const ketuSign=Math.floor(nodes.ketu/30);
+  const key=rahuSign+'-'+ketuSign;
+  return{rahuSign,ketuSign,key,rahuLon:nodes.rahu,ketuLon:nodes.ketu};
+}
+function sameRahuSign(date,sign){
+  return Math.floor(meanNodes(date).rahu/30)===sign;
+}
+function refineRahuBoundary(a,b,oldSign){
+  let lo=a.getTime(),hi=b.getTime();
+  for(let i=0;i<28;i++){
+    const mid=(lo+hi)/2;
+    if(sameRahuSign(new Date(mid),oldSign))lo=mid;else hi=mid;
+  }
+  return new Date(hi);
+}
+function nodalRegimeBounds(date){
+  const center=new Date(date);
+  const regime=nodalRegimeAt(center);
+  const day=86400000;
+  let left=new Date(center),right=new Date(center);
+  for(let i=0;i<700;i++){
+    const prev=new Date(left.getTime()-day);
+    if(!sameRahuSign(prev,regime.rahuSign)){left=refineRahuBoundary(prev,left,Math.floor(meanNodes(prev).rahu/30));break;}
+    left=prev;
+  }
+  for(let i=0;i<700;i++){
+    const next=new Date(right.getTime()+day);
+    if(!sameRahuSign(next,regime.rahuSign)){right=refineRahuBoundary(right,next,regime.rahuSign);break;}
+    right=next;
+  }
+  return{...regime,start:left,end:right};
+}
+function mergeNewsData(chunks){
+  const cat=new Map(),sub=new Map();
+  let count=0,eventCount=0,rawCount=0,publisherCount=0;
+  const subjects=new Map(),clusters=[];
+  for(const d of chunks){
+    count+=Number(d.count)||0;eventCount+=Number(d.eventCount)||0;rawCount+=Number(d.rawCount)||0;
+    publisherCount=Math.max(publisherCount,Number(d.publisherCount)||0);
+    for(const x of d.categories||[])cat.set(x.name,(cat.get(x.name)||0)+(Number(x.count)||0));
+    for(const x of d.subcategories||[]){
+      const key=(x.category||'')+'|||'+(x.name||'');
+      sub.set(key,(sub.get(key)||0)+(Number(x.count)||0));
+    }
+    for(const x of d.subjects||[])subjects.set(x.name,(subjects.get(x.name)||0)+(Number(x.count)||0));
+    for(const x of d.eventClusters||[])clusters.push(x);
+  }
+  return{
+    count,eventCount,rawCount,publisherCount,
+    categories:[...cat.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
+    subcategories:[...sub.entries()].map(([key,count])=>{const [category,name]=key.split('|||');return{category,name,count}}).sort((a,b)=>b.count-a.count),
+    subjects:[...subjects.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
+    eventClusters:clusters.sort((a,b)=>(b.headlineCount||0)-(a.headlineCount||0))
+  };
+}
+async function fetchNodalRegimeBaseline(p,planet,run){
+  const mid=new Date((p.start.getTime()+p.end.getTime())/2);
+  const regime=nodalRegimeBounds(mid);
+  const mode=periodDataMode(p);
+  const cacheKey=mode+'|'+regime.key+'|'+isoDay(regime.start)+'|'+isoDay(regime.end);
+  if(state.regimeNews.has(cacheKey))return{regime,data:state.regimeNews.get(cacheKey)};
+  const chunks=[];
+  const maxEnd=Math.min(regime.end.getTime(),Date.now()+86400000);
+  const chunkMs=90*86400000;
+  for(let ms=regime.start.getTime();ms<maxEnd;ms+=chunkMs){
+    if(run!==state.baselineRun||planet!==state.planet)return null;
+    const fromDate=new Date(ms);
+    const toDate=new Date(Math.min(ms+chunkMs,maxEnd));
+    const from=isoDay(fromDate),to=isoDay(toDate);
+    try{
+      const r=await fetch('/api/mercury-news?planet='+encodeURIComponent(planet)+'&from='+from+'&to='+to,{cache:'force-cache'});
+      if(r.ok){
+        const d=await r.json();
+        if(d.archiveQuality?.analysisEligible!==false)chunks.push(d);
+      }
+    }catch(_){}
+    await yieldUI();
+  }
+  const merged=mergeNewsData(chunks);
+  state.regimeNews.set(cacheKey,merged);
+  return{regime,data:merged};
+}
 function periodDataMode(p){
   return isoDay(new Date(p.end.getTime()+86400000))<='2014-01-01'?'historical-events':'modern-news';
 }
@@ -616,7 +702,15 @@ async function selectPeriod(id){
     if(requestPlanet!==state.planet)return;
     renderNews(p,data);
     const baselineRun=++state.baselineRun;
-    await loadFingerprintBaseline(p,requestPlanet,baselineRun);
+    document.getElementById('newsStatus').textContent='Building Rahu/Ketu regime baseline…';
+    const nodal=await fetchNodalRegimeBaseline(p,requestPlanet,baselineRun);
+    if(requestPlanet!==state.planet||baselineRun!==state.baselineRun||state.selected!==p.id)return;
+    if(nodal){
+      p.nodalRegime=nodal.regime;
+      p.nodalBaseline=nodal.data;
+    }else{
+      await loadFingerprintBaseline(p,requestPlanet,baselineRun);
+    }
     if(requestPlanet!==state.planet||baselineRun!==state.baselineRun||state.selected!==p.id)return;
     renderNews(p,data);
   }catch(e){
@@ -636,6 +730,7 @@ function renderDetail(p){
       box('Conjunctions',conj.length?conj.map(eventText).join(' · '):'None within 5°')+
       box('Squares',sq.length?sq.map(eventText).join(' · '):'None within 4°')+
       box('Inconjuncts',inc.length?inc.map(eventText).join(' · '):'None within 3° of 150°')+
+      box('Rahu/Ketu regime',(()=>{const r=nodalRegimeAt(new Date((p.start.getTime()+p.end.getTime())/2));return 'Rahu '+SIGNS[r.rahuSign]+' ↔ Ketu '+SIGNS[r.ketuSign]})())+
       box('Duration',daysBetween(p.start,p.end).toFixed(2)+' days')+
     '</div>'+
     '<div id="newsArea">'+(future?
@@ -835,6 +930,17 @@ function renderResearchMetrics(p,data){
 }
 function subcategoryAnomalies(p,data){
   const currentDays=Math.max(1/24,daysBetween(p.start,p.end));
+  if(p.nodalBaseline&&p.nodalRegime){
+    const regimeDays=Math.max(1/24,daysBetween(p.nodalRegime.start,p.nodalRegime.end));
+    const baseMap=new Map((p.nodalBaseline.subcategories||[]).map(s=>[((s.category||'')+'|||'+(s.name||'')),(Number(s.count)||0)/regimeDays]));
+    return (data.subcategories||[]).map(s=>{
+      const key=(s.category||'')+'|||'+(s.name||'');
+      const currentRate=(Number(s.count)||0)/currentDays;
+      const baseRate=baseMap.get(key)||0;
+      const ratio=baseRate>0?currentRate/baseRate:(currentRate>0?2:1);
+      return{name:s.name,category:s.category,count:Number(s.count)||0,currentRate,baseRate,ratio};
+    }).filter(x=>x.count>0).sort((a,b)=>b.ratio-a.ratio||b.currentRate-a.currentRate);
+  }
   const baseline=new Map();
   let baselineWindows=0;
   for(const other of state.periods){
@@ -862,9 +968,13 @@ function subcategoryAnomalies(p,data){
 function renderTransitFingerprint(p,data,subLifts){
   const events=(data.eventClusters||[]).slice(0,3);
   const top=subLifts[0];
+  const regime=p.nodalRegime;
+  const regimeText=regime
+    ? '<div class="note"><b>Rahu/Ketu background:</b> '+SG[regime.rahuSign]+' Rahu in '+SIGNS[regime.rahuSign]+' ↔ '+SG[regime.ketuSign]+' Ketu in '+SIGNS[regime.ketuSign]+' · '+fmtDate(regime.start)+' → '+fmtDate(regime.end)+'</div>'
+    : '';
   const distinctive=top
     ? '<div class="trend-peak"><div class="small">MOST DISTINCTIVE PATTERN</div><div class="detail-title">'+esc(top.name)+'</div>'+
-      '<div class="detail-sub">'+esc(top.category||'')+' · '+top.count+' matches · '+top.ratio.toFixed(2)+'× same-planet baseline</div></div>'
+      '<div class="detail-sub">'+esc(top.category||'')+' · '+top.count+' matches · '+top.ratio.toFixed(2)+'× Rahu/Ketu-regime baseline</div></div>'
     : '<div class="note">Building a same-planet comparison baseline for this transit. The fingerprint will update automatically when enough comparable windows are available.</div>';
   const lifts=subLifts.length
     ? '<div class="headline-group"><h3>Detailed subcategory lift</h3><div class="subcategory-list">'+subLifts.map(x=>
@@ -874,11 +984,20 @@ function renderTransitFingerprint(p,data,subLifts){
     ? '<div class="headline-group"><h3>Primary event drivers</h3><div class="headline-links">'+events.map(e=>
       '<div class="headline-link"><b>'+esc(e.title||'Event cluster')+'</b><span>'+Number(e.headlineCount||0)+' headlines · '+Number(e.sourceCount||0)+' sources · '+esc(e.topCategory||'')+'</span></div>').join('')+'</div></div>'
     : '';
-  return '<div class="headline-groups"><div class="panel-head"><strong>TRANSIT FINGERPRINT</strong><span class="status">Specific to this window</span></div>'+distinctive+lifts+drivers+'</div>';
+  return '<div class="headline-groups"><div class="panel-head"><strong>TRANSIT FINGERPRINT</strong><span class="status">Rahu/Ketu-regime normalized</span></div>'+regimeText+distinctive+lifts+drivers+'</div>';
 }
 
 function categoryAnomalies(p,data){
   const currentDays=Math.max(1/24,daysBetween(p.start,p.end));
+  if(p.nodalBaseline&&p.nodalRegime){
+    const regimeDays=Math.max(1/24,daysBetween(p.nodalRegime.start,p.nodalRegime.end));
+    const baseMap=new Map((p.nodalBaseline.categories||[]).map(x=>[x.name,(Number(x.count)||0)/regimeDays]));
+    return (data.categories||[]).filter(x=>x.name!=='Other / Unclassified').map(x=>{
+      const currentRate=(Number(x.count)||0)/currentDays;
+      const baseRate=baseMap.get(x.name)||0;
+      return{name:x.name,currentRate,baseRate,ratio:baseRate>0?currentRate/baseRate:(currentRate>0?2:1)};
+    }).sort((a,b)=>Math.abs(b.ratio-1)-Math.abs(a.ratio-1));
+  }
   const baseline=new Map();
   let baselineWindows=0;
   for(const other of state.periods){
