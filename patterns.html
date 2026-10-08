@@ -254,11 +254,11 @@ document.getElementById('addTransitFilterBtn').onclick=addUnifiedFilter;
 document.getElementById('clearTransitFiltersBtn').onclick=()=>{state.activeFilters=[];applyUnifiedFilters();};
 document.getElementById('loadSummaryBtn').onclick=()=>buildSignSummary(true);
 
-build();;
+build();
 
 function simplePlanetSignPeriods(planet,start,end){
   const periods=[];
-  const step=['Sun','Jupiter','Saturn','Rahu','Ketu'].includes(planet)?12*3600000:6*3600000;
+  const step=['Sun','Jupiter','Saturn','Rahu','Ketu'].includes(planet)?3*86400000:86400000;
   const signAt=d=>Math.floor(planetLon(planet,d)/30);
   const refine=(a,b,oldSign)=>{
     let lo=a.getTime(),hi=b.getTime();
@@ -357,7 +357,7 @@ async function build(){
 }
 async function buildSignPeriodsAsync(start,end,planet){
   const periods=[];
-  const step=['Sun','Jupiter','Saturn','Rahu','Ketu'].includes(planet)?12*3600000:6*3600000;
+  const step=['Sun','Jupiter','Saturn','Rahu','Ketu'].includes(planet)?3*86400000:86400000;
   let t=new Date(start),lon=trackedLon(t),sign=Math.floor(lon/30),periodStart=new Date(t);
   let iterations=0;
   for(let ms=t.getTime()+step;ms<=end.getTime()+step;ms+=step){
@@ -369,7 +369,7 @@ async function buildSignPeriodsAsync(start,end,planet){
       periodStart=new Date(boundary);
       sign=s;
     }
-    if(++iterations%180===0){
+    if(++iterations%90===0){
       document.getElementById('timelineStatus').textContent='Calculating '+planet+' transits… '+fmtDate(d);
       await yieldUI();
       if(planet!==state.planet)return[];
@@ -398,14 +398,9 @@ function refineNakBoundary(a,b,oldNak){
 }
 function makeLightPeriod(start,end,sign){
   const s=new Date(start),e=new Date(end);
-  const mid=new Date((s.getTime()+e.getTime())/2);
-  const startLon=trackedLon(new Date(Math.min(e.getTime(),s.getTime()+60000)));
-  const endLon=trackedLon(new Date(Math.max(s.getTime(),e.getTime()-60000)));
-  const nakSamples=[s,mid,new Date(Math.max(s.getTime(),e.getTime()-60000))]
-    .map(d=>Math.min(26,Math.floor(trackedLon(d)/NAK_SIZE)));
   return{
-    id:s.toISOString()+'-'+sign,start:s,end:e,sign,startLon,endLon,
-    naks:[...new Set(nakSamples)],nakWindows:[],motion:[trackedMotion(mid)],aspects:[],hydrated:false
+    id:s.toISOString()+'-'+sign,start:s,end:e,sign,
+    startLon:null,endLon:null,naks:[],nakWindows:[],motion:[],aspects:[],hydrated:false
   };
 }
 function makePeriod(start,end,sign){
@@ -495,7 +490,7 @@ function renderTimeline(){
       : '<span class="tag">Fast preview</span>';
     return '<div class="'+cls+'" data-id="'+esc(p.id)+'">'+
       '<div><div class="sign">'+SG[p.sign]+' '+SIGNS[p.sign]+'</div><div class="small">'+(active?'CURRENT':future?'FUTURE':'PAST')+'</div></div>'+
-      '<div><div class="dates">'+fmtDate(p.start)+' → '+fmtDate(p.end)+'</div><div class="motion">'+(p.motion||[]).join(' / ')+'<br>'+fmtDegree(p.startLon)+' → '+fmtDegree(p.endLon)+'</div><div class="small">'+daysBetween(p.start,p.end).toFixed(1)+' days'+(p.hydrated?' · '+aspectList.length+' aspect links':'')+'</div></div>'+
+      '<div><div class="dates">'+fmtDate(p.start)+' → '+fmtDate(p.end)+'</div><div class="motion">'+(p.hydrated?((p.motion||[]).join(' / ')+'<br>'+fmtDegree(p.startLon)+' → '+fmtDegree(p.endLon)):'Details load on selection')+'</div><div class="small">'+daysBetween(p.start,p.end).toFixed(1)+' days'+(p.hydrated?' · '+aspectList.length+' aspect links':'')+'</div></div>'+
       '<div><div class="nak">'+detailText+'</div><div class="aspects">'+aspectText+'</div></div>'+
     '</div>';
   }).join('')||'<div class="empty">No dates overlap all active transit filters. Remove or change one of the filters.</div>';
