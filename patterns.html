@@ -331,7 +331,7 @@ function applyUnifiedFilters(){
   for(const target of state.activeFilters){
     windows=windows.map(w=>({p:w.p,start:Math.max(w.start,target.start.getTime()),end:Math.min(w.end,target.end.getTime())})).filter(w=>w.end>w.start);
   }
-  state.periods=windows.map(w=>(w.start===w.p.start.getTime()&&w.end===w.p.end.getTime())?w.p:makePeriod(new Date(w.start),new Date(w.end),w.p.sign));
+  state.periods=windows.map(w=>(w.start===w.p.start.getTime()&&w.end===w.p.end.getTime())?w.p:makeLightPeriod(new Date(w.start),new Date(w.end),w.p.sign));
   state.news.clear();state.selected=null;
   renderActiveFilters();renderTimeline();
   document.getElementById('timelineStatus').textContent=state.periods.length+' '+state.planet+' periods after filters';
@@ -365,7 +365,7 @@ async function buildSignPeriodsAsync(start,end,planet){
     const l=trackedLon(d),s=Math.floor(l/30);
     if(s!==sign || d.getTime()===end.getTime()){
       const boundary=s!==sign?refineSignBoundary(new Date(ms-step),d,sign):d;
-      periods.push(makePeriod(periodStart,boundary,sign));
+      periods.push(makeLightPeriod(periodStart,boundary,sign));
       periodStart=new Date(boundary);
       sign=s;
     }
@@ -395,6 +395,18 @@ function refineNakBoundary(a,b,oldNak){
     if(ni===oldNak)lo=mid;else hi=mid;
   }
   return new Date(hi);
+}
+function makeLightPeriod(start,end,sign){
+  const s=new Date(start),e=new Date(end);
+  const mid=new Date((s.getTime()+e.getTime())/2);
+  const startLon=trackedLon(new Date(Math.min(e.getTime(),s.getTime()+60000)));
+  const endLon=trackedLon(new Date(Math.max(s.getTime(),e.getTime()-60000)));
+  const nakSamples=[s,mid,new Date(Math.max(s.getTime(),e.getTime()-60000))]
+    .map(d=>Math.min(26,Math.floor(trackedLon(d)/NAK_SIZE)));
+  return{
+    id:s.toISOString()+'-'+sign,start:s,end:e,sign,startLon,endLon,
+    naks:[...new Set(nakSamples)],nakWindows:[],motion:[trackedMotion(mid)],aspects:[],hydrated:false
+  };
 }
 function makePeriod(start,end,sign){
   const sample=[];
@@ -440,7 +452,7 @@ function makePeriod(start,end,sign){
   const endLon=trackedLon(new Date(Math.max(start.getTime(),end.getTime()-60000)));
   return{
     id:start.toISOString()+'-'+sign,start:new Date(start),end:new Date(end),sign,
-    startLon,endLon,naks,nakWindows,motion:[...motions],aspects
+    startLon,endLon,naks,nakWindows,motion:[...motions],aspects,hydrated:true
   };
 }
 function trackedLon(d){return planetLon(state.planet,d)}
@@ -473,11 +485,18 @@ function renderTimeline(){
   document.getElementById('transitList').innerHTML=rows.map(p=>{
     const future=p.start.getTime()>now,active=p.start.getTime()<=now&&p.end.getTime()>now;
     const cls='transit'+(future?' future':'')+(state.selected===p.id?' active':'');
-    const aspects=p.aspects.slice(0,8).map(aspectTag).join('')+(p.aspects.length>8?'<span class="tag">+'+(p.aspects.length-8)+'</span>':'');
+    const aspectList=p.aspects||[];
+    const aspects=aspectList.slice(0,8).map(aspectTag).join('')+(aspectList.length>8?'<span class="tag">+'+(aspectList.length-8)+'</span>':'');
+    const detailText=p.hydrated
+      ? (p.naks.map(i=>NAK[i]).join(' → ')||'—')
+      : 'Nakshatra + aspects load when selected';
+    const aspectText=p.hydrated
+      ? (aspects||'<span class="tag">No configured aspect within orb</span>')
+      : '<span class="tag">Fast preview</span>';
     return '<div class="'+cls+'" data-id="'+esc(p.id)+'">'+
       '<div><div class="sign">'+SG[p.sign]+' '+SIGNS[p.sign]+'</div><div class="small">'+(active?'CURRENT':future?'FUTURE':'PAST')+'</div></div>'+
-      '<div><div class="dates">'+fmtDate(p.start)+' → '+fmtDate(p.end)+'</div><div class="motion">'+p.motion.join(' / ')+'<br>'+fmtDegree(p.startLon)+' → '+fmtDegree(p.endLon)+'</div><div class="small">'+daysBetween(p.start,p.end).toFixed(1)+' days · '+p.aspects.length+' aspect links</div></div>'+
-      '<div><div class="nak">'+p.naks.map(i=>NAK[i]).join(' → ')+'</div><div class="aspects">'+(aspects||'<span class="tag">No configured aspect within orb</span>')+'</div></div>'+
+      '<div><div class="dates">'+fmtDate(p.start)+' → '+fmtDate(p.end)+'</div><div class="motion">'+(p.motion||[]).join(' / ')+'<br>'+fmtDegree(p.startLon)+' → '+fmtDegree(p.endLon)+'</div><div class="small">'+daysBetween(p.start,p.end).toFixed(1)+' days'+(p.hydrated?' · '+aspectList.length+' aspect links':'')+'</div></div>'+
+      '<div><div class="nak">'+detailText+'</div><div class="aspects">'+aspectText+'</div></div>'+
     '</div>';
   }).join('')||'<div class="empty">No dates overlap all active transit filters. Remove or change one of the filters.</div>';
   document.querySelectorAll('.transit[data-id]').forEach(el=>el.onclick=()=>selectPeriod(el.dataset.id));
@@ -622,8 +641,17 @@ async function loadFingerprintBaseline(selected,planet,run){
 }
 async function selectPeriod(id){
   const requestPlanet=state.planet;
-  const p=state.periods.find(x=>x.id===id);if(!p)return;
-  state.selected=id;renderTimeline();renderDetail(p);
+  const index=state.periods.findIndex(x=>x.id===id);if(index<0)return;
+  let p=state.periods[index];
+  state.selected=id;
+  if(!p.hydrated){
+    document.getElementById('newsStatus').textContent='Calculating transit details…';
+    await yieldUI();
+    if(requestPlanet!==state.planet||state.selected!==id)return;
+    p=makePeriod(p.start,p.end,p.sign);
+    state.periods[index]=p;
+  }
+  renderTimeline();renderDetail(p);
   if(p.start.getTime()>Date.now())return;
   const key=p.id;
   let data=state.news.get(key)||null;
