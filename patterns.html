@@ -360,7 +360,7 @@ main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
 <section class="hero"><div><span class="eyebrow">SIDEREAL NEWS PATTERN TRACKER</span><h1>Planet Transit News Tracker</h1><p>Explore Lahiri sidereal planet transits from 2014 through 2028, then layer exact planet/sign passages to isolate overlapping historical windows. Select any transit to calculate detailed nakshatras, motion, aspects and the news patterns recorded during that interval.</p></div></section>
 
 <section class="controls primary-toolbar">
-<label>Analyze planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
+<label>Analyze planet<select id="planetSelect"><option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Uranus">♅ Uranus</option><option value="Neptune">♆ Neptune</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option></select></label>
 <div class="detail-sub" style="align-self:center">Research range: Jan 1, 2014 → Dec 31, 2028</div>
 </section>
 
@@ -369,7 +369,7 @@ main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
 <div class="unified-filter-grid">
 <label>Filter planet
 <select id="filterPlanetSelect">
-<option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option>
+<option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Uranus">♅ Uranus</option><option value="Neptune">♆ Neptune</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option>
 </select></label>
 <label>Filter sign<select id="filterSignSelect"><option value="">Any sign</option></select></label>
 <label>Passage / year<select id="filterPassageSelect"><option value="">Choose a passage</option></select></label>
@@ -377,13 +377,13 @@ main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
 <button id="clearTransitFiltersBtn" type="button">Clear all</button>
 </div>
 <div id="activeTransitFilters" class="active-filter-list"><span class="small">No transit filters applied.</span></div>
-<div class="detail-sub">Mercury, Sun, Venus, Mars, Jupiter, Saturn, Rahu, and Ketu all use this same filter. Add one or more passages to restrict results to their exact overlapping dates.</div>
+<div class="detail-sub">Mercury, Sun, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Rahu, and Ketu all use this same filter. Add one or more passages to restrict results to their exact overlapping dates.</div>
 </section>
 
 <section class="panel summary-panel dashboard-panel">
 <div class="panel-head"><strong>▦ 12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button id="loadSummaryBtn" type="button" style="min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer">Load 12-sign news summary</button></div>
-<div class="detail-sub">Each zodiac summarizes the analyzed planet within the currently active transit filters. Any of the eight planets/nodes can be used as a filter across 2014–2028. Weak or missing archive windows are excluded from comparative baselines.</div>
+<div class="detail-sub">Each zodiac summarizes the analyzed planet within the currently active transit filters. Any of the ten planets/nodes can be used as a filter across 2014–2028. Weak or missing archive windows are excluded from comparative baselines.</div>
 <div id="summaryGrid" class="summary-grid"><div class="empty empty-state"><b>Summary ready when you are.</b><span>Load the 12-sign news summary after choosing any filters you want to apply.</span></div></div>
 </section>
 
@@ -411,7 +411,7 @@ const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Nep
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
 const state={periods:[],basePeriods:[],filterCatalogs:{},activeFilters:[],selected:null,news:new Map(),fetchCache:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,buildRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
-const FILTER_PLANETS=['Mercury','Sun','Venus','Mars','Jupiter','Saturn','Rahu','Ketu'];
+const FILTER_PLANETS=['Mercury','Sun','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Rahu','Ketu'];
 const RESEARCH_START=new Date('2014-01-01T00:00:00Z');
 const RESEARCH_END=new Date('2028-12-31T23:59:59Z');
 
@@ -441,7 +441,7 @@ build();
 
 async function simplePlanetSignPeriodsAsync(planet,start,end){
   const periods=[];
-  const step=['Sun','Jupiter','Saturn','Rahu','Ketu'].includes(planet)?3*86400000:86400000;
+  const step=['Sun','Jupiter','Saturn','Uranus','Neptune','Rahu','Ketu'].includes(planet)?3*86400000:86400000;
   const signAt=d=>Math.floor(planetLon(planet,d)/30);
   const refine=(a,b,oldSign)=>{
     let lo=a.getTime(),hi=b.getTime();
