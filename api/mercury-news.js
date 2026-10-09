@@ -456,10 +456,13 @@ export default async function handler(req,res){
     const eventClusters=clusterEvents(analysisArticles);
     const articleCluster=new Map();
     for(const cluster of eventClusters)for(const id of cluster.articleIds)articleCluster.set(id,cluster.id);
+    const clusterScore=new Map(eventClusters.map(x=>[x.id,Number(x.significanceScore)||0]));
     const articles=[...analysisArticles]
-      .sort((a,b)=>new Date(b.publishedAtFull||b.publishedAt)-new Date(a.publishedAtFull||a.publishedAt))
+      .map(a=>({...a,eventClusterId:articleCluster.get(a.id)||''}))
+      .sort((a,b)=>(clusterScore.get(b.eventClusterId)||0)-(clusterScore.get(a.eventClusterId)||0)||
+        new Date(b.publishedAtFull||b.publishedAt)-new Date(a.publishedAtFull||a.publishedAt))
       .slice(0,160)
-      .map(a=>({...a,eventClusterId:articleCluster.get(a.id)||''}));
+      .map(a=>({...a,significanceScore:clusterScore.get(a.eventClusterId)||0}));
     const counts=new Map(),subCounts=new Map();
     for(const a of analysisArticles){
       counts.set(a.newsCategory,(counts.get(a.newsCategory)||0)+1);
@@ -485,7 +488,8 @@ export default async function handler(req,res){
     });
     return res.status(200).json({
       from,to,planet,future:false,count:analysisArticles.length,rawCount:rawArticles.length,publisherCount,archiveQuality,
-      eventCount:eventClusters.length,eventClusters:eventClusters.slice(0,100),categories,subcategories,subjects,articles,leaderEvidence,
+      eventCount:eventClusters.length,eventClusters:eventClusters.slice(0,100),categories,subcategories,
+      weightedCategories:buildWeightedCategories(eventClusters),subjects,articles,leaderEvidence,
       sourceCounts,
       sourceCoverage:{
         googleNews:{available:true,label:'Google News RSS',count:sourceCounts['Google News']||0},
@@ -703,6 +707,29 @@ function isWithinGdeltDocWindow(from,to){
   return{available:true,reason:''};
 }
 const SUBJECT_STOP=new Set(('the a an and or but if then than to of in on for from with without at by as is are was were be been being this that these those it its their his her they them he she you we our your about after before during over under into out up down new latest says said say report reports reported amid as us u.s. will would could should may might can just more most less least first last today yesterday tomorrow year years day days week weeks month months').split(/\s+/));
+const CATEGORY_IMPACT={
+  'War / Military Conflict':5,'Natural Disasters':5,'Severe Weather':5,'Nuclear / Power Infrastructure':5,
+  'Disease / Outbreaks / Public Health':5,'Accidents / Industrial Disasters':4.5,'Crime / Public Safety':4,
+  'Protests / Civil Unrest':4,'Economy / Growth / Recession':4,'Banking / Interest Rates / Monetary Policy':4,
+  'Elections / Political Campaigns':4,'Government / Policy / Legislation':3.5,'Diplomacy / International Relations':3.5,
+  'Courts / Legal Decisions':3.5,'Trade / Tariffs / Supply Chains':3.5,'Energy / Oil / Gas':3.5,
+  'Cybersecurity / Hacking / Data Breaches':3.5,'Transportation / Aviation':3.5,'Human Rights / Social Issues':3.5
+};
+const TRUSTED_SOURCE_TERMS=['reuters','associated press',' ap ','bbc','cnn','npr','pbs','guardian','new york times','washington post','wall street journal','bloomberg','financial times','al jazeera','abc news','cbs news','nbc news','fox news','axios','politico','noaa','nasa','who','cdc','united nations'];
+function trustedSource(a){
+  const s=(' '+String(a?.source||'')+' '+String(a?.url||'')+' ').toLowerCase();
+  return TRUSTED_SOURCE_TERMS.some(x=>s.includes(x));
+}
+function eventImpact(category){return CATEGORY_IMPACT[category]||2.5}
+function eventScore(cluster){
+  const headlineSignal=Math.log2(1+cluster.headlineCount)*7;
+  const sourceSignal=Math.log2(1+cluster.sources.size)*12;
+  const archiveSignal=Math.log2(1+cluster.archiveSources.size)*7;
+  const trustedSignal=Math.min(18,cluster.trustedSources.size*4);
+  const category=[...cluster.categories.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||'Other / Unclassified';
+  const impactSignal=eventImpact(category)*8;
+  return Math.round((headlineSignal+sourceSignal+archiveSignal+trustedSignal+impactSignal)*10)/10;
+}
 function clusterEvents(articles){
   const clusters=[];
   for(const article of articles){
@@ -719,6 +746,8 @@ function clusterEvents(articles){
       best.latest=laterIso(best.latest,article.publishedAtFull||article.publishedAt);
       for(const t of tokens)best.tokens.add(t);
       best.sources.add(article.source||'Unknown');
+      best.archiveSources.add(article.archiveSource||'Unknown');
+      if(trustedSource(article))best.trustedSources.add(article.source||article.url||article.id);
       best.categories.set(article.newsCategory,(best.categories.get(article.newsCategory)||0)+1);
       if((article.title||'').length<(best.title||'').length)best.title=article.title;
     }else{
@@ -732,15 +761,21 @@ function clusterEvents(articles){
         articleIds:[article.id],
         tokens:new Set(tokens),
         sources:new Set([article.source||'Unknown']),
+        archiveSources:new Set([article.archiveSource||'Unknown']),
+        trustedSources:new Set(trustedSource(article)?[article.source||article.url||article.id]:[]),
         categories
       });
     }
   }
-  return clusters.map(c=>({
-    id:c.id,title:c.title,earliest:c.earliest,latest:c.latest,
-    headlineCount:c.headlineCount,sourceCount:c.sources.size,articleIds:c.articleIds,
-    topCategory:[...c.categories.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||'Other / Unclassified'
-  })).sort((a,b)=>b.headlineCount-a.headlineCount||b.sourceCount-a.sourceCount);
+  return clusters.map(c=>{
+    const topCategory=[...c.categories.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||'Other / Unclassified';
+    return{
+      id:c.id,title:c.title,earliest:c.earliest,latest:c.latest,
+      headlineCount:c.headlineCount,sourceCount:c.sources.size,archiveSourceCount:c.archiveSources.size,
+      trustedSourceCount:c.trustedSources.size,articleIds:c.articleIds,topCategory,
+      significanceScore:eventScore(c)
+    };
+  }).sort((a,b)=>b.significanceScore-a.significanceScore||b.sourceCount-a.sourceCount||b.headlineCount-a.headlineCount);
 }
 function eventTokens(title){
   return new Set(String(title||'').toLowerCase()
@@ -755,6 +790,19 @@ function jaccard(a,b){
 }
 function laterIso(a,b){return new Date(a)>new Date(b)?a:b}
 
+function buildWeightedCategories(clusters){
+  const m=new Map();
+  for(const e of clusters){
+    const key=e.topCategory||'Other / Unclassified';
+    const row=m.get(key)||{name:key,eventCount:0,score:0};
+    row.eventCount++;
+    row.score+=(Number(e.significanceScore)||0);
+    m.set(key,row);
+  }
+  return [...m.values()]
+    .map(x=>({...x,score:Math.round(x.score*10)/10}))
+    .sort((a,b)=>b.score-a.score||b.eventCount-a.eventCount);
+}
 function buildOrganicSubjects(articles){
   const unigram=new Map(),bigram=new Map();
   for(const a of articles){
