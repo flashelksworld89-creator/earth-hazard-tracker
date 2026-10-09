@@ -1240,8 +1240,12 @@ function renderSourceCoverage(data){
   const cov=data.sourceCoverage||{};
   const parts=Object.entries(counts).map(([name,count])=>esc(name)+': '+count);
   const gdelt=cov.gdelt;
-  const note=gdelt&&!gdelt.available?' · GDELT unavailable for this window: '+esc(gdelt.reason||'outside archive window'):'';
-  return '<div class="note"><b>News sources:</b> '+(parts.join(' · ')||'No source counts')+' · '+Number(data.publisherCount||0)+' independent publishers'+note+'</div>';
+  const wiki=cov.wikipediaCurrentEvents;
+  const notes=[];
+  if(gdelt&&!gdelt.available)notes.push('GDELT unavailable for this window: '+esc(gdelt.reason||'outside archive window'));
+  else if(gdelt&&Number(gdelt.count||0)===0)notes.push('GDELT returned no usable records; the report was not treated as zero activity');
+  if(wiki?.used)notes.push('Wikipedia Current Events fallback was added because primary archive coverage was sparse');
+  return '<div class="note"><b>News sources:</b> '+(parts.join(' · ')||'No source counts')+' · '+Number(data.publisherCount||0)+' independent publishers'+(notes.length?' · '+notes.join(' · '):'')+'</div>';
 }
 function renderOrganicSubjects(data){
   const rows=(data.subjects||[]).slice(0,10);
