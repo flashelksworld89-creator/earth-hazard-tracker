@@ -761,7 +761,7 @@ function nodalRegimeBounds(date){
   return{...regime,start:left,end:right};
 }
 function mergeNewsData(chunks){
-  const cat=new Map(),sub=new Map();
+  const cat=new Map(),sub=new Map(),weighted=new Map();
   let count=0,eventCount=0,rawCount=0,publisherCount=0;
   const subjects=new Map(),clusters=[];
   for(const d of chunks){
@@ -773,6 +773,10 @@ function mergeNewsData(chunks){
       sub.set(key,(sub.get(key)||0)+(Number(x.count)||0));
     }
     for(const x of d.subjects||[])subjects.set(x.name,(subjects.get(x.name)||0)+(Number(x.count)||0));
+    for(const x of d.weightedCategories||[]){
+      const row=weighted.get(x.name)||{name:x.name,eventCount:0,score:0};
+      row.eventCount+=(Number(x.eventCount)||0);row.score+=(Number(x.score)||0);weighted.set(x.name,row);
+    }
     for(const x of d.eventClusters||[])clusters.push(x);
   }
   return{
@@ -780,7 +784,8 @@ function mergeNewsData(chunks){
     categories:[...cat.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
     subcategories:[...sub.entries()].map(([key,count])=>{const [category,name]=key.split('|||');return{category,name,count}}).sort((a,b)=>b.count-a.count),
     subjects:[...subjects.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
-    eventClusters:clusters.sort((a,b)=>(b.headlineCount||0)-(a.headlineCount||0))
+    weightedCategories:[...weighted.values()].sort((a,b)=>(b.score||0)-(a.score||0)),
+    eventClusters:clusters.sort((a,b)=>(b.significanceScore||0)-(a.significanceScore||0)||(b.sourceCount||0)-(a.sourceCount||0))
   };
 }
 async function fetchNodalRegimeBaseline(p,planet,run){
@@ -916,12 +921,13 @@ function renderNews(p,data){
   const bars=cats.length?'<div class="category-bars">'+cats.map(c=>'<div class="cat"><span>'+esc(c.name)+'</span><div class="track"><div class="fill" style="width:'+((c.count/max)*100).toFixed(1)+'%"></div></div><b>'+c.count+'</b></div>').join('')+'</div>':'';
   const stories=(data.articles||[]).slice(0,24).map(a=>
     '<div class="story"><a href="'+escAttr(a.url)+'" target="_blank" rel="noopener">'+esc(a.title)+'</a>'+
-    '<div class="story-meta"><span>'+esc(a.newsCategory||'Other / Unclassified')+'</span>'+(a.newsSubcategory?'<span>'+esc(a.newsSubcategory)+'</span>':'')+'<span>'+esc(a.archiveSource||'News')+'</span><span>'+esc(a.source||'')+'</span><span>'+esc(a.publishedAt||'')+'</span></div>'+
+    '<div class="story-meta"><span>Impact '+Number(a.significanceScore||0).toFixed(1)+'</span><span>'+esc(a.newsCategory||'Other / Unclassified')+'</span>'+(a.newsSubcategory?'<span>'+esc(a.newsSubcategory)+'</span>':'')+'<span>'+esc(a.archiveSource||'News')+'</span><span>'+esc(a.source||'')+'</span><span>'+esc(a.publishedAt||'')+'</span></div>'+
     (a.description?'<p>'+esc(a.description)+'</p>':'')+'</div>'
   ).join('');
   const leaderBlock=state.planet==='Sun'?renderLeaderEvidence(data.leaderEvidence||[]):'';
   const subjectBlock=renderOrganicSubjects(data);
   const sourceBlock=renderSourceCoverage(data);
+  const significanceBlock=renderWeightedCategories(data);
   const metricsBlock=renderResearchMetrics(p,data);
   const subcategoryBlock=renderSubcategoryBreakdown(data);
   const topCategoryBlock=renderTopCategoryHeadlines(data);
@@ -930,6 +936,7 @@ function renderNews(p,data){
     '<div class="small">Headline categories during this '+state.planet+'-in-'+SIGNS[p.sign]+' interval</div>'+
     sourceBlock+
     metricsBlock+
+    significanceBlock+
     subjectBlock+
     bars+
     subcategoryBlock+
@@ -1195,7 +1202,7 @@ function renderTransitFingerprint(p,data,subLifts){
     : '';
   const drivers=events.length
     ? '<div class="headline-group"><h3>Primary event drivers</h3><div class="headline-links">'+events.map(e=>
-      '<div class="headline-link"><b>'+esc(e.title||'Event cluster')+'</b><span>'+Number(e.headlineCount||0)+' headlines · '+Number(e.sourceCount||0)+' sources · '+esc(e.topCategory||'')+'</span></div>').join('')+'</div></div>'
+      '<div class="headline-link"><b>'+esc(e.title||'Event cluster')+'</b><span>Impact '+Number(e.significanceScore||0).toFixed(1)+' · '+Number(e.headlineCount||0)+' headlines · '+Number(e.sourceCount||0)+' sources · '+Number(e.trustedSourceCount||0)+' trusted · '+esc(e.topCategory||'')+'</span></div>').join('')+'</div></div>'
     : '';
   return '<div class="headline-groups"><div class="panel-head"><strong>TRANSIT FINGERPRINT</strong><span class="status">Rahu/Ketu-regime normalized</span></div>'+regimeText+distinctive+lifts+drivers+'</div>';
 }
@@ -1244,6 +1251,15 @@ function renderSourceCoverage(data){
   else if(gdelt&&Number(gdelt.count||0)===0)notes.push('GDELT returned no usable records; the report was not treated as zero activity');
   if(wiki?.used)notes.push('Wikipedia Current Events fallback was added because primary archive coverage was sparse');
   return '<div class="note"><b>News sources:</b> '+(parts.join(' · ')||'No source counts')+' · '+Number(data.publisherCount||0)+' independent publishers'+(notes.length?' · '+notes.join(' · '):'')+'</div>';
+}
+function renderWeightedCategories(data){
+  const rows=(data.weightedCategories||[]).filter(x=>x.name!=='Other / Unclassified').slice(0,8);
+  if(!rows.length)return'';
+  const max=Math.max(1,...rows.map(x=>Number(x.score)||0));
+  return '<div class="headline-groups"><div class="panel-head"><strong>EVENT SIGNIFICANCE RANKING</strong><span class="status">Weighted by independent coverage + impact</span></div>'+
+    '<div class="category-bars">'+rows.map(x=>
+      '<div class="cat"><span>'+esc(x.name)+'</span><div class="track"><div class="fill" style="width:'+(((Number(x.score)||0)/max)*100).toFixed(1)+'%"></div></div><b>'+Number(x.score||0).toFixed(1)+'</b></div>'
+    ).join('')+'</div><div class="note">This ranking uses event clusters rather than raw headline totals, so repeated coverage of the same event has less influence.</div></div>';
 }
 function renderOrganicSubjects(data){
   const rows=(data.subjects||[]).slice(0,10);
