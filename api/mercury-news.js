@@ -942,6 +942,8 @@ function cleanPlanet(v){
   if(p==='mars')return'Mars';
   if(p==='jupiter')return'Jupiter';
   if(p==='saturn')return'Saturn';
+  if(p==='uranus')return'Uranus';
+  if(p==='neptune')return'Neptune';
   if(p==='rahu')return'Rahu';
   if(p==='ketu')return'Ketu';
   return'Mercury';
