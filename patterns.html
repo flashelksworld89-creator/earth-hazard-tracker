@@ -30,7 +30,7 @@ h1{font-size:clamp(30px,4vw,48px);margin:6px 0 9px}
 .controls select,.controls input,.controls button{min-height:42px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:9px;padding:9px 10px;font-size:14px}
 .controls button{cursor:pointer;font-weight:800;padding-inline:16px}
 #unifiedFilterPanel{margin-bottom:14px}
-.unified-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(170px,1fr)) auto auto;gap:10px;align-items:end}
+.unified-filter-grid{display:grid;grid-template-columns:repeat(2,minmax(170px,1fr)) auto auto;gap:10px;align-items:end}
 .unified-filter-grid label{display:grid;gap:6px;color:#bfd1dc;font-size:11px;font-weight:700}
 .unified-filter-grid select,.unified-filter-grid button{min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px}
 .unified-filter-grid button{cursor:pointer;font-weight:800}
@@ -371,13 +371,12 @@ main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
 <select id="filterPlanetSelect">
 <option value="Mercury">☿ Mercury</option><option value="Sun">☉ Sun</option><option value="Venus">♀ Venus</option><option value="Mars">♂ Mars</option><option value="Jupiter">♃ Jupiter</option><option value="Saturn">♄ Saturn</option><option value="Uranus">♅ Uranus</option><option value="Neptune">♆ Neptune</option><option value="Rahu">☊ Rahu</option><option value="Ketu">☋ Ketu</option>
 </select></label>
-<label>Filter sign<select id="filterSignSelect"><option value="">Any sign</option></select></label>
-<label>Passage / year<select id="filterPassageSelect"><option value="">Choose a passage</option></select></label>
+<label>Filter sign<select id="filterSignSelect"><option value="">Choose a sign</option></select></label>
 <button id="addTransitFilterBtn" type="button">Add filter</button>
 <button id="clearTransitFiltersBtn" type="button">Clear all</button>
 </div>
 <div id="activeTransitFilters" class="active-filter-list"><span class="small">No transit filters applied.</span></div>
-<div class="detail-sub">Mercury, Sun, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Rahu, and Ketu all use this same filter. Add one or more passages to restrict results to their exact overlapping dates.</div>
+<div class="detail-sub">Mercury, Sun, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Rahu, and Ketu all use this same filter. Choose a planet and sign; every matching passage in 2014–2028 is included automatically, including retrograde re-entries.</div>
 </section>
 
 <section class="panel summary-panel dashboard-panel">
@@ -430,9 +429,7 @@ for(let i=0;i<12;i++){
 }
 document.getElementById('filterPlanetSelect').onchange=()=>{
   document.getElementById('filterSignSelect').value='';
-  document.getElementById('filterPassageSelect').innerHTML='<option value="">Choose a sign first</option>';
 };
-document.getElementById('filterSignSelect').onchange=populateUnifiedPassages;
 document.getElementById('addTransitFilterBtn').onclick=addUnifiedFilter;
 document.getElementById('clearTransitFiltersBtn').onclick=()=>{state.activeFilters=[];applyUnifiedFilters();};
 document.getElementById('loadSummaryBtn').onclick=()=>buildSignSummary(true);
@@ -478,32 +475,24 @@ async function ensureFilterCatalog(planet){
   state.filterCatalogs[planet]=rows;
   return rows;
 }
-async function populateUnifiedPassages(){
-  const planet=document.getElementById('filterPlanetSelect').value;
-  const signValue=document.getElementById('filterSignSelect').value;
-  const passage=document.getElementById('filterPassageSelect');
-  if(signValue===''){
-    passage.innerHTML='<option value="">Choose a sign first</option>';
-    return;
-  }
-  passage.innerHTML='<option value="">Loading '+planet+' passages…</option>';
-  await yieldUI();
-  const rows=await ensureFilterCatalog(planet);
-  const filtered=signValue===''?rows:rows.filter(r=>r.sign===Number(signValue));
-  passage.innerHTML='<option value="">Choose a passage</option>'+filtered.map(r=>{
-    const sy=r.start.getUTCFullYear(),ey=r.end.getUTCFullYear();
-    const years=sy===ey?String(sy):(sy+'–'+ey);
-    return '<option value="'+escAttr(r.id)+'">'+SG[r.sign]+' '+SIGNS[r.sign]+' · '+years+' · '+fmtDate(r.start)+' → '+fmtDate(r.end)+'</option>';
-  }).join('');
-}
 async function addUnifiedFilter(){
   const planet=document.getElementById('filterPlanetSelect').value;
-  const id=document.getElementById('filterPassageSelect').value;
-  if(!id){document.getElementById('planetFilterStatus').textContent='Choose a passage first';return;}
+  const signValue=document.getElementById('filterSignSelect').value;
+  if(signValue===''){
+    document.getElementById('planetFilterStatus').textContent='Choose a sign first';
+    return;
+  }
+  const sign=Number(signValue);
   const rows=await ensureFilterCatalog(planet);
-  const passage=rows.find(r=>r.id===id);if(!passage)return;
+  const windows=rows
+    .filter(r=>r.sign===sign)
+    .map(r=>({id:r.id,start:new Date(r.start),end:new Date(r.end)}));
+  if(!windows.length){
+    document.getElementById('planetFilterStatus').textContent='No matching passage in the research range';
+    return;
+  }
   state.activeFilters=state.activeFilters.filter(f=>f.planet!==planet);
-  state.activeFilters.push({...passage});
+  state.activeFilters.push({planet,sign,windows});
   applyUnifiedFilters();
 }
 function removeUnifiedFilter(planet){
@@ -518,8 +507,9 @@ function renderActiveFilters(){
     return;
   }
   el.innerHTML=state.activeFilters.map(f=>{
-    const sy=f.start.getUTCFullYear(),ey=f.end.getUTCFullYear(),years=sy===ey?String(sy):(sy+'–'+ey);
-    return '<span class="active-filter-chip">'+GLYPH[f.planet]+' '+esc(f.planet)+' · '+SG[f.sign]+' '+SIGNS[f.sign]+' · '+years+
+    const count=(f.windows||[]).length;
+    return '<span class="active-filter-chip">'+GLYPH[f.planet]+' '+esc(f.planet)+' · '+SG[f.sign]+' '+SIGNS[f.sign]+
+      ' · all '+count+' passage'+(count===1?'':'s')+
       '<button type="button" data-remove-filter="'+escAttr(f.planet)+'">×</button></span>';
   }).join('');
   el.querySelectorAll('[data-remove-filter]').forEach(btn=>btn.onclick=()=>removeUnifiedFilter(btn.dataset.removeFilter));
@@ -528,7 +518,15 @@ function renderActiveFilters(){
 function applyUnifiedFilters(autoSelect=true){
   let windows=state.basePeriods.map(p=>({p,start:p.start.getTime(),end:p.end.getTime()}));
   for(const target of state.activeFilters){
-    windows=windows.map(w=>({p:w.p,start:Math.max(w.start,target.start.getTime()),end:Math.min(w.end,target.end.getTime())})).filter(w=>w.end>w.start);
+    const next=[];
+    for(const w of windows){
+      for(const interval of target.windows||[]){
+        const start=Math.max(w.start,interval.start.getTime());
+        const end=Math.min(w.end,interval.end.getTime());
+        if(end>start)next.push({p:w.p,start,end});
+      }
+    }
+    windows=next;
   }
   state.periods=windows.map(w=>(w.start===w.p.start.getTime()&&w.end===w.p.end.getTime())?w.p:makeLightPeriod(new Date(w.start),new Date(w.end),w.p.sign));
   state.news.clear();state.selected=null;
