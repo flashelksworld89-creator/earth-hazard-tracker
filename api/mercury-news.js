@@ -431,6 +431,19 @@ export default async function handler(req,res){
       const gdeltSettled=await Promise.allSettled(FEEDS.slice(0,6).map(f=>fetchGdeltFeed(f,from,to)));
       for(const r of gdeltSettled) if(r.status==='fulfilled') items.push(...r.value);
     }
+
+    // Do not let a sparse or empty GDELT response collapse the report. When the
+    // combined archive is thin, add major dated events from Wikipedia's
+    // Current Events archive as an independent fallback source.
+    let preliminary=dedupe(items).filter(a=>a.publishedAt>=from && a.publishedAt<to);
+    let wikipediaFallbackUsed=false;
+    if(preliminary.length<12){
+      const fallback=await fetchWikipediaCurrentEvents(from,to);
+      if(fallback.length){
+        items.push(...fallback);
+        wikipediaFallbackUsed=true;
+      }
+    }
     const rawArticles=dedupe(items)
       .filter(a=>a.publishedAt>=from && a.publishedAt<to);
     const balancedArticles=balanceByPublisher(rawArticles);
@@ -463,18 +476,21 @@ export default async function handler(req,res){
     const subjects=buildOrganicSubjects(analysisArticles);
     const sourceCounts=countSources(analysisArticles);
     const publisherCount=countPublishers(analysisArticles);
+    const archiveSourceCount=Object.keys(sourceCounts).length;
     const archiveQuality=assessArchiveQuality({
       articleCount:analysisArticles.length,
       publisherCount,
-      gdeltAvailable:gdeltCoverage.available
+      gdeltAvailable:gdeltCoverage.available,
+      archiveSourceCount
     });
     return res.status(200).json({
       from,to,planet,future:false,count:analysisArticles.length,rawCount:rawArticles.length,publisherCount,archiveQuality,
       eventCount:eventClusters.length,eventClusters:eventClusters.slice(0,100),categories,subcategories,subjects,articles,leaderEvidence,
       sourceCounts,
       sourceCoverage:{
-        googleNews:{available:true,label:'Google News RSS'},
-        gdelt:{available:gdeltCoverage.available,label:'GDELT DOC 2.0',reason:gdeltCoverage.reason||''}
+        googleNews:{available:true,label:'Google News RSS',count:sourceCounts['Google News']||0},
+        gdelt:{available:gdeltCoverage.available,label:'GDELT DOC 2.0',reason:gdeltCoverage.reason||'',count:sourceCounts['GDELT']||0},
+        wikipediaCurrentEvents:{available:true,label:'Wikipedia Current Events',used:wikipediaFallbackUsed,count:sourceCounts['Wikipedia Current Events']||0}
       }
     });
   }catch(e){
@@ -635,6 +651,48 @@ function parseGdeltDate(v){
   if(m)return new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]));
   return new Date(s);
 }
+function wikiCurrentEventsPage(date){
+  const month=date.toLocaleString('en-US',{month:'long',timeZone:'UTC'});
+  return 'Portal:Current events/'+date.getUTCFullYear()+'_'+month+'_'+date.getUTCDate();
+}
+async function fetchWikipediaCurrentEvents(from,to){
+  const start=new Date(from+'T00:00:00Z');
+  const end=new Date(to+'T00:00:00Z');
+  const dates=[];
+  for(let d=new Date(start);d<end&&dates.length<31;d.setUTCDate(d.getUTCDate()+1))dates.push(new Date(d));
+  const settled=await Promise.allSettled(dates.map(async date=>{
+    const page=wikiCurrentEventsPage(date);
+    const url='https://en.wikipedia.org/w/api.php?action=parse&format=json&formatversion=2&prop=text&page='+encodeURIComponent(page)+'&origin=*';
+    const r=await fetch(url,{headers:{'Accept':'application/json','User-Agent':'PlanetTransitNewsTracker/1.1'}});
+    if(!r.ok)throw new Error('Wikipedia Current Events HTTP '+r.status);
+    const json=await r.json();
+    const html=String(json?.parse?.text||'');
+    const blocks=[...html.matchAll(/<li>([\s\S]*?)<\/li>/gi)].map(m=>m[1]);
+    const iso=date.toISOString().slice(0,10);
+    const out=[];
+    for(let i=0;i<blocks.length&&out.length<14;i++){
+      const block=blocks[i];
+      const external=block.match(/<a[^>]+href=["'](https?:\/\/[^"'#]+)["'][^>]*>/i);
+      const title=clean(block);
+      const link=external?.[1]||('https://en.wikipedia.org/wiki/'+encodeURIComponent(page.replace(/ /g,'_')));
+      if(title.length<30||!safe(link))continue;
+      out.push({
+        id:'wiki-current-'+iso+'-'+i+'-'+hash(title),
+        title:summary(title),
+        description:'',
+        source:'Wikipedia Current Events',
+        url:safe(link),
+        archiveSource:'Wikipedia Current Events',
+        publishedAt:iso,
+        publishedAtFull:iso+'T12:00:00.000Z'
+      });
+    }
+    return out;
+  }));
+  const rows=[];
+  for(const r of settled)if(r.status==='fulfilled')rows.push(...r.value);
+  return dedupe(rows);
+}
 function isWithinGdeltDocWindow(from,to){
   const now=Date.now();
   const start=new Date(from+'T00:00:00Z').getTime();
@@ -750,17 +808,20 @@ function publisherKey(a){
 function countPublishers(articles){
   return new Set(articles.map(publisherKey).filter(Boolean)).size;
 }
-function assessArchiveQuality({articleCount,publisherCount,gdeltAvailable}){
-  if(articleCount<8||publisherCount<3){
-    return{level:'limited',analysisEligible:false,reason:'Too few articles or independent publishers for reliable comparison'};
+function assessArchiveQuality({articleCount,publisherCount,gdeltAvailable,archiveSourceCount=1}){
+  if(articleCount<8||publisherCount<2){
+    return{level:'limited',analysisEligible:false,reason:'Too few independent records for reliable comparison'};
   }
-  if(gdeltAvailable&&articleCount>=24&&publisherCount>=8){
-    return{level:'strong',analysisEligible:true,reason:'Multiple archives and broad publisher diversity'};
+  if(articleCount>=24&&publisherCount>=8&&archiveSourceCount>=2){
+    return{level:'strong',analysisEligible:true,reason:'Broad multi-source coverage with good publisher diversity'};
   }
-  if(articleCount>=16&&publisherCount>=5){
-    return{level:'moderate',analysisEligible:true,reason:gdeltAvailable?'Usable multi-source coverage':'Usable publisher diversity, but GDELT DOC is unavailable for this older window'};
+  if(articleCount>=16&&publisherCount>=4){
+    return{level:'moderate',analysisEligible:true,reason:archiveSourceCount>=2?'Usable multi-source coverage':'Usable coverage from a single archive family'};
   }
-  return{level:'limited',analysisEligible:false,reason:gdeltAvailable?'Coverage is too sparse for anomaly comparison':'Older archive coverage is too sparse for anomaly comparison'};
+  if(articleCount>=10&&archiveSourceCount>=2){
+    return{level:'moderate',analysisEligible:true,reason:'Multiple archives supplied enough dated events for comparison'};
+  }
+  return{level:'limited',analysisEligible:false,reason:gdeltAvailable?'Coverage remains sparse after fallback retrieval':'Archive coverage remains sparse after fallback retrieval'};
 }
 function countSources(articles){
   const m={};
