@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#06111f">
-<meta name="description" content="Mercury sidereal transit and news tracker from January 2024 forward.">
+<meta name="description" content="Mercury sidereal transit and news tracker from January 1980 through December 2028.">
 <title>Planet Transit News Tracker</title>
 <style>
 :root{
@@ -411,7 +411,7 @@ const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'
 const state={periods:[],basePeriods:[],filterCatalogs:{},activeFilters:[],selected:null,news:new Map(),fetchCache:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,buildRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 const FILTER_PLANETS=['Mercury','Sun','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Rahu','Ketu'];
-const RESEARCH_START=new Date('2014-01-01T00:00:00Z');
+const RESEARCH_START=new Date('1980-01-01T00:00:00Z');
 const RESEARCH_END=new Date('2028-12-31T23:59:59Z');
 
 
