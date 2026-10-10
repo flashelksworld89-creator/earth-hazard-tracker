@@ -1,15 +1,8 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-
 const FEEDS=[
-  {name:'World',q:'world OR international OR diplomacy OR conflict'},
-  {name:'Politics',q:'politics OR government OR election OR congress OR parliament OR court'},
-  {name:'Economy',q:'economy OR markets OR business OR trade OR inflation OR jobs OR banking'},
-  {name:'Technology',q:'technology OR AI OR cyber OR internet OR software OR telecommunications'},
-  {name:'Science Health',q:'science OR space OR research OR health OR medicine OR disease'},
-  {name:'Climate Energy',q:'climate OR weather OR disaster OR energy OR oil OR power grid'},
-  {name:'Society',q:'immigration OR protest OR education OR housing OR human rights OR religion'},
-  {name:'Culture',q:'sports OR entertainment OR celebrity OR media OR social media'}
+  {name:'World Politics',q:'world OR international OR diplomacy OR conflict OR politics OR government OR election OR court'},
+  {name:'Economy Business',q:'economy OR markets OR business OR trade OR inflation OR jobs OR banking OR corporate'},
+  {name:'Science Technology Health',q:'technology OR AI OR cyber OR science OR space OR research OR health OR medicine'},
+  {name:'Climate Society Culture',q:'climate OR weather OR disaster OR energy OR immigration OR protest OR education OR housing OR sports OR entertainment OR media'}
 ];
 
 const CATEGORIES={
@@ -415,18 +408,27 @@ export default async function handler(req,res){
     if(new Date(from+'T00:00:00Z')>now) return res.status(200).json({from,to,planet,future:true,count:0,rawCount:0,publisherCount:0,archiveQuality:{level:'future',analysisEligible:false,reason:'Future window'},eventCount:0,eventClusters:[],articles:[],categories:[],subcategories:[],subjects:[],leaderEvidence:[],sourceCounts:{},sourceCoverage:{googleNews:{available:true,label:'Google News RSS'},gdelt:{available:false,label:'GDELT DOC 2.0',reason:'Future window'}}});
     if(from<'2014-01-01') return res.status(400).json({error:'Planet News supports transit windows from 2014-01-01 forward.'});
 
-    const feeds=FEEDS.map(f=>({
-      ...f,
-      url:'https://news.google.com/rss/search?q='+encodeURIComponent(f.q+' after:'+from+' before:'+to)+'&hl=en-US&gl=US&ceid=US:en'
-    }));
-    const settled=await Promise.allSettled(feeds.map(fetchFeed));
+    const coverageWindows=buildCoverageWindows(from,to);
+    const googleTasks=[];
+    for(const window of coverageWindows){
+      for(const feed of FEEDS)googleTasks.push(()=>fetchFeed(feed,window.from,window.to));
+    }
+    const googleSettled=await runPool(googleTasks,8);
     const items=[];
-    for(const r of settled) if(r.status==='fulfilled') items.push(...r.value);
+    let googleFailed=0;
+    for(const r of googleSettled){
+      if(r.status==='fulfilled')items.push(...r.value);
+      else googleFailed++;
+    }
 
     const gdeltCoverage=isWithinGdeltDocWindow(from,to);
+    let gdeltFailed=0;
     if(gdeltCoverage.available){
-      const gdeltSettled=await Promise.allSettled(FEEDS.slice(0,6).map(f=>fetchGdeltFeed(f,from,to)));
-      for(const r of gdeltSettled) if(r.status==='fulfilled') items.push(...r.value);
+      const gdeltSettled=await Promise.allSettled(FEEDS.map(f=>fetchGdeltFeed(f,from,to)));
+      for(const r of gdeltSettled){
+        if(r.status==='fulfilled')items.push(...r.value);
+        else gdeltFailed++;
+      }
     }
 
     // Do not let a sparse or empty GDELT response collapse the report. When the
@@ -488,6 +490,16 @@ export default async function handler(req,res){
       eventCount:eventClusters.length,eventClusters:eventClusters.slice(0,100),categories,subcategories,
       weightedCategories:buildWeightedCategories(eventClusters),subjects,articles,leaderEvidence,
       sourceCounts,
+      retrievalCoverage:{
+        from,to,
+        days:Math.max(1,Math.ceil((new Date(to+'T00:00:00Z')-new Date(from+'T00:00:00Z'))/86400000)),
+        windowCount:coverageWindows.length,
+        windows:coverageWindows,
+        googleQueries:googleTasks.length,
+        googleFailed,
+        gdeltQueries:gdeltCoverage.available?FEEDS.length:0,
+        gdeltFailed
+      },
       sourceCoverage:{
         googleNews:{available:true,label:'Google News RSS',count:sourceCounts['Google News']||0},
         gdelt:{available:gdeltCoverage.available,label:'GDELT DOC 2.0',reason:gdeltCoverage.reason||'',count:sourceCounts['GDELT']||0},
@@ -499,20 +511,49 @@ export default async function handler(req,res){
   }
 }
 
-async function fetchFeed(feed){
-  const r=await fetch(feed.url,{headers:{'Accept':'application/rss+xml, application/xml, text/xml','User-Agent':'MercuryTransitNewsTracker/1.0'}});
+function isoDate(d){return new Date(d).toISOString().slice(0,10)}
+function buildCoverageWindows(from,to){
+  const start=new Date(from+'T00:00:00Z');
+  const end=new Date(to+'T00:00:00Z');
+  const totalDays=Math.max(1,Math.ceil((end-start)/86400000));
+  const targetDays=totalDays<=45?7:totalDays<=180?14:totalDays<=540?30:Math.ceil(totalDays/10);
+  const windows=[];
+  for(let cursor=new Date(start);cursor<end;){
+    const next=new Date(Math.min(end.getTime(),cursor.getTime()+targetDays*86400000));
+    windows.push({from:isoDate(cursor),to:isoDate(next)});
+    cursor=next;
+  }
+  return windows;
+}
+async function runPool(tasks,limit=8){
+  const results=new Array(tasks.length);
+  let next=0;
+  async function worker(){
+    while(true){
+      const i=next++;
+      if(i>=tasks.length)return;
+      try{results[i]={status:'fulfilled',value:await tasks[i]()}}
+      catch(reason){results[i]={status:'rejected',reason}}
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(limit,tasks.length)},()=>worker()));
+  return results;
+}
+async function fetchFeed(feed,from,to){
+  const url='https://news.google.com/rss/search?q='+encodeURIComponent(feed.q+' after:'+from+' before:'+to)+'&hl=en-US&gl=US&ceid=US:en';
+  const r=await fetch(url,{headers:{'Accept':'application/rss+xml, application/xml, text/xml','User-Agent':'PlanetTransitNewsTracker/2.0'}});
   if(!r.ok) throw new Error(feed.name+' HTTP '+r.status);
   const xml=await r.text();
   const blocks=[...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(m=>m[1]);
-  return blocks.slice(0,40).map((b,i)=>{
+  return blocks.slice(0,60).map((b,i)=>{
     const title=clean(readTag(b,'title'));
     const link=clean(readTag(b,'link'))||clean(readTag(b,'guid'));
     const pub=clean(readTag(b,'pubDate'))||clean(readTag(b,'dc:date'));
     const description=summary(clean(readTag(b,'description')));
     const source=clean(readTag(b,'source'))||feed.name;
     const d=new Date(pub);
-    return {id:feed.name+'-'+i+'-'+hash(title+link),title,description,source,url:safe(link),archiveSource:'Google News',publishedAt:Number.isFinite(d.getTime())?d.toISOString().slice(0,10):'',publishedAtFull:Number.isFinite(d.getTime())?d.toISOString():''};
-  }).filter(x=>x.title&&x.url&&x.publishedAt);
+    return {id:feed.name+'-'+from+'-'+i+'-'+hash(title+link),title,description,source,url:safe(link),archiveSource:'Google News',publishedAt:Number.isFinite(d.getTime())?d.toISOString().slice(0,10):'',publishedAtFull:Number.isFinite(d.getTime())?d.toISOString():''};
+  }).filter(x=>x.title&&x.url&&x.publishedAt&&x.publishedAt>=from&&x.publishedAt<to);
 }
 async function fetchGdeltFeed(feed,from,to){
   const now=new Date();
@@ -730,6 +771,18 @@ function buildOrganicSubjects(articles){
   }
   return selected;
 }
+function takeEvenlyAcrossTime(rows,cap){
+  if(rows.length<=cap)return rows;
+  const sorted=[...rows].sort((a,b)=>new Date(a.publishedAtFull||a.publishedAt)-new Date(b.publishedAtFull||b.publishedAt));
+  if(cap===1)return[sorted[Math.floor(sorted.length/2)]];
+  const out=[],used=new Set();
+  for(let i=0;i<cap;i++){
+    let idx=Math.round(i*(sorted.length-1)/(cap-1));
+    while(used.has(idx)&&idx<sorted.length-1)idx++;
+    if(!used.has(idx)){used.add(idx);out.push(sorted[idx])}
+  }
+  return out;
+}
 function balanceByPublisher(articles){
   if(articles.length<=24)return articles;
   const publishers=new Map();
@@ -739,13 +792,10 @@ function balanceByPublisher(articles){
     publishers.get(key).push(a);
   }
   const publisherCount=Math.max(1,publishers.size);
-  const cap=Math.max(3,Math.min(10,Math.ceil(articles.length/Math.max(8,publisherCount))));
+  const cap=Math.max(3,Math.min(12,Math.ceil(articles.length/Math.max(8,publisherCount))));
   const out=[];
-  for(const rows of publishers.values()){
-    rows.sort((a,b)=>new Date(b.publishedAtFull||b.publishedAt)-new Date(a.publishedAtFull||a.publishedAt));
-    out.push(...rows.slice(0,cap));
-  }
-  return out.sort((a,b)=>new Date(b.publishedAtFull||b.publishedAt)-new Date(a.publishedAtFull||a.publishedAt));
+  for(const rows of publishers.values())out.push(...takeEvenlyAcrossTime(rows,cap));
+  return out.sort((a,b)=>new Date(a.publishedAtFull||a.publishedAt)-new Date(b.publishedAtFull||b.publishedAt));
 }
 function publisherKey(a){
   const src=String(a.source||'').trim().toLowerCase();
@@ -802,7 +852,24 @@ function decode(v){return v.replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace
 function summary(v){return v.length>240?v.slice(0,237)+'…':v}
 function safe(v){try{const u=new URL(v);return /^https?:$/.test(u.protocol)?u.href:''}catch{return''}}
 function cleanDate(v){const s=String(v||'');return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:''}
-function dedupe(items){const seen=new Set();return items.filter(x=>{const k=(x.title||'').toLowerCase().replace(/\W+/g,' ').trim();if(seen.has(k))return false;seen.add(k);return true})}
+function canonicalHeadline(title){
+  return String(title||'').toLowerCase()
+    .replace(/\s+-\s+[^-]{2,80}$/,'')
+    .replace(/\b(live updates?|breaking news|update)\b/g,' ')
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim();
+}
+function dedupe(items){
+  const seenTitles=new Set(),seenUrls=new Set();
+  return items.filter(x=>{
+    const titleKey=canonicalHeadline(x.title);
+    const urlKey=String(x.url||'').replace(/[?#].*$/,'');
+    if((titleKey&&seenTitles.has(titleKey))||(urlKey&&seenUrls.has(urlKey)))return false;
+    if(titleKey)seenTitles.add(titleKey);
+    if(urlKey)seenUrls.add(urlKey);
+    return true;
+  });
+}
 function hash(t){let h=2166136261;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
 
 
