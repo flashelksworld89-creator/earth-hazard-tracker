@@ -345,9 +345,6 @@ main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
   .unified-filter-grid{grid-template-columns:1fr}
 }
 
-.historical-report{margin:4px 0 14px;padding:16px;border:1px solid rgba(101,217,255,.18);border-radius:14px;background:linear-gradient(180deg,rgba(7,30,45,.82),rgba(5,19,30,.84))}
-.historical-report p{margin:10px 0;color:#c7d9e3;font-size:12px;line-height:1.72}
-.historical-report p b{color:#edf9ff}
 </style>
 </head>
 <body>
@@ -382,7 +379,7 @@ main{width:min(1500px,calc(100% - 40px));padding:30px 0 64px}
 <section class="panel summary-panel dashboard-panel">
 <div class="panel-head"><strong>▦ 12-ZODIAC <span id="summaryPlanetName">MERCURY</span> NEWS SUMMARY</strong><span id="summaryStatus" class="status">Ready to load historical news</span></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button id="loadSummaryBtn" type="button" style="min-height:40px;border:1px solid var(--border);background:#06111f;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer">Load 12-sign news summary</button></div>
-<div class="detail-sub">Each zodiac summarizes the analyzed planet within the currently active transit filters. Any of the ten planets/nodes can be used as a filter across 2014–2028. Weak or missing archive windows are excluded from comparative baselines.</div>
+<div class="detail-sub">Each zodiac summarizes the analyzed planet within the currently active transit filters. Any of the ten planets/nodes can be used as a filter across 2014–2028. Sparse source windows are flagged instead of being treated as low news activity.</div>
 <div id="summaryGrid" class="summary-grid"><div class="empty empty-state"><b>Summary ready when you are.</b><span>Load the 12-sign news summary after choosing any filters you want to apply.</span></div></div>
 </section>
 
@@ -408,16 +405,15 @@ const NAK=['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarva
 const NAK_SIZE=360/27;
 const OTHER_ALL=['Sun','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Rahu','Ketu'];
 const GLYPH={Sun:'☉',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',Rahu:'☊',Ketu:'☋'};
-const state={periods:[],basePeriods:[],filterCatalogs:{},activeFilters:[],selected:null,news:new Map(),fetchCache:new Map(),regimeNews:new Map(),summaryRun:0,baselineRun:0,buildRun:0,planet:'Mercury'};
+const state={periods:[],basePeriods:[],filterCatalogs:{},activeFilters:[],selected:null,news:new Map(),fetchCache:new Map(),summaryRun:0,buildRun:0,planet:'Mercury'};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 const FILTER_PLANETS=['Mercury','Sun','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Rahu','Ketu'];
-const RESEARCH_START=new Date('1980-01-01T00:00:00Z');
+const RESEARCH_START=new Date('2014-01-01T00:00:00Z');
 const RESEARCH_END=new Date('2028-12-31T23:59:59Z');
 
 
 document.getElementById('planetSelect').onchange=()=>{
   state.summaryRun++;
-  state.baselineRun++;
   state.planet=document.getElementById('planetSelect').value;
   state.news.clear();state.selected=null;
   build();
@@ -724,123 +720,14 @@ async function fetchPeriodNews(p,planet,cacheMode='force-cache'){
     throw e;
   }
 }
-function nodalRegimeAt(date){
-  const mid=new Date(date);
-  const nodes=meanNodes(mid);
-  const rahuSign=Math.floor(nodes.rahu/30);
-  const ketuSign=Math.floor(nodes.ketu/30);
-  const key=rahuSign+'-'+ketuSign;
-  return{rahuSign,ketuSign,key,rahuLon:nodes.rahu,ketuLon:nodes.ketu};
-}
-function sameRahuSign(date,sign){
-  return Math.floor(meanNodes(date).rahu/30)===sign;
-}
-function refineRahuBoundary(a,b,oldSign){
-  let lo=a.getTime(),hi=b.getTime();
-  for(let i=0;i<28;i++){
-    const mid=(lo+hi)/2;
-    if(sameRahuSign(new Date(mid),oldSign))lo=mid;else hi=mid;
-  }
-  return new Date(hi);
-}
-function nodalRegimeBounds(date){
-  const center=new Date(date);
-  const regime=nodalRegimeAt(center);
-  const day=86400000;
-  let left=new Date(center),right=new Date(center);
-  for(let i=0;i<700;i++){
-    const prev=new Date(left.getTime()-day);
-    if(!sameRahuSign(prev,regime.rahuSign)){left=refineRahuBoundary(prev,left,Math.floor(meanNodes(prev).rahu/30));break;}
-    left=prev;
-  }
-  for(let i=0;i<700;i++){
-    const next=new Date(right.getTime()+day);
-    if(!sameRahuSign(next,regime.rahuSign)){right=refineRahuBoundary(right,next,regime.rahuSign);break;}
-    right=next;
-  }
-  return{...regime,start:left,end:right};
-}
-function mergeNewsData(chunks){
-  const cat=new Map(),sub=new Map(),weighted=new Map();
-  let count=0,eventCount=0,rawCount=0,publisherCount=0;
-  const subjects=new Map(),clusters=[];
-  for(const d of chunks){
-    count+=Number(d.count)||0;eventCount+=Number(d.eventCount)||0;rawCount+=Number(d.rawCount)||0;
-    publisherCount=Math.max(publisherCount,Number(d.publisherCount)||0);
-    for(const x of d.categories||[])cat.set(x.name,(cat.get(x.name)||0)+(Number(x.count)||0));
-    for(const x of d.subcategories||[]){
-      const key=(x.category||'')+'|||'+(x.name||'');
-      sub.set(key,(sub.get(key)||0)+(Number(x.count)||0));
-    }
-    for(const x of d.subjects||[])subjects.set(x.name,(subjects.get(x.name)||0)+(Number(x.count)||0));
-    for(const x of d.weightedCategories||[]){
-      const row=weighted.get(x.name)||{name:x.name,eventCount:0,score:0};
-      row.eventCount+=(Number(x.eventCount)||0);row.score+=(Number(x.score)||0);weighted.set(x.name,row);
-    }
-    for(const x of d.eventClusters||[])clusters.push(x);
-  }
-  return{
-    count,eventCount,rawCount,publisherCount,
-    categories:[...cat.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
-    subcategories:[...sub.entries()].map(([key,count])=>{const [category,name]=key.split('|||');return{category,name,count}}).sort((a,b)=>b.count-a.count),
-    subjects:[...subjects.entries()].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count),
-    weightedCategories:[...weighted.values()].sort((a,b)=>(b.score||0)-(a.score||0)),
-    eventClusters:clusters.sort((a,b)=>(b.significanceScore||0)-(a.significanceScore||0)||(b.sourceCount||0)-(a.sourceCount||0))
-  };
-}
-async function fetchNodalRegimeBaseline(p,planet,run){
-  const mid=new Date((p.start.getTime()+p.end.getTime())/2);
-  const regime=nodalRegimeBounds(mid);
-  const mode=periodDataMode(p);
-  const cacheKey=mode+'|'+regime.key+'|'+isoDay(regime.start)+'|'+isoDay(regime.end);
-  if(state.regimeNews.has(cacheKey))return{regime,data:state.regimeNews.get(cacheKey)};
-  const maxEnd=Math.min(regime.end.getTime(),Date.now()+86400000);
-  const chunkMs=180*86400000;
-  const windows=[];
-  for(let ms=regime.start.getTime();ms<maxEnd;ms+=chunkMs){
-    windows.push([new Date(ms),new Date(Math.min(ms+chunkMs,maxEnd))]);
-  }
-  const settled=await Promise.allSettled(windows.map(async([fromDate,toDate])=>{
-    if(run!==state.baselineRun||planet!==state.planet)return null;
-    const from=isoDay(fromDate),to=isoDay(toDate);
-    const key='regime|'+planet+'|'+from+'|'+to;
-    let promise=state.fetchCache.get(key);
-    if(!promise){
-      promise=fetch('/api/mercury-news?planet='+encodeURIComponent(planet)+'&from='+from+'&to='+to,{cache:'force-cache'}).then(r=>r.ok?r.json():null);
-      state.fetchCache.set(key,promise);
-    }
-    return promise;
-  }));
-  if(run!==state.baselineRun||planet!==state.planet)return null;
-  const chunks=settled.filter(x=>x.status==='fulfilled'&&x.value&&x.value.archiveQuality?.analysisEligible!==false).map(x=>x.value);
-  const merged=mergeNewsData(chunks);
-  state.regimeNews.set(cacheKey,merged);
-  return{regime,data:merged};
-}
-function periodDataMode(p){
-  return isoDay(new Date(p.end.getTime()+86400000))<'2014-01-01'?'historical-events':'modern-news';
-}
-async function loadFingerprintBaseline(selected,planet,run){
-  const mode=periodDataMode(selected);
-  const eligible=state.periods.filter(p=>
-    p.id!==selected.id &&
-    p.start.getTime()<=Date.now() &&
-    periodDataMode(p)===mode
-  );
-  eligible.sort((a,b)=>Math.abs(a.start-selected.start)-Math.abs(b.start-selected.start));
-  const targets=eligible.slice(0,8);
-  const status=document.getElementById('newsStatus');
-  let done=0;
-  for(const p of targets){
-    if(run!==state.baselineRun||planet!==state.planet)return;
-    if(!state.news.has(p.id)){
-      try{await fetchPeriodNews(p,planet,'force-cache')}catch(_){}
-    }
-    done++;
-    if(status&&run===state.baselineRun)status.textContent='Building transit fingerprint '+done+' / '+targets.length;
-    if(done%2===0)await yieldUI();
-  }
-}
+
+
+
+
+
+
+
+
 async function selectPeriod(id){
   const requestPlanet=state.planet;
   const index=state.periods.findIndex(x=>x.id===id);if(index<0)return;
@@ -855,43 +742,18 @@ async function selectPeriod(id){
   }
   renderTimeline();renderDetail(p);
   if(p.start.getTime()>Date.now())return;
-  const key=p.id;
-  let data=state.news.get(key)||null;
-  document.getElementById('newsStatus').textContent=data?'News loaded':'Loading news…';
+  document.getElementById('newsStatus').textContent=state.news.has(p.id)?'News loaded':'Loading news…';
   try{
-    if(!data)data=await fetchPeriodNews(p,requestPlanet,'force-cache');
+    const data=await fetchPeriodNews(p,requestPlanet,'force-cache');
     if(requestPlanet!==state.planet||state.selected!==p.id)return;
     if(!data)throw new Error('No news response returned');
     renderNews(p,data);
-    document.getElementById('newsStatus').textContent=(data.count||data.eventCount||0)+' records loaded';
   }catch(e){
     if(requestPlanet!==state.planet||state.selected!==p.id)return;
     document.getElementById('newsStatus').textContent='News request failed';
     const n=document.getElementById('newsArea');
     if(n)n.innerHTML='<div class="empty"><b>News could not load.</b><br>'+esc(e?.message||String(e))+'</div>';
-    return;
   }
-
-  const baselineRun=++state.baselineRun;
-  Promise.resolve().then(async()=>{
-    try{
-      const nodal=await fetchNodalRegimeBaseline(p,requestPlanet,baselineRun);
-      if(requestPlanet!==state.planet||baselineRun!==state.baselineRun||state.selected!==p.id)return;
-      if(nodal){
-        p.nodalRegime=nodal.regime;
-        p.nodalBaseline=nodal.data;
-      }else{
-        await loadFingerprintBaseline(p,requestPlanet,baselineRun);
-      }
-      if(requestPlanet!==state.planet||baselineRun!==state.baselineRun||state.selected!==p.id)return;
-      renderNews(p,data);
-      document.getElementById('newsStatus').textContent=(data.count||data.eventCount||0)+' records loaded · fingerprint ready';
-    }catch(_){
-      if(requestPlanet===state.planet&&state.selected===p.id){
-        document.getElementById('newsStatus').textContent=(data.count||data.eventCount||0)+' records loaded · baseline unavailable';
-      }
-    }
-  });
 }
 function renderDetail(p){
   const future=p.start.getTime()>Date.now();
@@ -916,7 +778,6 @@ function renderDetail(p){
 }
 function renderNews(p,data){
   const area=document.getElementById('newsArea');if(!area)return;
-  if(data.mode==='historical-events'){renderHistoricalEvents(p,data,area);return;}
   const cats=data.categories||[],max=Math.max(1,...cats.map(x=>x.count));
   const bars=cats.length?'<div class="category-bars">'+cats.map(c=>'<div class="cat"><span>'+esc(c.name)+'</span><div class="track"><div class="fill" style="width:'+((c.count/max)*100).toFixed(1)+'%"></div></div><b>'+c.count+'</b></div>').join('')+'</div>':'';
   const stories=(data.articles||[]).slice(0,24).map(a=>
@@ -1020,103 +881,10 @@ function renderSignSummary(){
   }).join('');
 }
 
-function historicalSentimentLabel(tone){
-  const n=Number(tone)||0;
-  if(n<=-5)return 'strongly negative';
-  if(n<=-1.5)return 'negative';
-  if(n<1.5)return 'mixed / neutral';
-  if(n<5)return 'positive';
-  return 'strongly positive';
-}
-function historicalGoldsteinLabel(score){
-  const n=Number(score)||0;
-  if(n<=-5)return 'high-conflict';
-  if(n<=-1)return 'conflict-leaning';
-  if(n<1)return 'mixed';
-  if(n<5)return 'cooperative';
-  return 'strongly cooperative';
-}
-function buildHistoricalNarrative(p,data){
-  const stats=data.historicalStats||{};
-  const cats=(data.categories||[]).slice(0,5);
-  const detailed=(data.detailedEventCodes||[]).slice(0,5);
-  const actors=(stats.topActors||[]).slice(0,5);
-  const pairs=(stats.topActorPairs||[]).slice(0,4);
-  const locations=(stats.topLocations||[]).slice(0,5);
-  const total=Math.max(1,Number(stats.events)||0);
-  const days=Math.max(1/24,daysBetween(p.start,p.end));
-  const eventRate=(Number(stats.events)||0)/days;
-  const pct=x=>((Number(x.count||0)/total)*100).toFixed(1)+'%';
-  const topCat=cats[0];
-  const secondCat=cats[1];
-  const actorText=actors.length?actors.map(x=>x.name).join(', '):'no dominant actors identified';
-  const locationText=locations.length?locations.map(x=>x.name).join(', '):'no dominant locations identified';
-  const pairText=pairs.length?pairs.map(x=>x.name).join(' · '):'no dominant actor-action pairs identified';
-  const codeText=detailed.length?detailed.map(x=>'CAMEO '+x.code+' ('+x.count+')').join(', '):'no detailed event codes available';
-  const categorySentence=topCat
-    ? ('The largest event category was <b>'+esc(topCat.name)+'</b> at '+pct(topCat)+
-       (secondCat?' of coded events, followed by <b>'+esc(secondCat.name)+'</b> at '+pct(secondCat)+'.':'.'))
-    : 'No dominant event category was available for this interval.';
-  return '<div class="historical-report">'+
-    '<div class="panel-head"><strong>HISTORICAL EVENT REPORT</strong><span class="status">GDELT reconstruction</span></div>'+
-    '<p><b>'+esc(state.planet)+' transit window:</b> '+fmtDate(p.start)+' → '+fmtDate(p.end)+'. '+
-      'The historical archive contains <b>'+Number(stats.events||0)+'</b> coded events across this interval, averaging <b>'+eventRate.toFixed(1)+'</b> events per day.</p>'+
-    '<p>'+categorySentence+' Overall event tone was <b>'+historicalSentimentLabel(stats.avgTone)+'</b> ('+Number(stats.avgTone||0).toFixed(2)+
-      '), while the average Goldstein score indicates a <b>'+historicalGoldsteinLabel(stats.avgGoldstein)+'</b> interaction environment ('+Number(stats.avgGoldstein||0).toFixed(2)+').</p>'+
-    '<p><b>Most active actors:</b> '+esc(actorText)+'. <b>Most active locations:</b> '+esc(locationText)+'.</p>'+
-    '<p><b>Dominant interaction patterns:</b> '+esc(pairText)+'.</p>'+
-    '<p><b>Most frequent detailed event codes:</b> '+esc(codeText)+'.</p>'+
-    '<div class="note"><b>What this report is:</b> a readable reconstruction from structured GDELT event records for the selected dates. It is not a reproduction of original historical newspaper headlines.</div>'+
-  '</div>';
-}
-function renderHistoricalEvents(p,data,area){
-  const stats=data.historicalStats||{};
-  const roots=(data.historicalEventTypes||[]).slice(0,12);
-  const detailed=(data.detailedEventCodes||[]).slice(0,12);
-  const actors=(stats.topActors||[]).slice(0,8);
-  const actorPairs=(stats.topActorPairs||[]).slice(0,8);
-  const locations=(stats.topLocations||[]).slice(0,8);
-  const quality=data.archiveQuality||{};
-  const days=Math.max(1/24,daysBetween(p.start,p.end));
-  const eventRate=(Number(stats.events)||0)/days;
-  const rootHtml=roots.length
-    ? '<div class="headline-group"><h3>Top historical event themes</h3><div class="subcategory-list">'+roots.map(x=>
-        '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
-    : '';
-  const detailedHtml=detailed.length
-    ? '<div class="headline-group"><h3>Detailed GDELT event codes</h3><div class="subcategory-list">'+detailed.map(x=>
-        '<div class="subcategory-row"><b>'+esc(x.name||('CAMEO '+x.code))+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
-    : '';
-  const actorHtml=actors.length
-    ? '<div class="headline-group"><h3>Most frequent actors</h3><div class="subcategory-list">'+actors.map(x=>
-        '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
-    : '';
-  const pairHtml=actorPairs.length
-    ? '<div class="headline-group"><h3>Top actor → action → actor patterns</h3><div class="subcategory-list">'+actorPairs.map(x=>
-        '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
-    : '';
-  const locHtml=locations.length
-    ? '<div class="headline-group"><h3>Most frequent locations</h3><div class="subcategory-list">'+locations.map(x=>
-        '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.count+'</span></div>').join('')+'</div></div>'
-    : '';
-  area.innerHTML=
-    buildHistoricalNarrative(p,data)+
-    '<div class="headline-groups"><div class="panel-head"><strong>HISTORICAL EVENT METRICS</strong><span class="status">'+esc(String(quality.level||'unknown').toUpperCase())+'</span></div>'+
-      '<div class="metric-grid">'+
-        '<div class="metric-card"><small>Coded events</small><b>'+Number(stats.events||0)+'</b></div>'+
-        '<div class="metric-card"><small>Events / 24h</small><b>'+eventRate.toFixed(1)+'</b></div>'+
-        '<div class="metric-card"><small>Media mentions</small><b>'+Number(stats.mentions||0)+'</b></div>'+
-        '<div class="metric-card"><small>Source references</small><b>'+Number(stats.sources||0)+'</b></div>'+
-        '<div class="metric-card"><small>Article references</small><b>'+Number(stats.articles||0)+'</b></div>'+
-        '<div class="metric-card"><small>Avg Goldstein</small><b>'+Number(stats.avgGoldstein||0).toFixed(2)+'</b></div>'+
-        '<div class="metric-card"><small>Avg tone</small><b>'+Number(stats.avgTone||0).toFixed(2)+'</b></div>'+
-      '</div>'+
-      (quality.reason?'<div class="note">'+esc(quality.reason)+'</div>':'')+
-      detailedHtml+rootHtml+pairHtml+actorHtml+locHtml+
-    '</div>';
-  document.getElementById('newsStatus').textContent=(Number(stats.events)||0)+' historical events · report generated';
-  if(document.getElementById('summaryStatus')?.dataset.loading==='1')renderSignSummary();
-}
+
+
+
+
 
 function renderResearchMetrics(p,data){
   const days=Math.max(1/24,daysBetween(p.start,p.end));
@@ -1127,7 +895,6 @@ function renderResearchMetrics(p,data){
   const headlineRate=headlines/days;
   const eventRate=events/days;
   const anomalies=quality.analysisEligible===false?[]:categoryAnomalies(p,data).slice(0,3);
-  const subLifts=quality.analysisEligible===false?[]:subcategoryAnomalies(p,data).slice(0,5);
   const anomalyHtml=anomalies.length
     ? '<div class="headline-group"><h3>Largest category deviations vs loaded '+state.planet+' baseline</h3><div class="subcategory-list">'+anomalies.map(x=>{
         const cls=x.ratio>=1?'anomaly-up':'anomaly-down';
@@ -1145,8 +912,7 @@ function renderResearchMetrics(p,data){
       '<div class="metric-card"><small>Raw → balanced sample</small><b>'+Number(data.rawCount||0)+' → '+headlines+'</b></div>'+
     '</div>'+
     (quality.reason?'<div class="note">'+esc(quality.reason)+'</div>':'')+
-    anomalyHtml+
-    renderTransitFingerprint(p,data,subLifts)+'</div>';
+    anomalyHtml+'</div>';
 }
 function subcategoryAnomalies(p,data){
   const currentDays=Math.max(1/24,daysBetween(p.start,p.end));
@@ -1185,27 +951,7 @@ function subcategoryAnomalies(p,data){
     return{name:s.name,category:s.category,count:Number(s.count)||0,currentRate,baseRate,ratio};
   }).filter(x=>x.count>0).sort((a,b)=>b.ratio-a.ratio||b.currentRate-a.currentRate);
 }
-function renderTransitFingerprint(p,data,subLifts){
-  const events=(data.eventClusters||[]).slice(0,3);
-  const top=subLifts[0];
-  const regime=p.nodalRegime;
-  const regimeText=regime
-    ? '<div class="note"><b>Rahu/Ketu background:</b> '+SG[regime.rahuSign]+' Rahu in '+SIGNS[regime.rahuSign]+' ↔ '+SG[regime.ketuSign]+' Ketu in '+SIGNS[regime.ketuSign]+' · '+fmtDate(regime.start)+' → '+fmtDate(regime.end)+'</div>'
-    : '';
-  const distinctive=top
-    ? '<div class="trend-peak"><div class="small">MOST DISTINCTIVE PATTERN</div><div class="detail-title">'+esc(top.name)+'</div>'+
-      '<div class="detail-sub">'+esc(top.category||'')+' · '+top.count+' matches · '+top.ratio.toFixed(2)+'× Rahu/Ketu-regime baseline</div></div>'
-    : '<div class="note">Building a same-planet comparison baseline for this transit. The fingerprint will update automatically when enough comparable windows are available.</div>';
-  const lifts=subLifts.length
-    ? '<div class="headline-group"><h3>Detailed subcategory lift</h3><div class="subcategory-list">'+subLifts.map(x=>
-      '<div class="subcategory-row"><b>'+esc(x.name)+'</b><span>'+x.ratio.toFixed(2)+'×</span></div>').join('')+'</div></div>'
-    : '';
-  const drivers=events.length
-    ? '<div class="headline-group"><h3>Primary event drivers</h3><div class="headline-links">'+events.map(e=>
-      '<div class="headline-link"><b>'+esc(e.title||'Event cluster')+'</b><span>Impact '+Number(e.significanceScore||0).toFixed(1)+' · '+Number(e.headlineCount||0)+' headlines · '+Number(e.sourceCount||0)+' sources · '+Number(e.trustedSourceCount||0)+' trusted · '+esc(e.topCategory||'')+'</span></div>').join('')+'</div></div>'
-    : '';
-  return '<div class="headline-groups"><div class="panel-head"><strong>TRANSIT FINGERPRINT</strong><span class="status">Rahu/Ketu-regime normalized</span></div>'+regimeText+distinctive+lifts+drivers+'</div>';
-}
+
 
 function categoryAnomalies(p,data){
   const currentDays=Math.max(1/24,daysBetween(p.start,p.end));
