@@ -989,12 +989,18 @@ function categoryAnomalies(p,data){
 function renderSourceCoverage(data){
   const counts=data.sourceCounts||{};
   const cov=data.sourceCoverage||{};
+  const coverage=data.retrievalCoverage||{};
   const parts=Object.entries(counts).map(([name,count])=>esc(name)+': '+count);
   const gdelt=cov.gdelt;
   const wiki=cov.wikipediaCurrentEvents;
   const notes=[];
+  if(coverage.windowCount){
+    notes.push('Full date range queried in '+Number(coverage.windowCount)+' consecutive window'+(Number(coverage.windowCount)===1?'':'s')+' across '+Number(coverage.days||0)+' days');
+    if(Number(coverage.googleFailed||0)>0)notes.push(Number(coverage.googleFailed)+' Google News slice'+(Number(coverage.googleFailed)===1?'':'s')+' failed');
+  }
   if(gdelt&&!gdelt.available)notes.push('GDELT unavailable for this window: '+esc(gdelt.reason||'outside archive window'));
   else if(gdelt&&Number(gdelt.count||0)===0)notes.push('GDELT returned no usable records; the report was not treated as zero activity');
+  if(Number(coverage.gdeltFailed||0)>0)notes.push(Number(coverage.gdeltFailed)+' GDELT request'+(Number(coverage.gdeltFailed)===1?'':'s')+' failed');
   if(wiki?.used)notes.push('Wikipedia Current Events fallback was added because primary archive coverage was sparse');
   return '<div class="note"><b>News sources:</b> '+(parts.join(' · ')||'No source counts')+' · '+Number(data.publisherCount||0)+' independent publishers'+(notes.length?' · '+notes.join(' · '):'')+'</div>';
 }
