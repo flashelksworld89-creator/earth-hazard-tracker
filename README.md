@@ -39,3 +39,14 @@ No ephemeris API route, npm astronomy dependency, API key, or new environment va
 - NOAA Stage IV current 24-hour QPE availability/status.
 - Moon phase, Lahiri sidereal Moon zodiac/nakshatra, and Venus-Moon major aspect calculated at each event or cyclone peak timestamp.
 - Monthly frequency reports and strongest/heaviest vs lower-intensity quartile comparisons.
+
+## Aviation Moon aspect comparison (experimental)
+The Aviation Agent now includes a separate 2026 date-only Moon aspect comparison panel.
+- Switch between traditional sign-based Parashari aspects and modern angular aspects (8-degree orb).
+- Compare crash/collision reports with other emergency reports, based on headline-derived categories.
+- Rank aspects by observed incident share divided by the share of 2026 UTC calendar days with the same aspect at noon.
+- Show an exposure-adjusted sidereal Moon sign comparison.
+- Flag aspects that are not present at both UTC day endpoints when an incident has no reported event time.
+- Keep existing Mars/Rahu 8-degree Jyotish cards and original Moon zodiac/nakshatra charts unchanged.
+
+The new panel is exploratory. Its baseline is calendar-day frequency, **not flight volume or aircraft exposure**. News-source coverage, duplicate events, missing incident times, and multiple incidents per date can bias comparisons. An enrichment ratio is not a causal effect or aviation safety prediction. The node model in the new classical panel uses seventh-house aspect only; the legacy Rahu cards retain their separate fifth/seventh/ninth convention.
