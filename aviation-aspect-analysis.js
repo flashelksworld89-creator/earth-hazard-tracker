@@ -32,7 +32,7 @@ function render(){
   const today=new Date().toISOString().slice(0,10);
   const end=today<'2026-12-31'?today:'2026-12-31';
   const days=dateRange(start,end);
-  const filtered=incidents.filter(r=>{
+  const filtered=countedIncidents.filter(r=>{
     const day=String(r.eventAt||'').slice(0,10);
     if(day<start||day>end)return false;
     const categories=Array.isArray(r.categories)?r.categories:[];
