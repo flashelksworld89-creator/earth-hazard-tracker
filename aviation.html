@@ -90,6 +90,11 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     <div class="note">Past/current-month incident counts are grouped by the Moon’s sidereal zodiac sign and nakshatra at the event timestamp. Future months show projected Moon sign/nakshatra movement only; no future incident counts are invented.</div>
   </section>
   <section class="panel">
+    <div class="panel-head"><strong>INCIDENT DUPLICATE AUDIT</strong><span class="status">review before consolidating</span></div>
+    <div id="duplicateReview"></div>
+    <div class="note">Articles are not automatically merged merely because they share a date or city. Strong matches on new reports are archived; historical possible duplicates require your confirmation. The archive and backup are stored in this browser, not a shared server database.</div>
+  </section>
+  <section class="panel">
     <div class="panel-head"><strong>AVIATION DATASET</strong><span id="datasetCount" class="status">0 records</span></div>
     <div class="dataset-controls">
       <select id="filterSeverity"><option value="all">All severities</option><option>Critical</option><option>High</option><option>Moderate</option><option>Low</option></select>
@@ -112,6 +117,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
 </main>
 <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
 <script src="/aviation-aspect-analysis.js"></script>
+<script src="/aviation-dedup.js"></script>
 <script>
 const A=window.Astronomy;
 const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
@@ -161,6 +167,7 @@ async function scan(){
       const ascendant=geo?.found?calculateLocalAscendant(timing.date,geo.lat,geo.lon):null;
       const region=geo?.found?worldRegion(geo.lat,geo.lon,geo.countryCode):'Unknown';
       const record=enrichIncident({key,title:article.title,url:article.url,source:article.source||'Source',description:article.description||'',publishedAt:article.publishedAt,eventAt:timing.date.toISOString(),timeBasis:timing.basis,timeConfidence:timing.confidence,categories:classifyAviation(article),astro,locationText,geo,region,ascendant,storedAt:new Date().toISOString()});
+      if(!window.aviationDedup.process(record,incidents))continue;
       incidents.unshift(record);
       persistObservation('aviation_incident',key,record.eventAt,record.eventAt.slice(0,10),record);
       added++;
@@ -207,6 +214,7 @@ async function backfillHistorical(manual){
           categories:classifyAviation(article),astro,locationText,geo,region,ascendant,
           historicalBackfill:true,backfillDay:day,storedAt:new Date().toISOString()
         });
+        if(!window.aviationDedup.process(record,incidents))continue;
         incidents.push(record);
         persistObservation('aviation_incident',key,record.eventAt,record.eventAt.slice(0,10),record);
         added++;
@@ -406,6 +414,7 @@ function majorAspect(sep){
 }
 function nearestAspect(sep){const a=majorAspect(sep);return a?a.name+' · orb '+a.orb.toFixed(1)+'°':'no major aspect · '+sep.toFixed(1)+'° apart'}
 function render(){
+  if(window.aviationDedup)window.aviationDedup.render(incidents,()=>{saveIncidents();render()});
   if(window.renderAviationAspectComparison)window.renderAviationAspectComparison();
   document.getElementById('incidentCount').textContent=incidents.length;renderPatternSummary();renderMonthlyReport();renderDatasetFilters();renderDataset();document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
 }
