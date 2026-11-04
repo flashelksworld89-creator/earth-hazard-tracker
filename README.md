@@ -50,3 +50,8 @@ The Aviation Agent now includes a separate 2026 date-only Moon aspect comparison
 - Keep existing Mars/Rahu 8-degree Jyotish cards and original Moon zodiac/nakshatra charts unchanged.
 
 The new panel is exploratory. Its baseline is calendar-day frequency, **not flight volume or aircraft exposure**. News-source coverage, duplicate events, missing incident times, and multiple incidents per date can bias comparisons. An enrichment ratio is not a causal effect or aviation safety prediction. The node model in the new classical panel uses seventh-house aspect only; the legacy Rahu cards retain their separate fifth/seventh/ninth convention.
+
+## Aviation incident duplicate audit
+The Aviation Agent now has an **Incident Duplicate Audit** section. Exact article keys remain filtered. New articles with the same reported aircraft registration, UTC date and crash/emergency category (or matching flight number and location) are archived as strong matches instead of counted again. Ambiguous matches are **not** automatically merged. Historical incident pairs are shown for manual review, with a full JSON backup export and an undo-last-consolidation control. The original second article is retained in browser local storage.
+
+Important: Existing article records live in browser local storage (limited to 1,000 active entries); duplicate archives and backups are browser-specific. A cleared browser or another device will not share review decisions. The server-side observations feed is not retroactively deduplicated. Timezones, missing registration identifiers, vague locations, and news reporting errors can still produce false negatives or false positives. Review candidate pairs before consolidating and export a backup first.
