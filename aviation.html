@@ -64,6 +64,14 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
     <div class="note">Frequency counts use the entire recorded aviation dataset across all available months. The Mars cards compare the incidents belonging to the highest- and lowest-frequency Moon-sign groups and report the most common Mars→Moon Jyotish drishti (4th, 7th, or 8th) within an 8° orb. The graphs include zero-count categories so the complete zodiac and nakshatra ranking is visible from lowest to highest.</div>
   </section>
   <section class="panel">
+    <div class="panel-head"><strong>PLANETARY ASPECT CORRELATION · EXPLORATORY</strong><span class="status">2026 · date-only comparison</span></div>
+    <div class="dataset-controls">
+      <select id="aspectSystem" aria-label="Aspect system"><option value="vedic">Traditional Jyotish sign aspects</option><option value="modern">Modern angular aspects</option></select>
+      <select id="aspectIncidentType" aria-label="Incident category"><option value="all">All crashes and emergencies</option><option value="crash">Crash / collision reports</option><option value="emergency">Other emergency reports</option></select>
+    </div>
+    <div id="aspectComparison" class="rank-chart">Calculating calendar-day comparison…</div>
+  </section>
+  <section class="panel">
     <div class="panel-head"><strong>GEOGRAPHIC + ASCENDANT PATTERN SUMMARY</strong><span class="status">recorded incident sample</span></div>
     <div id="patternSummary" class="focus-grid"></div>
     <div class="note">Ascendant statistics only use incidents with both a geocoded event location and a usable event timestamp. Incidents lacking enough evidence are excluded from that ranking rather than guessed.</div>
@@ -103,6 +111,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
   </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+<script src="/aviation-aspect-analysis.js"></script>
 <script>
 const A=window.Astronomy;
 const SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
@@ -128,6 +137,7 @@ document.getElementById('backfillBtn').onclick=()=>backfillHistorical(true);
 document.getElementById('prevMonthBtn').onclick=()=>shiftReportMonth(-1);
 document.getElementById('nextMonthBtn').onclick=()=>shiftReportMonth(1);
 document.getElementById('reportYear').onchange=e=>{reportYear=Number(e.target.value);renderMonthlyReport()};
+['aspectSystem','aspectIncidentType'].forEach(id=>document.getElementById(id).addEventListener('change',()=>window.renderAviationAspectComparison()));
 document.querySelectorAll('.dataset th[data-sort]').forEach(th=>th.onclick=()=>{
   const key=th.dataset.sort;
   datasetSort={key,dir:datasetSort.key===key&&datasetSort.dir==='asc'?'desc':'asc'};
@@ -366,6 +376,7 @@ function calculateAstro(date){
   const moonAspects=aspectBodies.map(p=>aspectRecord(p,lon[p],lon.Moon)).filter(x=>x.major);
   const mercuryAspects=mercuryBodies.map(p=>aspectRecord(p,lon[p],lon.Mercury)).filter(x=>x.major);
   return{
+    PlanetLongitudes:lon,
     Moon:positionRecord(lon.Moon),
     Mercury:{...positionRecord(lon.Mercury),moonRelation:relationRecord(lon.Moon,lon.Mercury)},
     Mars:relationRecord(lon.Moon,lon.Mars),
@@ -395,6 +406,7 @@ function majorAspect(sep){
 }
 function nearestAspect(sep){const a=majorAspect(sep);return a?a.name+' · orb '+a.orb.toFixed(1)+'°':'no major aspect · '+sep.toFixed(1)+'° apart'}
 function render(){
+  if(window.renderAviationAspectComparison)window.renderAviationAspectComparison();
   document.getElementById('incidentCount').textContent=incidents.length;renderPatternSummary();renderMonthlyReport();renderDatasetFilters();renderDataset();document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
 }
 function renderPatternSummary(){
