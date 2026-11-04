@@ -94,5 +94,41 @@ function render(records,onChanged){
  };
 }
 function escapeHtml(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-window.aviationDedup={process,render,read};
+
+/* Analytical event identity: separate reported articles from counted events.
+   Never automatically merge merely on city, date, headline, or aircraft class. */
+function dateDistance(a,b){
+ const x=Date.parse(day(a)+'T00:00:00Z'),y=Date.parse(day(b)+'T00:00:00Z');
+ return Number.isFinite(x)&&Number.isFinite(y)?Math.abs(x-y)/86400000:Infinity;
+}
+function eventIdentityMatch(a,b){
+ if(dateDistance(a,b)>3)return false;
+ const ar=registration(a),br=registration(b),af=flight(a),bf=flight(b);
+ if(ar&&br&&ar!==br)return false;
+ if(af&&bf&&af!==bf)return false;
+ if(ar&&br&&ar===br)return true;
+ if(af&&bf&&af===bf){
+   const al=norm(a.locationText||a.geo?.displayName),bl=norm(b.locationText||b.geo?.displayName);
+   return !!(al&&bl&&al===bl);
+ }
+ return false;
+}
+function eventGroups(records){
+ const groups=[];
+ const ordered=[...records].sort((a,b)=>String(a.publishedAt||a.eventAt).localeCompare(String(b.publishedAt||b.eventAt)));
+ for(const r of ordered){
+   let group=groups.find(g=>g.articles.some(other=>eventIdentityMatch(r,other)));
+   if(!group){group={articles:[]};groups.push(group)}
+   group.articles.push(r);
+ }
+ return groups.map((g,i)=>{
+   const preferred=[...g.articles].sort((a,b)=>{
+     const score=r=>(r.timeConfidence==='reported'?3:r.timeConfidence==='inferred'?2:0)+(r.geo?.found?1:0);
+     return score(b)-score(a)||String(a.publishedAt||'').localeCompare(String(b.publishedAt||''));
+   })[0];
+   return {id:'event-'+i,record:preferred,articles:g.articles};
+ });
+}
+function countedEvents(records){return eventGroups(records).map(g=>g.record)}
+window.aviationDedup={process,render,read,eventGroups,countedEvents};
 })();
