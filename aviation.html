@@ -91,6 +91,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
   </section>
   <section class="panel">
     <div class="panel-head"><strong>INCIDENT DUPLICATE AUDIT</strong><span class="status">review before consolidating</span></div>
+    <div id="eventCountingSummary" class="note"></div>
     <div id="duplicateReview"></div>
     <div class="note">Articles are not automatically merged merely because they share a date or city. Strong matches on new reports are archived; historical possible duplicates require your confirmation. The archive and backup are stored in this browser, not a shared server database.</div>
   </section>
@@ -112,7 +113,7 @@ if(window.top===window.self && location.pathname!=='/dashboard.html'){
   <section class="panel">
     <div class="panel-head"><strong>RECORDED INCIDENTS</strong><span id="scanStatus" class="status">Starting…</span></div>
     <div id="incidentList" class="list"></div>
-    <div class="note">Incident time extraction is best-effort from the headline/description. When an explicit event time with a recognizable timezone is unavailable, the agent marks the record as a publication-time fallback. The astrology is a pattern-analysis layer and does not establish causation.</div>
+    <div class="note">The analytical count groups articles only when strong event identifiers agree. Unresolved duplicates may remain; records with publication-time fallback are not verified event timestamps. Incident time extraction is best-effort from the headline/description. When an explicit event time with a recognizable timezone is unavailable, the agent marks the record as a publication-time fallback. The astrology is a pattern-analysis layer and does not establish causation.</div>
   </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
@@ -130,6 +131,7 @@ const BACKFILL_START='2026-01-01';
 const BACKFILL_END='2026-09-24';
 const BACKFILL_MARK='aviation-backfill-2026-01-01-09-24-v2';
 let incidents=loadIncidents();
+let countedIncidents=[];
 let lastScanAt=Number(localStorage.getItem('aviation-agent-last-scan')||0);
 let nextScanAt=Date.now()+SCAN_MS;
 let scanning=false;
@@ -414,16 +416,19 @@ function majorAspect(sep){
 }
 function nearestAspect(sep){const a=majorAspect(sep);return a?a.name+' · orb '+a.orb.toFixed(1)+'°':'no major aspect · '+sep.toFixed(1)+'° apart'}
 function render(){
+  countedIncidents=window.aviationDedup?window.aviationDedup.countedEvents(incidents):incidents;
+  const summary=document.getElementById('eventCountingSummary');
+  if(summary)summary.textContent=incidents.length+' source articles · '+countedIncidents.length+' conservatively identified events · '+(incidents.length-countedIncidents.length)+' additional reports grouped. Counts remain provisional where event identifiers or occurrence times are missing.';
   if(window.aviationDedup)window.aviationDedup.render(incidents,()=>{saveIncidents();render()});
   if(window.renderAviationAspectComparison)window.renderAviationAspectComparison();
-  document.getElementById('incidentCount').textContent=incidents.length;renderPatternSummary();renderMonthlyReport();renderDatasetFilters();renderDataset();document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
+  document.getElementById('incidentCount').textContent=countedIncidents.length;renderPatternSummary();renderMonthlyReport();renderDatasetFilters();renderDataset();document.getElementById('lastScan').textContent=lastScanAt?new Date(lastScanAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';document.getElementById('exactCount').textContent=incidents.filter(x=>x.timeConfidence!=='fallback').length;document.getElementById('meanSample').textContent=incidents.length;renderMean();renderList();updateCountdown();
 }
 function renderPatternSummary(){
   const el=document.getElementById('patternSummary');if(!el)return;
-  if(!incidents.length){el.innerHTML='<div class="focus-card"><small>Geography</small><b>—</b><p>No incidents recorded yet.</p></div>';return}
+  if(!countedIncidents.length){el.innerHTML='<div class="focus-card"><small>Geography</small><b>—</b><p>No countedIncidents recorded yet.</p></div>';return}
   const regions=new Map(),asc=new Map(),aircraft=new Map(),severity=new Map();
   let geoN=0,ascN=0;
-  incidents.forEach(r=>{
+  countedIncidents.forEach(r=>{
     if(r.region&&r.region!=='Unknown'){regions.set(r.region,(regions.get(r.region)||0)+1);geoN++}
     if(r.ascendant&&Number.isFinite(r.ascendant.sign)){const s=SIGNS[r.ascendant.sign];asc.set(s,(asc.get(s)||0)+1);ascN++}
     const at=r.aircraftType||'Unspecified aircraft';aircraft.set(at,(aircraft.get(at)||0)+1);
@@ -433,10 +438,10 @@ function renderPatternSummary(){
   const topAsc=[...asc.entries()].sort((a,b)=>b[1]-a[1])[0];
   const topAircraft=[...aircraft.entries()].sort((a,b)=>b[1]-a[1])[0];
   const topSeverity=[...severity.entries()].sort((a,b)=>b[1]-a[1])[0];
-  const topMoon=topFrequency(incidents.map(r=>r.astro?.Moon?.sign).filter(Number.isFinite).map(i=>SIGNS[i]));
-  const topMercurySign=topFrequency(incidents.map(r=>r.astro?.Mercury?.sign).filter(Number.isFinite).map(i=>SIGNS[i]));
-  const topMoonNak=topFrequency(incidents.map(r=>r.astro?.Moon?.nakshatraName).filter(Boolean));
-  const topMercuryNak=topFrequency(incidents.map(r=>r.astro?.Mercury?.nakshatraName).filter(Boolean));
+  const topMoon=topFrequency(countedIncidents.map(r=>r.astro?.Moon?.sign).filter(Number.isFinite).map(i=>SIGNS[i]));
+  const topMercurySign=topFrequency(countedIncidents.map(r=>r.astro?.Mercury?.sign).filter(Number.isFinite).map(i=>SIGNS[i]));
+  const topMoonNak=topFrequency(countedIncidents.map(r=>r.astro?.Moon?.nakshatraName).filter(Boolean));
+  const topMercuryNak=topFrequency(countedIncidents.map(r=>r.astro?.Mercury?.nakshatraName).filter(Boolean));
   const moonAspectStats=topAspectSignature('MoonAspects');
   const mercuryAspectStats=topAspectSignature('MercuryAspects');
   const moonMarsStats=vedicAspectFrequency('MoonMars','Mars');
@@ -444,20 +449,20 @@ function renderPatternSummary(){
   const moonUranusStats=aspectFrequencyForPlanet('MoonAspects','Uranus');
   const moonPlutoStats=aspectFrequencyForPlanet('MoonAspects','Pluto');
   el.innerHTML=
-    patternCard('Majority region',topRegion?topRegion[0]:'Insufficient geocoded data',topRegion?topRegion[1]+' of '+geoN+' geocoded incidents':'0 geocoded incidents')+
+    patternCard('Majority region',topRegion?topRegion[0]:'Insufficient geocoded data',topRegion?topRegion[1]+' of '+geoN+' geocoded countedIncidents':'0 geocoded countedIncidents')+
     patternCard('Most frequent Ascendant',topAsc?topAsc[0]:'Insufficient timed/geocoded data',topAsc?topAsc[1]+' of '+ascN+' usable local charts':'0 usable local charts')+
     patternCard('Most frequent Moon sign',topMoon?topMoon.value:'—',topMoon?topMoon.count+' of '+topMoon.total+' · '+topMoon.rate.toFixed(1)+'%':'No sample')+
     patternCard('Most frequent Moon nakshatra',topMoonNak?topMoonNak.value:'—',topMoonNak?topMoonNak.count+' of '+topMoonNak.total+' · '+topMoonNak.rate.toFixed(1)+'%':'No sample')+
     patternCard('Most frequent Mercury sign',topMercurySign?topMercurySign.value:'—',topMercurySign?topMercurySign.count+' of '+topMercurySign.total+' · '+topMercurySign.rate.toFixed(1)+'%':'No sample')+
     patternCard('Most frequent Mercury nakshatra',topMercuryNak?topMercuryNak.value:'—',topMercuryNak?topMercuryNak.count+' of '+topMercuryNak.total+' · '+topMercuryNak.rate.toFixed(1)+'%':'No sample')+
-    patternCard('Most common aspect to Moon',moonAspectStats?moonAspectStats.label:'No major aspect pattern',moonAspectStats?moonAspectStats.count+' occurrences · '+moonAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
-    patternCard('Mars → Moon · Jyotish drishti',moonMarsStats?moonMarsStats.label:'No Mars drishti within 8° orb',moonMarsStats?moonMarsStats.count+' occurrences · '+moonMarsStats.rate.toFixed(1)+'% of incidents':'No sample')+
-    patternCard('Rahu → Moon · Jyotish drishti',moonRahuStats?moonRahuStats.label:'No Rahu drishti within 8° orb',moonRahuStats?moonRahuStats.count+' occurrences · '+moonRahuStats.rate.toFixed(1)+'% of incidents':'No sample')+
-    patternCard('Moon ↔ Uranus',moonUranusStats?moonUranusStats.label:'No major Uranus aspect',moonUranusStats?moonUranusStats.count+' occurrences · '+moonUranusStats.rate.toFixed(1)+'% of incidents':'No sample')+
-    patternCard('Moon ↔ Pluto',moonPlutoStats?moonPlutoStats.label:'No major Pluto aspect',moonPlutoStats?moonPlutoStats.count+' occurrences · '+moonPlutoStats.rate.toFixed(1)+'% of incidents':'No sample')+
-    patternCard('Most common aspect to Mercury',mercuryAspectStats?mercuryAspectStats.label:'No major aspect pattern',mercuryAspectStats?mercuryAspectStats.count+' occurrences · '+mercuryAspectStats.rate.toFixed(1)+'% of incidents':'No sample')+
-    patternCard('Most incident-prone aircraft type',topAircraft?topAircraft[0]:'—',topAircraft?topAircraft[1]+' of '+incidents.length+' classified records':'No sample')+
-    patternCard('Most common severity',topSeverity?topSeverity[0]:'—',topSeverity?topSeverity[1]+' of '+incidents.length+' records':'No sample');
+    patternCard('Most common aspect to Moon',moonAspectStats?moonAspectStats.label:'No major aspect pattern',moonAspectStats?moonAspectStats.count+' occurrences · '+moonAspectStats.rate.toFixed(1)+'% of countedIncidents':'No sample')+
+    patternCard('Mars → Moon · Jyotish drishti',moonMarsStats?moonMarsStats.label:'No Mars drishti within 8° orb',moonMarsStats?moonMarsStats.count+' occurrences · '+moonMarsStats.rate.toFixed(1)+'% of countedIncidents':'No sample')+
+    patternCard('Rahu → Moon · Jyotish drishti',moonRahuStats?moonRahuStats.label:'No Rahu drishti within 8° orb',moonRahuStats?moonRahuStats.count+' occurrences · '+moonRahuStats.rate.toFixed(1)+'% of countedIncidents':'No sample')+
+    patternCard('Moon ↔ Uranus',moonUranusStats?moonUranusStats.label:'No major Uranus aspect',moonUranusStats?moonUranusStats.count+' occurrences · '+moonUranusStats.rate.toFixed(1)+'% of countedIncidents':'No sample')+
+    patternCard('Moon ↔ Pluto',moonPlutoStats?moonPlutoStats.label:'No major Pluto aspect',moonPlutoStats?moonPlutoStats.count+' occurrences · '+moonPlutoStats.rate.toFixed(1)+'% of countedIncidents':'No sample')+
+    patternCard('Most common aspect to Mercury',mercuryAspectStats?mercuryAspectStats.label:'No major aspect pattern',mercuryAspectStats?mercuryAspectStats.count+' occurrences · '+mercuryAspectStats.rate.toFixed(1)+'% of countedIncidents':'No sample')+
+    patternCard('Most incident-prone aircraft type',topAircraft?topAircraft[0]:'—',topAircraft?topAircraft[1]+' of '+countedIncidents.length+' classified records':'No sample')+
+    patternCard('Most common severity',topSeverity?topSeverity[0]:'—',topSeverity?topSeverity[1]+' of '+countedIncidents.length+' records':'No sample');
 }
 function topFrequency(values){
   if(!values.length)return null;
@@ -467,30 +472,30 @@ function topFrequency(values){
 }
 function topAspectSignature(field){
   const counts=new Map();
-  incidents.forEach(r=>(r.astro?.[field]||[]).forEach(a=>{
+  countedIncidents.forEach(r=>(r.astro?.[field]||[]).forEach(a=>{
     if(!a?.major)return;
     const key=a.planet+' '+a.aspect;
     counts.set(key,(counts.get(key)||0)+1);
   }));
   const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
-  return top?{label:top[0],count:top[1],rate:(top[1]/Math.max(1,incidents.length))*100}:null;
+  return top?{label:top[0],count:top[1],rate:(top[1]/Math.max(1,countedIncidents.length))*100}:null;
 }
 function aspectFrequencyForPlanet(field,planet){
   const counts=new Map();
-  incidents.forEach(r=>(r.astro?.[field]||[]).forEach(a=>{
+  countedIncidents.forEach(r=>(r.astro?.[field]||[]).forEach(a=>{
     if(a?.major&&a.planet===planet)counts.set(a.aspect,(counts.get(a.aspect)||0)+1);
   }));
   const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
-  return top?{label:planet+' '+top[0]+' Moon',count:top[1],rate:(top[1]/Math.max(1,incidents.length))*100}:null;
+  return top?{label:planet+' '+top[0]+' Moon',count:top[1],rate:(top[1]/Math.max(1,countedIncidents.length))*100}:null;
 }
 function vedicAspectFrequency(field,planet){
   const counts=new Map();
-  incidents.forEach(r=>{
+  countedIncidents.forEach(r=>{
     const a=r.astro?.[field];
     if(a?.major)counts.set(a.aspect,(counts.get(a.aspect)||0)+1);
   });
   const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0];
-  return top?{label:planet+' '+top[0]+' Moon',count:top[1],rate:(top[1]/Math.max(1,incidents.length))*100}:null;
+  return top?{label:planet+' '+top[0]+' Moon',count:top[1],rate:(top[1]/Math.max(1,countedIncidents.length))*100}:null;
 }
 function patternCard(label,value,note){return '<div class="focus-card"><small>'+esc(label)+'</small><b>'+esc(value)+'</b><p>'+esc(note)+'</p></div>'}
 
@@ -532,7 +537,7 @@ function renderMonthlyReport(){
   grid.innerHTML=months.map((m,i)=>'<button type="button" class="month-chip '+(i===reportMonth?'active':'')+'" data-report-month="'+i+'">'+m+'</button>').join('');
   grid.querySelectorAll('[data-report-month]').forEach(b=>b.onclick=()=>{reportMonth=Number(b.dataset.reportMonth);renderMonthlyReport()});
 
-  const monthIncidents=incidents.filter(r=>{
+  const monthIncidents=countedIncidents.filter(r=>{
     const d=new Date(r.eventAt);
     return d.getUTCFullYear()===reportYear&&d.getUTCMonth()===reportMonth;
   });
@@ -557,13 +562,13 @@ function renderMonthlyReport(){
   const future=reportYear>now.getUTCFullYear()||(reportYear===now.getUTCFullYear()&&reportMonth>now.getUTCMonth());
   const monthLabel=new Date(Date.UTC(reportYear,reportMonth,1)).toLocaleString('en-US',{month:'long',year:'numeric',timeZone:'UTC'});
 
-  document.getElementById('monthlyStatus').textContent=monthLabel+(future?' · future Moon transit calendar':' · '+monthIncidents.length+' recorded incidents');
+  document.getElementById('monthlyStatus').textContent=monthLabel+(future?' · future Moon transit calendar':' · '+monthIncidents.length+' recorded countedIncidents');
   document.getElementById('monthlySummary').innerHTML=
-    patternCard('Month',monthLabel,monthIncidents.length+' recorded aviation incidents')+
-    patternCard('Most incidents · Moon sign',topSign?topSign.value:'No recorded incidents',topSign?topSign.count+' incident'+(topSign.count===1?'':'s')+' · '+topSign.rate.toFixed(1)+'%':'No Moon-sign count yet')+
-    patternCard('Least incidents · Moon sign',lowSign?lowSign.value:'No recorded incidents',lowSign?lowSign.count+' incident'+(lowSign.count===1?'':'s')+' · '+lowSign.rate.toFixed(1)+'%':'No Moon-sign count yet')+
-    patternCard('Most incidents · Moon nakshatra',topNak?topNak.value:'No recorded incidents',topNak?topNak.count+' incident'+(topNak.count===1?'':'s')+' · '+topNak.rate.toFixed(1)+'%':'No nakshatra count yet')+
-    patternCard('Least incidents · Moon nakshatra',lowNak?lowNak.value:'No recorded incidents',lowNak?lowNak.count+' incident'+(lowNak.count===1?'':'s')+' · '+lowNak.rate.toFixed(1)+'%':'No nakshatra count yet');
+    patternCard('Month',monthLabel,monthIncidents.length+' recorded aviation countedIncidents')+
+    patternCard('Most countedIncidents · Moon sign',topSign?topSign.value:'No recorded countedIncidents',topSign?topSign.count+' incident'+(topSign.count===1?'':'s')+' · '+topSign.rate.toFixed(1)+'%':'No Moon-sign count yet')+
+    patternCard('Least countedIncidents · Moon sign',lowSign?lowSign.value:'No recorded countedIncidents',lowSign?lowSign.count+' incident'+(lowSign.count===1?'':'s')+' · '+lowSign.rate.toFixed(1)+'%':'No Moon-sign count yet')+
+    patternCard('Most countedIncidents · Moon nakshatra',topNak?topNak.value:'No recorded countedIncidents',topNak?topNak.count+' incident'+(topNak.count===1?'':'s')+' · '+topNak.rate.toFixed(1)+'%':'No nakshatra count yet')+
+    patternCard('Least countedIncidents · Moon nakshatra',lowNak?lowNak.value:'No recorded countedIncidents',lowNak?lowNak.count+' incident'+(lowNak.count===1?'':'s')+' · '+lowNak.rate.toFixed(1)+'%':'No nakshatra count yet');
 
   const tg=document.getElementById('tithiGrid');
   tg.innerHTML=
@@ -581,7 +586,7 @@ function rankCount(map,mode){
 }
 function formatCountList(map){
   const arr=[...map.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
-  return arr.length?arr.map(([k,v])=>k+' '+v).join(' · '):'No recorded incidents';
+  return arr.length?arr.map(([k,v])=>k+' '+v).join(' · '):'No recorded countedIncidents';
 }
 
 function renderFutureMoonCalendar(isFuture,monthLabel){
@@ -604,14 +609,14 @@ function renderDatasetFilters(){
     el.innerHTML='<option value="all">'+label+'</option>'+[...new Set(values.filter(Boolean))].sort().map(v=>'<option value="'+escAttr(v)+'">'+esc(v)+'</option>').join('');
     if([...el.options].some(o=>o.value===current))el.value=current;
   };
-  setOptions('filterAircraft',incidents.map(r=>r.aircraftType),'All aircraft types');
-  setOptions('filterRegion',incidents.map(r=>r.region),'All regions');
-  setOptions('filterAsc',incidents.map(r=>r.ascendant?SIGNS[r.ascendant.sign]:''),'All Ascendants');
-  setOptions('filterMoon',incidents.map(r=>r.astro?.Moon?SIGNS[r.astro.Moon.sign]:''),'All Moon signs');
+  setOptions('filterAircraft',countedIncidents.map(r=>r.aircraftType),'All aircraft types');
+  setOptions('filterRegion',countedIncidents.map(r=>r.region),'All regions');
+  setOptions('filterAsc',countedIncidents.map(r=>r.ascendant?SIGNS[r.ascendant.sign]:''),'All Ascendants');
+  setOptions('filterMoon',countedIncidents.map(r=>r.astro?.Moon?SIGNS[r.astro.Moon.sign]:''),'All Moon signs');
 }
 function filteredDataset(){
   const sev=document.getElementById('filterSeverity').value,air=document.getElementById('filterAircraft').value,region=document.getElementById('filterRegion').value,asc=document.getElementById('filterAsc').value,moon=document.getElementById('filterMoon').value,conf=document.getElementById('filterConfidence').value;
-  return incidents.filter(r=>(sev==='all'||r.severity===sev)&&(air==='all'||r.aircraftType===air)&&(region==='all'||r.region===region)&&(asc==='all'||(r.ascendant&&SIGNS[r.ascendant.sign]===asc))&&(moon==='all'||(r.astro?.Moon&&SIGNS[r.astro.Moon.sign]===moon))&&(conf==='all'||r.timeConfidence===conf));
+  return countedIncidents.filter(r=>(sev==='all'||r.severity===sev)&&(air==='all'||r.aircraftType===air)&&(region==='all'||r.region===region)&&(asc==='all'||(r.ascendant&&SIGNS[r.ascendant.sign]===asc))&&(moon==='all'||(r.astro?.Moon&&SIGNS[r.astro.Moon.sign]===moon))&&(conf==='all'||r.timeConfidence===conf));
 }
 function renderDataset(){
   const body=document.getElementById('datasetBody');if(!body)return;
@@ -626,7 +631,7 @@ function renderDataset(){
     if(key==='eventAt'){av=new Date(av).getTime()||0;bv=new Date(bv).getTime()||0}
     return (av>bv?1:av<bv?-1:0)*(dir==='asc'?1:-1);
   });
-  document.getElementById('datasetCount').textContent=rows.length+' of '+incidents.length+' records';
+  document.getElementById('datasetCount').textContent=rows.length+' of '+countedIncidents.length+' records';
   body.innerHTML=rows.slice(0,500).map(r=>'<tr>'+
     '<td>'+esc(new Date(r.eventAt).toLocaleString())+'</td>'+
     '<td class="sev-'+String(r.severity||'low').toLowerCase()+'">'+esc(r.severity||'—')+'</td>'+
@@ -646,7 +651,7 @@ function renderDataset(){
 }
 
 function renderMean(){
-  const valid=incidents.filter(r=>r.astro?.Moon&&Number.isFinite(r.astro.Moon.sign)&&r.astro.Moon.nakshatraName);
+  const valid=countedIncidents.filter(r=>r.astro?.Moon&&Number.isFinite(r.astro.Moon.sign)&&r.astro.Moon.nakshatraName);
   document.getElementById('meanSample').textContent=valid.length;
 
   if(!valid.length){
@@ -687,26 +692,26 @@ function renderMean(){
   document.getElementById('meanMoonMercury').textContent=mostNak?mostNak.value:'—';
   document.getElementById('leastMoonNak').textContent=leastNak?leastNak.value:'—';
 
-  document.getElementById('meanMoonNote').textContent=mostSign?mostSign.count+' incidents · '+mostSign.rate.toFixed(1)+'% of Moon-sign sample':'—';
-  document.getElementById('meanMercuryNote').textContent=leastSign?leastSign.count+' incidents · '+leastSign.rate.toFixed(1)+'% of Moon-sign sample':'—';
-  document.getElementById('meanMoonMercuryNote').textContent=mostNak?mostNak.count+' incidents · '+mostNak.rate.toFixed(1)+'% of nakshatra sample':'—';
-  document.getElementById('leastMoonNakNote').textContent=leastNak?leastNak.count+' incidents · '+leastNak.rate.toFixed(1)+'% of nakshatra sample':'—';
+  document.getElementById('meanMoonNote').textContent=mostSign?mostSign.count+' countedIncidents · '+mostSign.rate.toFixed(1)+'% of Moon-sign sample':'—';
+  document.getElementById('meanMercuryNote').textContent=leastSign?leastSign.count+' countedIncidents · '+leastSign.rate.toFixed(1)+'% of Moon-sign sample':'—';
+  document.getElementById('meanMoonMercuryNote').textContent=mostNak?mostNak.count+' countedIncidents · '+mostNak.rate.toFixed(1)+'% of nakshatra sample':'—';
+  document.getElementById('leastMoonNakNote').textContent=leastNak?leastNak.count+' countedIncidents · '+leastNak.rate.toFixed(1)+'% of nakshatra sample':'—';
 
   document.getElementById('highMarsAspect').textContent=highMars?highMars.label:'No major Mars drishti';
   document.getElementById('lowMarsAspect').textContent=lowMars?lowMars.label:'No major Mars drishti';
   document.getElementById('highMarsAspectNote').textContent=highMars
-    ? highMars.count+' of '+highSignRecords.length+' incidents in '+mostSign.value+' · '+highMars.rate.toFixed(1)+'%'
-    : (mostSign?mostSign.value+' · '+highSignRecords.length+' incidents · no major Mars→Moon drishti within 8° orb':'No sample');
+    ? highMars.count+' of '+highSignRecords.length+' countedIncidents in '+mostSign.value+' · '+highMars.rate.toFixed(1)+'%'
+    : (mostSign?mostSign.value+' · '+highSignRecords.length+' countedIncidents · no major Mars→Moon drishti within 8° orb':'No sample');
   document.getElementById('lowMarsAspectNote').textContent=lowMars
-    ? lowMars.count+' of '+lowSignRecords.length+' incidents in '+leastSign.value+' · '+lowMars.rate.toFixed(1)+'%'
-    : (leastSign?leastSign.value+' · '+lowSignRecords.length+' incidents · no major Mars→Moon drishti within 8° orb':'No sample');
+    ? lowMars.count+' of '+lowSignRecords.length+' countedIncidents in '+leastSign.value+' · '+lowMars.rate.toFixed(1)+'%'
+    : (leastSign?leastSign.value+' · '+lowSignRecords.length+' countedIncidents · no major Mars→Moon drishti within 8° orb':'No sample');
 
   const months=new Set(valid.map(r=>{
     const d=new Date(r.eventAt);
     return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
   }));
   document.getElementById('meanStatus').textContent=
-    valid.length+' incidents · '+months.size+' recorded month'+(months.size===1?'':'s');
+    valid.length+' countedIncidents · '+months.size+' recorded month'+(months.size===1?'':'s');
 
   renderMoonRankCharts(signCounts,nakCounts);
 }
